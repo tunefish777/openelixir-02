@@ -1,0 +1,67 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  # Arm GNU Toolchain used for the build. The ITCM is nearly full, so the
+  # compiler version matters: change all three values together.
+  # Releases: https://gitlab.arm.com/tooling/gnu-toolchains-for-arm (branch releases/<version>)
+  TOOLCHAIN_VERSION: 15.3.rel2
+  TOOLCHAIN_URL: https://gitlab.arm.com/api/v4/projects/tooling%2Fgnu-toolchains-for-arm/packages/generic/gnu-toolchain/15.3.rel2/arm-gnu-toolchain-15.3.rel2-x86_64-arm-none-eabi.tar.xz
+  TOOLCHAIN_SHA256: 463df9665c246fa13bab2102115bbf83440661b6eb70b44f3dfd4712ca30037a
+
+jobs:
+  firmware:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+
+      - name: Cache toolchain
+        id: toolchain-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/arm-toolchain
+          key: arm-gnu-toolchain-${{ env.TOOLCHAIN_SHA256 }}
+
+      - name: Download toolchain
+        if: steps.toolchain-cache.outputs.cache-hit != 'true'
+        run: |
+          curl -sSL -o toolchain.tar.xz "$TOOLCHAIN_URL"
+          echo "$TOOLCHAIN_SHA256  toolchain.tar.xz" | sha256sum -c -
+          mkdir -p ~/arm-toolchain
+          tar xf toolchain.tar.xz -C ~/arm-toolchain --strip-components=1
+          rm toolchain.tar.xz
+
+      - name: Configure
+        run: cmake --preset release -DARM_TOOLCHAIN_DIR=$HOME/arm-toolchain/bin
+
+      - name: Build
+        run: cmake --build --preset release
+
+      - name: Memory usage summary
+        run: |
+          {
+            echo '## Memory usage'
+            echo '```'
+            python3 cmake/tools/memreport.py build/release/OpenElixir-02.elf \
+              --baseline memory_baseline.json --top 15 --no-history
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenElixir-02-${{ github.sha }}
+          path: |
+            build/release/*.img
+            build/release/*.elf
+            build/release/*.bin
+            build/release/*.hex
+            build/release/*.map
+          if-no-files-found: error

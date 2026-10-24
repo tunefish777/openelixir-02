@@ -1,5 +1,7 @@
 # OpenElixir-02
 
+[![Build](https://github.com/tunefish777/lxr-desktop-app/actions/workflows/build.yml/badge.svg)](https://github.com/tunefish777/lxr-desktop-app/actions/workflows/build.yml)
+
 Custom firmware for the Erica Synths LXR-02 drum machine. It is based on the open-source
 [LXR V2 firmware](https://github.com/erica-synths/lxr-desktop-app) by Erica Synths.
 
@@ -34,6 +36,10 @@ cmake --build --preset release
 This creates `build/release/LXR_OpenElixir-02_V<version>.img`. Copy it to the SD card and install it
 with the LXR-02's built-in updater (hold the encoder while switching on). The `LXR` prefix in the file
 name is required by the updater.
+
+Every push is also built on GitHub Actions: the firmware files are attached to each run in the
+[Actions tab](https://github.com/tunefish777/lxr-desktop-app/actions/workflows/build.yml), and the run
+summary shows the memory usage compared with the stock firmware.
 
 Requirements, build options, the memory map, troubleshooting and development details are in the
 original firmware's README: **[README_LXR.md](README_LXR.md)**.
