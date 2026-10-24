@@ -35,12 +35,18 @@
 
 
 uint8_t display_refresh_state = 0;
+#if CPU_METER
+static uint8_t menu_cpuMeterShown = 0;		//CPU meter page: 0 off, 1 load, 2 sections (development builds)
+static uint32_t menu_cpuMeterTimer = 0;
+#endif
 uint8_t display_needs_refresh = 0;
 uint8_t display_needs_clear_all = 0;
 uint8_t saveScreenPots[4]; //hold absolute pot position for save page name editing
 
 
 #include "Soundengine/DSPAudio/modulationNode.h"
+#include "Soundengine/CpuMeter.h"
+#include <stdio.h>
 
 // uppercase 3 letters in buf
 static void upr_three(char *buf);
@@ -984,6 +990,14 @@ uint8_t sendDisplayBuffer()
 //-----------------------------------------------------------------
 void menu_tick()
 {
+#if CPU_METER
+	//refresh the CPU load page 4 times per second
+	if(menu_cpuMeterShown && (display_refresh_state == 0) && (systick_ticks - menu_cpuMeterTimer > 250))
+	{
+		menu_cpuMeterTimer = systick_ticks;
+		menu_repaint();
+	}
+#endif
 
 	if((menu_activePage == PATTERN_SAVE_PAGE_OK) || (menu_activePage == KIT_SAVE_PAGE_OK))
 	{
@@ -1038,6 +1052,42 @@ void menu_repaintAll()
 		//menu_repaint();
 	}		
 }
+#if CPU_METER
+void menu_toggleCpuMeter()
+{
+	menu_cpuMeterShown = (menu_cpuMeterShown + 1) % 3;
+	cpuMeter_resetPeaks();
+	menu_repaintAll();
+}
+
+#define CPU_METER_MIN(a,b) (((a)<(b))?(a):(b))
+
+static void menu_repaintCpuMeter()
+{
+	//load in percent of one audio block, clamped so that each line fits 16 characters
+	const uint32_t block = cpuMeter_blockCycles();
+	if(menu_cpuMeterShown == 2)
+	{
+		//peak per section: drum voices 1-3, snare, cymbal, hi-hat, FX bus, rest of the mixer
+		unsigned pk[CPU_NUM_SECTIONS];
+		for(uint8_t i=0;i<CPU_NUM_SECTIONS;i++)
+		{
+			pk[i] = CPU_METER_MIN(cpuMeter.sectionPeak[i] * 100 / block, 99u);
+		}
+		snprintf(&editDisplayBuffer[0][0], 17, "D%2u %2u %2u S%2u   ", pk[0], pk[1], pk[2], pk[3]);
+		snprintf(&editDisplayBuffer[1][0], 17, "C%2u H%2u fx%2u o%2u", pk[4], pk[5], pk[CPU_SECTION_FX], pk[CPU_SECTION_OTHER]);
+		return;
+	}
+	const unsigned dsp = CPU_METER_MIN(cpuMeter.dspLast * 100 / block, 999u);
+	const unsigned dspPeak = CPU_METER_MIN(cpuMeter.dspPeak * 100 / block, 999u);
+	const unsigned allPeak = CPU_METER_MIN(cpuMeter.busyPeak * 100 / block, 999u);
+	const unsigned underruns = CPU_METER_MIN(cpuMeter_underruns(), 9u);
+	const unsigned stress = cpuMeter.stressFm % 10;
+
+	snprintf(&editDisplayBuffer[0][0], 17, "dsp%3u%% pk%3u%%  ", dsp, dspPeak);
+	snprintf(&editDisplayBuffer[1][0], 17, "all pk%3u%% u%u +%u", allPeak, underruns, stress);
+}
+#endif
 //-----------------------------------------------------------------
 static void menu_repaintSimplePage()
 {
@@ -1811,6 +1861,14 @@ void menu_repaintGeneric()
 void menu_repaint()
 {
 	if(screensaver_Active) return;
+#if CPU_METER
+	if(menu_cpuMeterShown)
+	{
+		menu_repaintCpuMeter();
+		display_needs_refresh = 1;
+		return;
+	}
+#endif
 
 	visibleCursor = 0;
 	if(menu_activePage == LOAD_PAGE || menu_activePage==SAVE_PAGE)

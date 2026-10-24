@@ -26,6 +26,7 @@
 #include "Soundengine/Sequencer/sequencer.h"
 #include "Preset/PresetManager.h"
 #include "Soundengine/FxBus.h"
+#include "Soundengine/CpuMeter.h"
 
 //used to remember the last active page when entering the sequencer mode
 //needed to return to the previously shown page when seq mode button is released
@@ -843,8 +844,14 @@ static void buttonHandler_seqButtonPressed(uint8_t seqButtonPressed)
 			break;
 
 		case SEQ_KIT: //kit
-		case SEQ_MORPH: //morph
+			break;
 
+		case SEQ_MORPH: //morph
+#if CPU_METER
+			//development builds: simulate more FM voices (0..4), restart the peak measurement
+			cpuMeter.stressFm = (cpuMeter.stressFm + 1) % (CPU_METER_MAX_STRESS + 1);
+			cpuMeter_resetPeaks();
+#endif
 			break;
 
 		case SEQ_FX:
@@ -873,7 +880,10 @@ static void buttonHandler_seqButtonPressed(uint8_t seqButtonPressed)
 
 			break;
 		case SEQ_PROJECT: //Performance
-
+#if CPU_METER
+			//development builds: show/hide the CPU load page
+			menu_toggleCpuMeter();
+#endif
 			break;
 
 		case SEQ_RELOAD:

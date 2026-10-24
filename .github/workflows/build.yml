@@ -21,6 +21,17 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write  # for publishing releases on tags
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # the normal firmware (the only one that is released)
+          - variant: release
+            cmake_args: ""
+          # development build with the CPU load meter, built so that it keeps compiling
+          - variant: cpumeter
+            cmake_args: -DLXR_CPU_METER=ON
+    name: firmware (${{ matrix.variant }})
     steps:
       - uses: actions/checkout@v4
 
@@ -44,17 +55,17 @@ jobs:
           rm toolchain.tar.xz
 
       - name: Configure
-        run: cmake --preset release -DARM_TOOLCHAIN_DIR=$HOME/arm-toolchain/bin
+        run: cmake --preset release -B build/${{ matrix.variant }} -DARM_TOOLCHAIN_DIR=$HOME/arm-toolchain/bin ${{ matrix.cmake_args }}
 
       - name: Build
-        run: cmake --build --preset release
+        run: cmake --build build/${{ matrix.variant }}
 
       - name: Memory usage summary
         run: |
           {
-            echo '## Memory usage'
+            echo '## Memory usage (${{ matrix.variant }})'
             echo '```'
-            python3 cmake/tools/memreport.py build/release/OpenElixir-02.elf \
+            python3 cmake/tools/memreport.py build/${{ matrix.variant }}/OpenElixir-02.elf \
               --baseline memory_baseline.json --top 15 --no-history
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
@@ -62,17 +73,17 @@ jobs:
       - name: Upload firmware
         uses: actions/upload-artifact@v4
         with:
-          name: OpenElixir-02-${{ github.sha }}
+          name: OpenElixir-02-${{ matrix.variant }}-${{ github.sha }}
           path: |
-            build/release/*.img
-            build/release/*.elf
-            build/release/*.bin
-            build/release/*.hex
-            build/release/*.map
+            build/${{ matrix.variant }}/*.img
+            build/${{ matrix.variant }}/*.elf
+            build/${{ matrix.variant }}/*.bin
+            build/${{ matrix.variant }}/*.hex
+            build/${{ matrix.variant }}/*.map
           if-no-files-found: error
 
       - name: Check release tag and notes
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: matrix.variant == 'release' && startsWith(github.ref, 'refs/tags/v')
         run: |
           version=$(sed -n 's/^ *VERSION \([0-9.]*\)$/\1/p' CMakeLists.txt)
           if [ "v$version" != "$GITHUB_REF_NAME" ]; then
@@ -82,7 +93,7 @@ jobs:
           test -f ".github/releases/$GITHUB_REF_NAME.md" || { echo "::error::Missing .github/releases/$GITHUB_REF_NAME.md"; exit 1; }
 
       - name: Publish release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: matrix.variant == 'release' && startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           name: OpenElixir-02 ${{ github.ref_name }}

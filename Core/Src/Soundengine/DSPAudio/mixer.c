@@ -24,6 +24,7 @@
 #include "Soundengine/TriggerOut.h"
 #include "menu/menu.h"
 #include "Soundengine/FxBus.h"
+#include "Soundengine/CpuMeter.h"
 
 	uint8_t r2_Available;
 	uint8_t l1_Available;
@@ -578,6 +579,9 @@ IN_ITCM_RAM void mixer_calcNextSampleBlock(int16_t* output,int16_t* output2)
 	int16_t fxBusData[OUTPUT_DMA_SIZE*2];
 
 	const uint8_t pos = 0;
+#if CPU_METER
+	uint32_t meterStart;
+#endif
 
 	//32-bit mix buffers, interleaved L/R like the DMA buffers (see mixer.h)
 	int32_t mix[OUTPUT_DMA_SIZE*2];
@@ -590,7 +594,13 @@ IN_ITCM_RAM void mixer_calcNextSampleBlock(int16_t* output,int16_t* output2)
 	bufferTool_clearBuffer(fxBusData,OUTPUT_DMA_SIZE*2);
 
 	//calc voice 1
+#if CPU_METER
+	meterStart = DWT->CYCCNT;
+#endif
 	calcDrumVoiceSyncBlock(0, sampleData,OUTPUT_DMA_SIZE);
+#if CPU_METER
+	cpuMeter_section(CPU_SECTION_VOICE1+0, meterStart);
+#endif
 	//decimate voice
 	mixer_decimateBlock(0,sampleData);
 	//copy to selected dma buffer
@@ -615,7 +625,13 @@ IN_ITCM_RAM void mixer_calcNextSampleBlock(int16_t* output,int16_t* output2)
 #if 1
 
 	//calc voice 2
+#if CPU_METER
+	meterStart = DWT->CYCCNT;
+#endif
 	calcDrumVoiceSyncBlock(1, sampleData,OUTPUT_DMA_SIZE);
+#if CPU_METER
+	cpuMeter_section(CPU_SECTION_VOICE1+1, meterStart);
+#endif
 	//decimate voice
 	mixer_decimateBlock(1,sampleData);
 	//copy to selected dma buffer
@@ -635,7 +651,13 @@ IN_ITCM_RAM void mixer_calcNextSampleBlock(int16_t* output,int16_t* output2)
 #endif
 #endif
 	//calc voice 3
+#if CPU_METER
+	meterStart = DWT->CYCCNT;
+#endif
 	calcDrumVoiceSyncBlock(2, sampleData,OUTPUT_DMA_SIZE);
+#if CPU_METER
+	cpuMeter_section(CPU_SECTION_VOICE1+2, meterStart);
+#endif
 	//decimate voice
 	mixer_decimateBlock(2,sampleData);
 	//copy to selected dma buffer
@@ -654,7 +676,13 @@ IN_ITCM_RAM void mixer_calcNextSampleBlock(int16_t* output,int16_t* output2)
 #endif
 #endif
 	//calc snare
+#if CPU_METER
+	meterStart = DWT->CYCCNT;
+#endif
 	Snare_calcSyncBlock(sampleData,OUTPUT_DMA_SIZE);
+#if CPU_METER
+	cpuMeter_section(CPU_SECTION_VOICE1+3, meterStart);
+#endif
 	//decimate voice
 	mixer_decimateBlock(3,sampleData);
 	//copy to selected dma buffer
@@ -669,7 +697,13 @@ IN_ITCM_RAM void mixer_calcNextSampleBlock(int16_t* output,int16_t* output2)
 #endif
 #endif
 	//calc cymbal
+#if CPU_METER
+	meterStart = DWT->CYCCNT;
+#endif
 	Cymbal_calcSyncBlock(sampleData,OUTPUT_DMA_SIZE);
+#if CPU_METER
+	cpuMeter_section(CPU_SECTION_VOICE1+4, meterStart);
+#endif
 	//decimate voice
 	mixer_decimateBlock(4,sampleData);
 	//copy to selected dma buffer
@@ -685,7 +719,13 @@ IN_ITCM_RAM void mixer_calcNextSampleBlock(int16_t* output,int16_t* output2)
 
 
 	//calc HiHat
+#if CPU_METER
+	meterStart = DWT->CYCCNT;
+#endif
 	HiHat_calcSyncBlock(sampleData,OUTPUT_DMA_SIZE);
+#if CPU_METER
+	cpuMeter_section(CPU_SECTION_VOICE1+5, meterStart);
+#endif
 	//decimate voice
 	mixer_decimateBlock(5,sampleData);
 	//copy to selected dma buffer
@@ -700,7 +740,21 @@ IN_ITCM_RAM void mixer_calcNextSampleBlock(int16_t* output,int16_t* output2)
 #endif
 
 #endif
+#if CPU_METER
+	//simulate kits with more FM voices: render the cymbal engine again (into the
+	//no longer needed sampleData). This also advances the cymbal state faster.
+	for(uint8_t i=0;i<cpuMeter.stressFm;i++)
+	{
+		Cymbal_calcSyncBlock(sampleData,OUTPUT_DMA_SIZE);
+	}
+#endif
+#if CPU_METER
+	meterStart = DWT->CYCCNT;
+#endif
 	FxBus_process(fxBusData,  &mix[pos],&mix[pos+1],&mix2[pos],&mix2[pos+1], OUTPUT_DMA_SIZE);
+#if CPU_METER
+	cpuMeter_section(CPU_SECTION_FX, meterStart);
+#endif
 
 	//bring the sums back into the 16-bit range of the DACs
 	mixer_limitBlock(&mixer_limiterGain[0], mix, output);

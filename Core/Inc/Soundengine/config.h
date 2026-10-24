@@ -34,6 +34,11 @@
 
 #define UART_DEBUG_ECHO_MODE 0
 
+//CPU load meter for development builds, set with cmake -DLXR_CPU_METER=ON (see CpuMeter.h)
+#ifndef CPU_METER
+#define CPU_METER 0
+#endif
+
 #if USE_BIG_SAMPLE_BUFFER
 #define OUTPUT_DMA_SIZE 64
 #else

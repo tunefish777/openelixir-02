@@ -25,6 +25,7 @@ Custom firmware for the Erica Synths LXR-02 drum machine. It is based on the ope
 | 0.1 | Voices and FX are summed in 32 bit, followed by a limiter on each output: loud kits no longer hard-clip. Levels that didn't clip before are unchanged. |
 | 0.1 | Memory usage report after every build, compared with the stock firmware. |
 | 0.1 | Renamed to OpenElixir-02: shown on the start-up screen and as the USB-MIDI device name. |
+| next | Development build option `-DLXR_CPU_METER=ON`: CPU load per voice and FX on the display. |
 
 ## Building and installing
 

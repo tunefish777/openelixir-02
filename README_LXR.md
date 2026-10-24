@@ -109,6 +109,7 @@ If the updater stops with one of these messages, switch the LXR off, fix the cau
 | `-DLXR_ITCM_OPT=<flag>` | Optimisation for the code in the fast ITCM memory, see [Memory map](#memory-map) (default `-O2`) |
 | `-DLXR_GENERATE_LISTING=ON` | Also write a disassembly listing (`.list`) |
 | `-DLXR_MEMORY_BASELINE=<file>` | Memory usage report to compare every build against, see [Memory usage report](#memory-usage-report) (default `memory_baseline.json`) |
+| `-DLXR_CPU_METER=ON` | Development build with a CPU load display, see [CPU load meter](#cpu-load-meter) (default `OFF`) |
 
 Options are passed when configuring, e.g. `cmake --preset release -DLXR_GENERATE_LISTING=ON`.
 The toolchain file and the CMake modules and tools are in the `cmake/` folder.
@@ -202,6 +203,35 @@ Targets:
 cmake --build --preset release --target memory_report     # also the 15 largest symbols per region, vs. baseline
 cmake --build --preset release --target memory_baseline   # save the current build as the new baseline
 ```
+
+### CPU load meter
+
+A development build that shows on the display how much of the available CPU time the audio uses.
+Build it in its own folder so it doesn't replace your normal build:
+
+```sh
+cmake --preset release -B build/cpumeter -DLXR_CPU_METER=ON
+cmake --build build/cpumeter
+```
+
+This creates `build/cpumeter/LXR_<name>_V<version>_cpumeter.img`; install it like a normal update.
+Normal builds don't contain any of it (the code is in `#if CPU_METER`, see
+`Core/Inc/Soundengine/CpuMeter.h`), and CI builds the meter variant too so that it keeps compiling.
+
+On the device, SHIFT + PROJECT steps through: off, load page, section page. All values are in percent
+of one audio block (64 samples, about 1.45 ms); "pk" values are peaks since the last reset.
+
+| Page | Shows |
+|---|---|
+| Load: `dsp 78% pk 80%` | Rendering of all voices and the FX (`mixer_calcNextSampleBlock`), current and peak |
+| Load: `all pk 82% u0 +0` | Peak of all audio work per block (sequencer, rendering, MIDI): what the UI can't use. `u` = buffer underruns (dropouts) since the reset, `+N` = simulated extra voices |
+| Sections: `D12 12 12 S10` | Peaks of drum voices 1-3 and the snare |
+| Sections: `C10 H10 fx12 o11` | Peaks of cymbal, hi-hat, FX bus and the rest of the mixer (LFOs, envelopes, sample-rate reduction, panning/summing, limiter) |
+
+SHIFT + MORPH renders the cymbal engine 0 to 4 extra times per block (`+N`) to simulate kits with more
+FM voices, and resets the peaks. While `+N` is above 0 the cymbal sounds wrong (its envelope runs
+faster); that's expected. Measured with a worst-case kit on the stock voice layout: `dsp` peak 78 %,
+`all` peak 82 %, drum voice 12 % each, snare/cymbal/hi-hat 10 %, FX 12 %, rest 11 %.
 
 ## Source layout and CMake targets
 

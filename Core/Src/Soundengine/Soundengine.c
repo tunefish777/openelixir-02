@@ -17,16 +17,23 @@
 #include <string.h>
 #include "Soundengine/USB/usb_manager.h"
 #include "Soundengine/MIDI/Uart.h"
+#include "Soundengine/CpuMeter.h"
 
 uint8_t soundengine_calcNextSampleBlock()
 {
 	if(bCurrentSampleValid!= SAMPLE_VALID)
 	{
+#if CPU_METER
+		const uint32_t meterStart = cpuMeter_dspStart();
+#endif
 	#if USE_DAC2
 		mixer_calcNextSampleBlock((int16_t*)&dma_buffer[bCurrentSampleValid*(OUTPUT_DMA_SIZE*2)],(int16_t*)&dma_buffer2[bCurrentSampleValid*(OUTPUT_DMA_SIZE*2)]);
 	#else
 		mixer_calcNextSampleBlock(&dma_buffer[bCurrentSampleValid*(OUTPUT_DMA_SIZE*2)],&dma_buffer2[(1-bCurrentSampleValid)*(OUTPUT_DMA_SIZE*2)]);
 	#endif
+#if CPU_METER
+		cpuMeter_dspEnd(meterStart);
+#endif
 		bCurrentSampleValid = SAMPLE_VALID;
 
 		return 1;
@@ -79,8 +86,14 @@ void soundengine_process()
 #if CALC_SAMPLES_IN_INTERRUPT
 	__HAL_TIM_DISABLE_IT(&htim2, TIM_IT_UPDATE);
 	//HAL_TIM_Base_Stop_IT(&htim2);
+#if CPU_METER
+	cpuMeter_busyEnter();
+#endif
 	seq_tick();
 	soundengine_calcNextSampleBlock();
+#if CPU_METER
+	cpuMeter_busyExit();
+#endif
 	__HAL_TIM_SetCounter(&htim2, 1950);
 	//HAL_TIM_Base_Start_IT(&htim2);
 	__HAL_TIM_ENABLE_IT(&htim2, TIM_IT_UPDATE);

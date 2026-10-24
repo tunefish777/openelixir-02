@@ -32,6 +32,7 @@
 #include "menu/menu.h"
 #include "Soundengine/Soundengine.h"
 #include "Soundengine/MIDI/Uart.h"
+#include "Soundengine/CpuMeter.h"
 #include "lcd.h"
 /* USER CODE END Includes */
 
@@ -268,9 +269,15 @@ void TIM2_IRQHandler(void)
 //#ifndef DEBUG
 
   HAL_GPIO_WritePin(GPIOE, GPIO_PIN_2, GPIO_PIN_SET);
+#if CPU_METER
+  cpuMeter_busyEnter();
+#endif
 	seq_tick();
 	soundengine_calcNextSampleBlock();
   uart_processMidi();
+#if CPU_METER
+  cpuMeter_busyExit();
+#endif
   HAL_GPIO_WritePin(GPIOE, GPIO_PIN_2, GPIO_PIN_RESET);
 
 

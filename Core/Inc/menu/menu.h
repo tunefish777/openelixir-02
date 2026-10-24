@@ -646,6 +646,10 @@ uint8_t getMenuIndx(void);
 //-----------------------------------------------------------------
 /** forces a complete repaint of the display*/
 void menu_repaintAll();
+#if CPU_METER
+/** development builds: show/hide the CPU load page (see Soundengine/CpuMeter.h) */
+void menu_toggleCpuMeter();
+#endif
 //-----------------------------------------------------------------
 //repaint the screen. show all changes*/
 void menu_repaint();

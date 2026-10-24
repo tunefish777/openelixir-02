@@ -104,6 +104,7 @@ add_library(lxr_dsp OBJECT
 # Audio engine: codec/I2S DMA, sample block rendering, FX bus, clock/trigger I/O.
 add_library(lxr_engine OBJECT
     Src/Soundengine/AudioCodecManager.c
+    Src/Soundengine/CpuMeter.c
     Src/Soundengine/cs4344_cs5343.c
     Src/Soundengine/FIFO.c
     Src/Soundengine/FxBus.c

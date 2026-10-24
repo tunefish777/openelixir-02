@@ -66,6 +66,11 @@ set(LXR_BOOTLOADER_DIR "" CACHE PATH "LXR bootloader source tree to build for th
 set(LXR_MEMORY_BASELINE "${CMAKE_CURRENT_SOURCE_DIR}/memory_baseline.json" CACHE FILEPATH
     "Saved memory usage report to compare each build against")
 
+# Development build with a CPU load page on the display (SHIFT + PROJECT) and
+# simulated extra FM voices (SHIFT + MORPH), see Core/Inc/Soundengine/CpuMeter.h.
+# The update file gets a "_cpumeter" suffix so it isn't mistaken for a release.
+option(LXR_CPU_METER "Build with the CPU load meter (development only)" OFF)
+
 include(${LXR_CMAKE_DIR}/stm32f765.cmake)
 include(${LXR_CMAKE_DIR}/firmware_outputs.cmake)
 
@@ -75,6 +80,9 @@ include(${LXR_CMAKE_DIR}/firmware_outputs.cmake)
 add_library(lxr_board_config INTERFACE)
 target_include_directories(lxr_board_config INTERFACE Core/Inc)
 target_compile_definitions(lxr_board_config INTERFACE "FIRMWARE_NAME=\"${PROJECT_NAME}\"")
+if(LXR_CPU_METER)
+    target_compile_definitions(lxr_board_config INTERFACE CPU_METER=1)
+endif()
 target_compile_options(lxr_board_config INTERFACE
     $<$<COMPILE_LANGUAGE:C>:-ffast-math -freciprocal-math -mfp16-format=ieee -fomit-frame-pointer>
 )
@@ -98,6 +106,9 @@ lxr_firmware_executable(${PROJECT_NAME} LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR
 # The update file name has to start with "LXR" and the image needs the LXRV2IMG
 # magic: that is what the bootloader on the device looks for.
 set(update_image_name LXR_${PROJECT_NAME}_V${PROJECT_VERSION})
+if(LXR_CPU_METER)
+    string(APPEND update_image_name _cpumeter)
+endif()
 lxr_add_firmware_outputs(${PROJECT_NAME} IMAGE_MAGIC LXRV2IMG IMAGE_NAME ${update_image_name})
 
 # "flash": application only, the bootloader on the device is left alone.
