@@ -57,6 +57,9 @@ typedef struct ImageFileHeaderStruct
 #ifndef FIRMWARE_VERSION
 #define FIRMWARE_VERSION " 2.00"
 #endif
+#ifndef FIRMWARE_NAME
+#define FIRMWARE_NAME "OpenElixir-02"
+#endif
 //#define f_unmount(path) f_mount(0, path, 0)
 
 /* Private macro -------------------------------------------------------------*/
@@ -351,10 +354,10 @@ int main(void)
 #else
 	//print boot up message
 lcd_clear();
-lcd_string("Sonic Potions");
+lcd_string(FIRMWARE_NAME);
 //goto 2nd line
 lcd_setcursor(0,2);
-lcd_string("LXR2 Drums V");
+lcd_string("Version");
 lcd_string(FIRMWARE_VERSION);
 #endif
 

@@ -3,7 +3,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
-# LXR V2 desktop drum machine firmware (STM32F765VG, Cortex-M7).
+# OpenElixir-02: custom firmware for the Erica Synths LXR-02 desktop drum
+# machine (STM32F765VG, Cortex-M7), based on the open-source LXR V2 firmware.
 #
 #   cmake --preset release
 #   cmake --build --preset release
@@ -19,9 +20,11 @@ if(NOT CMAKE_TOOLCHAIN_FILE)
     set(CMAKE_TOOLCHAIN_FILE "${LXR_CMAKE_DIR}/arm-none-eabi.cmake")
 endif()
 
-project(LXR_V2_STM32F765
-    VERSION 1.7
-    DESCRIPTION "LXR V2 drum machine firmware"
+# The project name is the firmware's name: it names the build outputs and is
+# shown on the start-up screen and as the USB-MIDI device name (FIRMWARE_NAME).
+project(OpenElixir-02
+    VERSION 0.1
+    DESCRIPTION "OpenElixir-02, custom firmware for the Erica Synths LXR-02 drum machine"
     LANGUAGES C ASM
 )
 
@@ -71,6 +74,7 @@ include(${LXR_CMAKE_DIR}/firmware_outputs.cmake)
 # as well as by the application.
 add_library(lxr_board_config INTERFACE)
 target_include_directories(lxr_board_config INTERFACE Core/Inc)
+target_compile_definitions(lxr_board_config INTERFACE "FIRMWARE_NAME=\"${PROJECT_NAME}\"")
 target_compile_options(lxr_board_config INTERFACE
     $<$<COMPILE_LANGUAGE:C>:-ffast-math -freciprocal-math -mfp16-format=ieee -fomit-frame-pointer>
 )
@@ -91,7 +95,10 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 
 # Linked at 0x08008000, behind the 32 KB bootloader.
 lxr_firmware_executable(${PROJECT_NAME} LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/STM32F765VGTX_FLASH.ld)
-lxr_add_firmware_outputs(${PROJECT_NAME} IMAGE_MAGIC LXRV2IMG IMAGE_NAME LXR_V2_V${PROJECT_VERSION})
+# The update file name has to start with "LXR" and the image needs the LXRV2IMG
+# magic: that is what the bootloader on the device looks for.
+set(update_image_name LXR_${PROJECT_NAME}_V${PROJECT_VERSION})
+lxr_add_firmware_outputs(${PROJECT_NAME} IMAGE_MAGIC LXRV2IMG IMAGE_NAME ${update_image_name})
 
 # "flash": application only, the bootloader on the device is left alone.
 lxr_add_openocd_flash_target(flash
@@ -157,9 +164,9 @@ if(NOT bootloader)
 endif()
 
 if(bootloader)
-    # LXR_V2_V<version>_full.hex/.bin: bootloader at 0x08000000 + firmware at 0x08008000.
+    # <name>_V<version>_full.hex/.bin: bootloader at 0x08000000 + firmware at 0x08008000.
     lxr_add_combined_image(full_image
-        OUTPUT_NAME LXR_V2_V${PROJECT_VERSION}_full
+        OUTPUT_NAME ${PROJECT_NAME}_V${PROJECT_VERSION}_full
         BOOTLOADER ${bootloader}
         APPLICATION ${PROJECT_NAME}
         BOOTLOADER_MAGIC LXRV2IMG
@@ -202,6 +209,6 @@ if(TARGET full_image)
     list(APPEND info_depends full_image)  # print after everything else is done
 endif()
 lxr_add_update_info(update_info
-    IMAGE ${CMAKE_CURRENT_BINARY_DIR}/LXR_V2_V${PROJECT_VERSION}.img
+    IMAGE ${CMAKE_CURRENT_BINARY_DIR}/${update_image_name}.img
     DEPENDS ${info_depends}
 )

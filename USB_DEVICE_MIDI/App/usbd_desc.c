@@ -66,9 +66,12 @@
 
 #define USBD_VID     0x0483
 #define USBD_LANGID_STRING     1033
-#define USBD_MANUFACTURER_STRING     "Sonic Potions"
+#ifndef FIRMWARE_NAME
+#define FIRMWARE_NAME "OpenElixir-02"
+#endif
+#define USBD_MANUFACTURER_STRING     "tunefish.at"
 #define USBD_PID_FS     0xA0D2
-#define USBD_PRODUCT_STRING_FS     "Sonic Potions USB MIDI"
+#define USBD_PRODUCT_STRING_FS     FIRMWARE_NAME
 #define USBD_CONFIGURATION_STRING_FS     "AUDIO Config"
 #define USBD_INTERFACE_STRING_FS     "AUDIO Interface"
 

@@ -1,7 +1,13 @@
-# LXR V2 firmware (desktop, STM32F765VG)
+# OpenElixir-02
 
-Firmware for the LXR V2 desktop drum machine: an STM32F765 (Cortex-M7, 216 MHz) running the
-drum voices, FX bus, step sequencer, MIDI (DIN + USB), SD-card preset storage and the LCD/button UI.
+OpenElixir-02 is custom firmware for the Erica Synths LXR-02 desktop drum machine, based on the
+open-source LXR V2 firmware by Erica Synths. It is not official Erica Synths firmware and is not
+affiliated with or approved by Erica Synths.
+
+It runs on the LXR-02's STM32F765 (Cortex-M7, 216 MHz): drum voices, FX bus, step sequencer, MIDI
+(DIN + USB), SD-card preset storage and the LCD/button UI. The start-up screen shows "OpenElixir-02"
+and the version, and the LXR-02 appears as "OpenElixir-02" on USB. The name is set by `project()` in
+[CMakeLists.txt](CMakeLists.txt).
 
 > **Licence and trademarks:** the firmware source code is free software under the GNU GPL version 3
 > ([LICENSE](LICENSE)). You're welcome to study, change and share it, for example to write your own
@@ -15,7 +21,8 @@ drum voices, FX bus, step sequencer, MIDI (DIN + USB), SD-card preset storage an
 Every LXR has a built-in updater (the bootloader) that installs new firmware from the SD card. You
 don't need any extra hardware:
 
-1. [Build the firmware](#building-the-firmware). This creates the update file `LXR_V2_V<version>.img`.
+1. [Build the firmware](#building-the-firmware). This creates the update file `LXR_OpenElixir-02_V<version>.img`
+   (the LXR's updater only accepts files whose name starts with `LXR`).
 2. [Copy it to the SD card and install it](#installing-the-update) on the LXR.
 
 ### Building the firmware
@@ -63,7 +70,7 @@ When the build has finished it shows where the update file is and how to install
 ```
 ======================================================================
   Firmware update file:
-    .../lxr_desktop_app/build/release/LXR_V2_V1.7.img
+    .../lxr_desktop_app/build/release/LXR_OpenElixir-02_V0.1.img
   ...
 ```
 
@@ -72,7 +79,7 @@ The version in the file name, and on the LXR's start-up screen, is set by `proje
 
 ### Installing the update
 
-1. Copy `LXR_V2_V<version>.img` from `build/release/` to the top folder of the SD card. Delete any
+1. Copy `LXR_OpenElixir-02_V<version>.img` from `build/release/` to the top folder of the SD card. Delete any
    older `LXR*.img` files from the card: the updater installs the first one it finds.
    On a Mac, eject the card in Finder before you take it out. Finder also leaves hidden files starting
    with `._` on the card; the updater ignores them.
@@ -115,12 +122,12 @@ All files the build creates (in `build/<preset>/`):
 
 | File                     | Purpose                                                        |
 |--------------------------|----------------------------------------------------------------|
-| `LXR_V2_V<version>.img`  | **Update file for the SD card** (see [Installing the update](#installing-the-update)) |
-| `LXR_V2_STM32F765.elf`   | Firmware with debug information, for a debugger               |
-| `LXR_V2_STM32F765.bin`   | Raw firmware image (from 0x08008000)                          |
-| `LXR_V2_STM32F765.hex`   | Intel HEX of the same                                         |
-| `LXR_V2_STM32F765.map`   | Linker map                                                    |
-| `LXR_V2_STM32F765.elf.memory*.json` | Memory usage of this and the previous build, for the "vs. last" column |
+| `LXR_OpenElixir-02_V<version>.img`  | **Update file for the SD card** (see [Installing the update](#installing-the-update)) |
+| `OpenElixir-02.elf`   | Firmware with debug information, for a debugger               |
+| `OpenElixir-02.bin`   | Raw firmware image (from 0x08008000)                          |
+| `OpenElixir-02.hex`   | Intel HEX of the same                                         |
+| `OpenElixir-02.map`   | Linker map                                                    |
+| `OpenElixir-02.elf.memory*.json` | Memory usage of this and the previous build, for the "vs. last" column |
 
 ## Cleaning the build
 
@@ -209,7 +216,7 @@ layout and the `USER CODE BEGIN/END` comments. It no longer depends on either to
 Pins, clocks and peripherals are configured in `Core/Inc/main.h`, `Core/Src/main.c`
 (`SystemClock_Config`, `MX_*_Init`) and `Core/Src/stm32f7xx_hal_msp.c`; edit them there.
 
-Every component is an OBJECT library linked into `LXR_V2_STM32F765`:
+Every component is an OBJECT library linked into `OpenElixir-02`:
 
 | Target          | Sources                                         | Contents                                              |
 |-----------------|-------------------------------------------------|-------------------------------------------------------|
@@ -255,7 +262,7 @@ cmake --preset release -DLXR_BOOTLOADER_DIR=path/to/LXR_V2_STM32F765_Bootloader
 
 The build checks that the bootloader is valid for this device: it must fit in the 32 KB bootloader
 sector and accept desktop (`LXRV2IMG`) update images, so the firmware, a full image or the Eurorack
-bootloader are rejected. It then also writes `LXR_V2_V<version>_full.hex`/`.bin` (bootloader +
+bootloader are rejected. It then also writes `OpenElixir-02_V<version>_full.hex`/`.bin` (bootloader +
 firmware, the whole flash from 0x08000000) and enables:
 
 ```sh

@@ -29,7 +29,8 @@ add_library(lxr_platform OBJECT
     Src/delay.c
     Src/flash_if.c
 )
-# Shown on the boot splash screen; comes from project(VERSION) in the top-level CMakeLists.txt.
+# Shown on the start-up screen; comes from project(VERSION) in the top-level CMakeLists.txt
+# (the name, FIRMWARE_NAME, from project() is defined for all sources via lxr_board_config).
 set_source_files_properties(Src/main.c PROPERTIES
     COMPILE_DEFINITIONS "FIRMWARE_VERSION=\" ${PROJECT_VERSION}\""
 )
