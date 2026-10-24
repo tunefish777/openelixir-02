@@ -106,6 +106,7 @@ If the updater stops with one of these messages, switch the LXR off, fix the cau
 | `-DARM_TOOLCHAIN_DIR=<bin folder>` | Use a toolchain that isn't on `PATH`, e.g. `/Applications/ArmGNUToolchain/14.3.rel1/arm-none-eabi/bin` (macOS) or `C:/toolchain_arm-none-eabi/11.3rel1/bin` (Windows) |
 | `-DLXR_ITCM_OPT=<flag>` | Optimisation for the code in the fast ITCM memory, see [Memory map](#memory-map) (default `-O2`) |
 | `-DLXR_GENERATE_LISTING=ON` | Also write a disassembly listing (`.list`) |
+| `-DLXR_MEMORY_BASELINE=<file>` | Memory usage report to compare every build against, see [Memory usage report](#memory-usage-report) (default `memory_baseline.json`) |
 
 Options are passed when configuring, e.g. `cmake --preset release -DLXR_GENERATE_LISTING=ON`.
 The toolchain file and the CMake modules and tools are in the `cmake/` folder.
@@ -119,6 +120,7 @@ All files the build creates (in `build/<preset>/`):
 | `LXR_V2_STM32F765.bin`   | Raw firmware image (from 0x08008000)                          |
 | `LXR_V2_STM32F765.hex`   | Intel HEX of the same                                         |
 | `LXR_V2_STM32F765.map`   | Linker map                                                    |
+| `LXR_V2_STM32F765.elf.memory*.json` | Memory usage of this and the previous build, for the "vs. last" column |
 
 ## Cleaning the build
 
@@ -161,8 +163,43 @@ The `build/` folder is never committed to git.
 | RAM      | 0x20020000                | 384 KB | `.data`, `.bss`, heap                                 |
 
 The ITCM is tight. Current GCC releases generate too much code at `-O3` for it, so the translation
-units that contain ITCM code are compiled with `LXR_ITCM_OPT` (default `-O2`). The linker prints
-region usage after every build.
+units that contain ITCM code are compiled with `LXR_ITCM_OPT` (default `-O2`). Watch the ITCM line
+of the [memory usage report](#memory-usage-report) when changing or adding `IN_ITCM_RAM` code.
+
+The initial values of `.data`, `.dtcm` and `.itcm_text` are stored in FLASH behind `.rodata`
+(`AT> FLASH` in `STM32F765VGTX_FLASH.ld`), so they count towards, and are checked against, the
+FLASH region. The stack starts at the top of the DTCM and grows down: the free DTCM is the stack space.
+
+### Memory usage report
+
+Every build prints the usage of each memory region (`cmake/tools/memreport.py`):
+
+```
+Region          Used       Size       Free    Use                          vs. last  vs. base
+---------------------------------------------------------------------------------------------
+ITCM_RAM      15,472     16,384        912  94.4%  [###################.]!      +336      +336
+  .itcm_text                       15,472
+  (of which linker veneers)           472  (59 long-branch stubs)
+DTCM         107,392    131,072     23,680  81.9%  [################....]          0         0
+  ...
+  stack (the free space)           23,680  (linker minimum 1,024)
+...
+```
+
+- **Used** is counted like the linker's `--print-memory-usage` (alignment gaps included); FLASH
+  includes the initial values of the RAM and TCM sections, i.e. it equals the `.bin` size.
+- **vs. last**: change since the previous build of this build folder.
+- **vs. base**: change since the saved baseline `memory_baseline.json` (stock firmware 1.7 built
+  with Arm GNU Toolchain 15.3.Rel2). Other compiler versions give somewhat different sizes; the
+  report says so when the compilers differ.
+- `!` marks regions that are at least 90 % full.
+
+Targets:
+
+```sh
+cmake --build --preset release --target memory_report     # also the 15 largest symbols per region, vs. baseline
+cmake --build --preset release --target memory_baseline   # save the current build as the new baseline
+```
 
 ## Source layout and CMake targets
 

@@ -57,6 +57,12 @@ set(LXR_ITCM_OPT "" CACHE STRING
 set(LXR_BOOTLOADER_HEX "" CACHE FILEPATH "Prebuilt LXR bootloader .hex for the full-flash image (optional)")
 set(LXR_BOOTLOADER_DIR "" CACHE PATH "LXR bootloader source tree to build for the full-flash image (optional)")
 
+# Memory usage report printed after every build is compared against this file
+# (if it exists). "cmake --build --preset release --target memory_baseline" saves
+# the current build as the new baseline.
+set(LXR_MEMORY_BASELINE "${CMAKE_CURRENT_SOURCE_DIR}/memory_baseline.json" CACHE FILEPATH
+    "Saved memory usage report to compare each build against")
+
 include(${LXR_CMAKE_DIR}/stm32f765.cmake)
 include(${LXR_CMAKE_DIR}/firmware_outputs.cmake)
 
@@ -178,8 +184,20 @@ if(bootloader)
     endif()
 endif()
 
+# --- Memory usage (printed after every build) -----------------------------------
+# "memory_report" additionally lists the largest symbols per region.
+lxr_add_memory_report(memory_usage
+    FIRMWARE ${PROJECT_NAME}
+    BASELINE ${LXR_MEMORY_BASELINE}
+    DETAIL_TARGET memory_report
+    BASELINE_TARGET memory_baseline
+)
+
 # --- How to install the update (printed at the end of every build) -------------
 set(info_depends ${PROJECT_NAME})
+if(TARGET memory_usage)
+    list(APPEND info_depends memory_usage)  # keep the instructions last
+endif()
 if(TARGET full_image)
     list(APPEND info_depends full_image)  # print after everything else is done
 endif()

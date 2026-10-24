@@ -55,7 +55,8 @@ endfunction()
 
 # lxr_add_firmware_outputs(<target> [IMAGE_MAGIC <8 chars> IMAGE_NAME <basename>])
 #
-# Writes <name>.hex, <name>.bin and prints the section sizes. With IMAGE_MAGIC and
+# Writes <name>.hex, <name>.bin and, without Python 3, prints the section sizes
+# (with Python 3, lxr_add_memory_report() gives the full picture instead). With IMAGE_MAGIC and
 # Python 3 available it also wraps the .bin into the bootloader's SD-card update
 # image <IMAGE_NAME>.img (see tools/mkimage.py for the format).
 function(lxr_add_firmware_outputs target)
@@ -69,8 +70,10 @@ function(lxr_add_firmware_outputs target)
     set(commands
         COMMAND ${CMAKE_OBJCOPY} -O ihex $<TARGET_FILE:${target}> ${hex}
         COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${target}> ${bin}
-        COMMAND ${CMAKE_SIZE} $<TARGET_FILE:${target}>
     )
+    if(NOT Python3_EXECUTABLE)
+        list(APPEND commands COMMAND ${CMAKE_SIZE} $<TARGET_FILE:${target}>)
+    endif()
     set(byproducts ${name}.hex ${name}.bin)
 
     if(LXR_GENERATE_LISTING)
@@ -99,6 +102,57 @@ function(lxr_add_firmware_outputs target)
         COMMENT "Generating firmware outputs for ${name}"
         VERBATIM
     )
+endfunction()
+
+# lxr_add_memory_report(<custom target> FIRMWARE <firmware target>
+#                       [BASELINE <file>] [DETAIL_TARGET <name>] [BASELINE_TARGET <name>])
+#
+# Prints the usage of every memory region (FLASH including the initial values of
+# RAM/TCM sections, ITCM, DTCM with the free stack space, RAM) after every
+# build, with the change since the previous build and, if the BASELINE file
+# exists, since the baseline. See tools/memreport.py.
+#  - DETAIL_TARGET: on-demand target that also lists the largest symbols per region.
+#  - BASELINE_TARGET: on-demand target that saves the current build as BASELINE.
+# Does nothing without Python 3 (the post-build step then prints the section sizes).
+function(lxr_add_memory_report name)
+    cmake_parse_arguments(ARG "" "FIRMWARE;BASELINE;DETAIL_TARGET;BASELINE_TARGET" "" ${ARGN})
+    if(NOT Python3_EXECUTABLE)
+        return()
+    endif()
+
+    lxr_firmware_basename(${ARG_FIRMWARE} fw_name)
+    set(elf $<TARGET_FILE:${ARG_FIRMWARE}>)
+    set(map $<TARGET_FILE_DIR:${ARG_FIRMWARE}>/${fw_name}.map)
+    set(report ${Python3_EXECUTABLE} ${LXR_CMAKE_TOOLS_DIR}/memreport.py ${elf} --map ${map})
+    set(baseline)
+    if(ARG_BASELINE)
+        set(baseline --baseline ${ARG_BASELINE})
+    endif()
+
+    add_custom_target(${name} ALL
+        COMMAND ${report} ${baseline}
+        DEPENDS ${ARG_FIRMWARE}
+        COMMENT "Memory usage"
+        VERBATIM
+    )
+    if(ARG_DETAIL_TARGET)
+        add_custom_target(${ARG_DETAIL_TARGET}
+            COMMAND ${report} ${baseline} --top 15 --no-history
+            DEPENDS ${ARG_FIRMWARE}
+            COMMENT "Memory usage with the largest symbols"
+            VERBATIM
+        )
+    endif()
+    if(ARG_BASELINE AND ARG_BASELINE_TARGET)
+        add_custom_target(${ARG_BASELINE_TARGET}
+            COMMAND ${report} --save-baseline ${ARG_BASELINE}
+            DEPENDS ${ARG_FIRMWARE}
+            COMMENT "Saving the memory usage baseline"
+            VERBATIM
+        )
+    endif()
+    set_property(TARGET ${ARG_FIRMWARE} APPEND PROPERTY ADDITIONAL_CLEAN_FILES
+        ${fw_name}.elf.memory.json ${fw_name}.elf.memory.prev.json)
 endfunction()
 
 # lxr_add_combined_image(<custom target> OUTPUT_NAME <basename>

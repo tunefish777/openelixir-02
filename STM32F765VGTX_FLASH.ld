@@ -190,20 +190,17 @@ SECTIONS
    *  ccmstack :: application stack
    */
    
-  . = _sidata + SIZEOF(.data);
-  _siccm = .;
-    
- /* _siccm = LOADADDR(.dtcm);*/
-  
-    /* TCM load area */
-  .dtcm :  AT(_siccm)
+    /* TCM load area. The initial values are stored in FLASH behind .data
+     (AT> FLASH, so that the linker checks and reports this flash use). */
+  .dtcm :
   {
     _sccm = .;
     . = ALIGN(4);
     *(.dtcm)
     . = ALIGN(4);
     _eccm = .;
-  } > DTCM
+  } > DTCM AT> FLASH
+  _siccm = LOADADDR(.dtcm);
   
     /* CCMZ area */
   .dtcmz (NOLOAD) :
@@ -219,12 +216,7 @@ SECTIONS
 
   /* Copy specific fast-executing code to ITCM RAM */
   
-    . = _siccm  + SIZEOF(.dtcm) ;
-    _siitcm = .;
-
- /* _itcm_data = LOADADDR(.itcm_text);*/
-
-	.itcm_text : AT(_siitcm)
+	.itcm_text :
 	{
 		
 		_itcm_text_start = .;
@@ -234,8 +226,8 @@ SECTIONS
 		*(.itcm_text*)
 		. = ALIGN(4);
 		_itcm_text_end = .;
-	} >ITCM_RAM  
-    
+	} >ITCM_RAM AT> FLASH
+
   	_itcm_data = LOADADDR(.itcm_text);
   	
   
