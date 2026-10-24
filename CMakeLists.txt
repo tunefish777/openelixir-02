@@ -12,7 +12,7 @@ cmake_minimum_required(VERSION 3.21)
 # For blank devices it can also produce a full-flash image (bootloader +
 # firmware) and a "flash_full" target, see LXR_BOOTLOADER_HEX / LXR_BOOTLOADER_DIR.
 #
-# See README.md for details.
+# See README.md for an overview and README_LXR.md for build details.
 
 # CMake modules and tools (toolchain file, MCU settings, output generation).
 set(LXR_CMAKE_DIR "${CMAKE_CURRENT_LIST_DIR}/cmake")
