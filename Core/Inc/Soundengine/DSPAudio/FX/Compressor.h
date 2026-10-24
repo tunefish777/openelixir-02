@@ -39,7 +39,7 @@ typedef struct CompressorStruct
 
 
 void Compressor_init(Compressor *c);
-void Compressor_process(Compressor *c, int16_t *fxBuffer,int16_t* outL, int16_t* outR, uint16_t size,  uint8_t channels, float dryWet);
+void Compressor_process(Compressor *c, int16_t *fxBuffer,int32_t* outL, int32_t* outR, uint16_t size,  uint8_t channels, float dryWet);
 void Compressor_setAttack(Compressor *c, float a);
 void Compressor_setTreshold(Compressor *c, float t);
 void Compressor_setRelease(Compressor *c, float t);

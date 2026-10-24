@@ -13,6 +13,7 @@
  */
 
 #include "Soundengine/DSPAudio/FX/Distortion.h"
+#include "Soundengine/DSPAudio/mixer.h"
 #include <math.h>
 
 INDTCM const float table_1n914[257] = {
@@ -205,7 +206,7 @@ float foldback(float in, float threshold)
   return in;
 }
 
-void Distortion_process(MasterDistortion *dist, int16_t *fxBuffer, int16_t* outL, int16_t* outR, uint16_t size, uint8_t channels, float dryWet)
+void Distortion_process(MasterDistortion *dist, int16_t *fxBuffer, int32_t* outL, int32_t* outR, uint16_t size, uint8_t channels, float dryWet)
 {
 	if(dist->distortionType == DISTORTION_TUBE)
 	{
@@ -218,7 +219,7 @@ void Distortion_process(MasterDistortion *dist, int16_t *fxBuffer, int16_t* outL
 		//outL and outR are in the same array as interleaved stereo samples.
 		//therefore the *out += 2 to increment it
 		//we can use an int32_t instead of int_16_t to use SIMD instructions on both stereo channels
-		int32_t* stereoOut = (int32_t*)outL;
+		int32_t* stereoOut = outL;
 
 		if(channels==2)
 		{
@@ -260,8 +261,8 @@ void Distortion_process(MasterDistortion *dist, int16_t *fxBuffer, int16_t* outL
 				const int32_t x = __PKHBT( fxBuffer[idx1] + __SSAT((wet - fxBuffer[idx1]) * dryWet,16), fxBuffer[idx2] + __SSAT((wet2 - fxBuffer[idx2]) * dryWet,16), 16);
 
 				//add stereo samples using SIMD
-				*stereoOut = __QADD16(*stereoOut, x);
-				stereoOut++;
+				mixer_addStereo(stereoOut, x);
+				stereoOut += 2;
 			}
 		}
 		else
@@ -283,7 +284,7 @@ void Distortion_process(MasterDistortion *dist, int16_t *fxBuffer, int16_t* outL
 
 				int16_t wet = __SSAT((int32_t)(val1 * 32768.0f), 16);
 				int16_t dw = fxBuffer[idx1] + __SSAT((wet - fxBuffer[idx1]) * dryWet,16);
-				*outL = __QADD16(*outL, dw);
+				*outL += dw;
 				//*outL =  __SSAT((int32_t)(val1 * 32768.0f), 16);
 				outL += 2;
 			}
@@ -300,7 +301,7 @@ void Distortion_process(MasterDistortion *dist, int16_t *fxBuffer, int16_t* outL
 
 		if(channels==2)
 		{
-			int32_t* stereoOut = (int32_t*)outL;
+			int32_t* stereoOut = outL;
 			//simdBuffer simd;
 
 			for(uint32_t i=0;i<size;i++)
@@ -337,7 +338,7 @@ void Distortion_process(MasterDistortion *dist, int16_t *fxBuffer, int16_t* outL
 				/*
 				int16_t wet = __SSAT((int32_t)(val1 * 32768.0f), 16);
 				int16_t dw = fxBuffer[i] + __SSAT((wet - fxBuffer[i]) * dryWet,16);
-				*outL = __QADD16(*outL, dw);
+				*outL += dw;
 				outL += 2;
 
 				wet = __SSAT((int32_t)(val2 * 32768.0f), 16);
@@ -355,8 +356,8 @@ void Distortion_process(MasterDistortion *dist, int16_t *fxBuffer, int16_t* outL
 				x = __PKHBT( fxBuffer[idx1] + __SSAT((wet - fxBuffer[idx1]) * dryWet,16), fxBuffer[idx2] + __SSAT((wet2 - fxBuffer[idx2]) * dryWet,16), 16);
 
 				//add stereo samples using SIMD
-				*stereoOut = __QADD16(*stereoOut, x);
-				stereoOut++;
+				mixer_addStereo(stereoOut, x);
+				stereoOut += 2;
 
 			}
 		}
@@ -379,7 +380,7 @@ void Distortion_process(MasterDistortion *dist, int16_t *fxBuffer, int16_t* outL
 				int16_t wet = __SSAT((int32_t)(val1 * 32768.0f), 16);
 				int16_t dw = fxBuffer[idx1] + __SSAT((wet - fxBuffer[idx1]) * dryWet,16);
 
-				*outL = __QADD16(*outL, dw);
+				*outL += dw;
 				outL += 2;
 
 			}
@@ -389,7 +390,7 @@ void Distortion_process(MasterDistortion *dist, int16_t *fxBuffer, int16_t* outL
 	}
 	else //DISTORTION_RAT
 	{
-		int32_t* stereoOut = (int32_t*)outL;
+		int32_t* stereoOut = outL;
 		int32_t x;
 		//simdBuffer simd;
 #if 0
@@ -543,8 +544,8 @@ void Distortion_process(MasterDistortion *dist, int16_t *fxBuffer, int16_t* outL
 
 				x = __PKHBT(fxBuffer[idx1] + __SSAT((wet - fxBuffer[idx1]) * dryWet,16), fxBuffer[idx2] + __SSAT((wet2 - fxBuffer[idx2]) * dryWet,16), 16);
 				//add stereo samples using SIMD
-				*stereoOut = __QADD16(*stereoOut, x);
-				stereoOut++;
+				mixer_addStereo(stereoOut, x);
+				stereoOut += 2;
 			}
 		}
 		else
@@ -597,7 +598,7 @@ void Distortion_process(MasterDistortion *dist, int16_t *fxBuffer, int16_t* outL
 
 				int16_t wet = __SSAT((int32_t)(dist->lastOut[0] * 32768.0f), 16);
 				int16_t dw = fxBuffer[idx1] + __SSAT((wet - fxBuffer[idx1]) * dryWet,16);
-				*outL = __QADD16(*outL, dw);
+				*outL += dw;
 				outL += 2;
 			}
 		}

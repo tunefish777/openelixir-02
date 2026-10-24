@@ -38,10 +38,10 @@ void FxBus_init()
 #endif
 }
 
-IN_ITCM_RAM void FxBus_process(int16_t *fxBuffer, int16_t* outL,int16_t* outR,int16_t* outL2, int16_t* outR2, uint32_t size)
+IN_ITCM_RAM void FxBus_process(int16_t *fxBuffer, int32_t* outL,int32_t* outR,int32_t* outL2, int32_t* outR2, uint32_t size)
 {
-	int16_t* out;
-	int16_t* out2 = NULL;
+	int32_t* out;
+	int32_t* out2 = NULL;
 	// < MIXER_ROUTING_DAC1_L -> stereo 1 or 2
 	const uint8_t channels = fxBus.audioRouting < MIXER_ROUTING_DAC1_L ? 2 : 1;
 	switch(fxBus.audioRouting)
@@ -77,26 +77,18 @@ IN_ITCM_RAM void FxBus_process(int16_t *fxBuffer, int16_t* outL,int16_t* outR,in
 	{
 		if(channels == 2)
 		{
-			int32_t* stereoIn = (int32_t*)fxBuffer;
-			int32_t* stereoOut = (int32_t*)out;
-
-			for(uint8_t i=0;i<size;i++)
+			for(uint8_t i=0;i<size*2;i++)
 			{
-				//add stereo samples using SIMD
-				*stereoOut = __QADD16(*stereoOut, *stereoIn);
-				stereoOut++;
-				stereoIn++;
+				out[i] += fxBuffer[i];
 			}
 		}
 		else
 		{
-			int32_t* in = (int32_t*)fxBuffer;
+			//mono out: left channel of the FX bus
 			for(uint8_t i=0;i<size;i++)
 			{
-				*out =  __QADD16(*out, *in);
+				*out += fxBuffer[i*2];
 				out +=2;
-				in++;
-
 			}
 		}
 	}

@@ -13,6 +13,7 @@
  */
 
 #include "Soundengine/DSPAudio/FX/Compressor.h"
+#include "Soundengine/DSPAudio/mixer.h"
 #include "math.h"
 #include "main.h"
 
@@ -101,12 +102,12 @@ void Compressor_setRatio(Compressor *c, uint8_t r)
 	}
 }
 
-void Compressor_process(Compressor *c, int16_t *fxBuffer,int16_t* outL, int16_t* outR, uint16_t size,  uint8_t channels, float dryWet)
+void Compressor_process(Compressor *c, int16_t *fxBuffer,int32_t* outL, int32_t* outR, uint16_t size,  uint8_t channels, float dryWet)
 {
 
 
 	int32_t x;
-	int32_t* stereoOut = (int32_t*)outL;
+	int32_t* stereoOut = outL;
 
 	int16_t left[size];
 	int16_t right[size];
@@ -148,8 +149,8 @@ void Compressor_process(Compressor *c, int16_t *fxBuffer,int16_t* outL, int16_t*
 			//int16_t wet2 = __SSAT((int32_t)(right[i] * 32768.0f), 16);
 			x = __PKHBT(fxBuffer[idx1] + __SSAT((left[i] - fxBuffer[idx1]) * dryWet,16), fxBuffer[idx2] + __SSAT((right[i] - fxBuffer[idx2]) * dryWet,16), 16);
 			//int16_t dw = fxBuffer[i] + __SSAT((wet - fxBuffer[i]) * dryWet,16);
-			*stereoOut = __QADD16(*stereoOut, x);
-			stereoOut++;
+			mixer_addStereo(stereoOut, x);
+			stereoOut += 2;
 		}
 	}
 	else
@@ -182,7 +183,7 @@ void Compressor_process(Compressor *c, int16_t *fxBuffer,int16_t* outL, int16_t*
 
 			//--- Output transfer ---
 			const int16_t dw = fxBuffer[idx1] + __SSAT((left[i] - fxBuffer[idx1]) * dryWet,16);
-			*outL = __QADD16(*outL, dw);
+			*outL += dw;
 			outL += 2;
 		}
 	}

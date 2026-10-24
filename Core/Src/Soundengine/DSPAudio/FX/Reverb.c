@@ -14,6 +14,7 @@
 
 
 #include "Soundengine/DSPAudio/FX/Reverb.h"
+#include "Soundengine/DSPAudio/mixer.h"
 #include "Soundengine/DSPAudio/FX/FxRamBuffer.h"
 
 
@@ -204,10 +205,10 @@ void Reverb_init(Reverb *r)
 
 
 //void Reverb_process(Reverb *r, int16_t* input1, int16_t* input2)
-void Reverb_process(Reverb *r, int16_t *fxBuffer,int16_t* outL, int16_t* outR, uint16_t size,  uint8_t channels, float dryWet)
+void Reverb_process(Reverb *r, int16_t *fxBuffer,int32_t* outL, int32_t* outR, uint16_t size,  uint8_t channels, float dryWet)
 {
 	int32_t x;
-	int32_t* stereoOut = (int32_t*)outL;
+	int32_t* stereoOut = outL;
 
 #if !HIGH_RES_SINE_COS
 	 SineCosine_calc(&r->lfo);
@@ -445,8 +446,8 @@ void Reverb_process(Reverb *r, int16_t *fxBuffer,int16_t* outL, int16_t* outR, u
 
 			x = __PKHBT(fxBuffer[idx1] + __SSAT((wet - fxBuffer[idx1]) * dryWet,16), fxBuffer[idx2] + __SSAT((wet - fxBuffer[idx2]) * dryWet,16), 16);
 			//LERP dryWet
-			*stereoOut = __QADD16(*stereoOut, x);
-			stereoOut++;
+			mixer_addStereo(stereoOut, x);
+			stereoOut += 2;
 	}
 }
 IN_ITCM_RAM void Reverb_setDelayTime(Reverb *r, float t)

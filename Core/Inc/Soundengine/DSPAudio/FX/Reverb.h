@@ -77,7 +77,7 @@ typedef struct ReverbStruct
 } Reverb;
 
 void Reverb_init(Reverb *r);
-void Reverb_process(Reverb *r, int16_t *fxBuffer,int16_t* outL, int16_t* outR, uint16_t size,  uint8_t channels, float dryWet);
+void Reverb_process(Reverb *r, int16_t *fxBuffer,int32_t* outL, int32_t* outR, uint16_t size,  uint8_t channels, float dryWet);
 void Reverb_setDelayTime(Reverb *r, float t);
 void Reverb_setFeedback(Reverb *r, float fb);
 void Reverb_setVariation(Reverb *r, float v);

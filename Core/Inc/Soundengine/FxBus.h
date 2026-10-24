@@ -63,7 +63,7 @@ typedef struct FxStruct
 extern INDTCMZ FxBus fxBus;
 
 void FxBus_init();
-void FxBus_process(int16_t *fxBuffer, int16_t* outL,int16_t* outR,int16_t* outL2, int16_t* outR2, uint32_t size);
+void FxBus_process(int16_t *fxBuffer, int32_t* outL,int32_t* outR,int32_t* outL2, int32_t* outR2, uint32_t size);
 void FxBus_setParameter(uint8_t idx, float value);
 void FxBus_updateParameter();
 //to prevent NaN pollution from delay

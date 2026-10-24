@@ -14,6 +14,7 @@
 
 
 #include "Soundengine/DSPAudio/FX/Ringmod.h"
+#include "Soundengine/DSPAudio/mixer.h"
 
 void Ringmod_init(Ringmod *rm)
 {
@@ -28,11 +29,11 @@ void Ringmod_init(Ringmod *rm)
 	rm->osc.pitchMod = 1.0f;
 	osc_setFreq(&rm->osc);
 }
-void Ringmod_process(Ringmod *rm, int16_t *fxBuffer, int16_t* outL, int16_t* outR, uint16_t size,  uint8_t channels, float dryWet)
+void Ringmod_process(Ringmod *rm, int16_t *fxBuffer, int32_t* outL, int32_t* outR, uint16_t size,  uint8_t channels, float dryWet)
 {
 	int16_t buf[size];
 	int32_t x;
-	int32_t* stereoOut = (int32_t*)outL;
+	int32_t* stereoOut = outL;
 
 	calcNextOscSampleBlock(&rm->osc, buf, size, 1.f, 0.3f);
 
@@ -55,8 +56,8 @@ void Ringmod_process(Ringmod *rm, int16_t *fxBuffer, int16_t* outL, int16_t* out
 
 			x = __PKHBT(fxBuffer[idx1] + __SSAT((wet - fxBuffer[idx1]) * dryWet,16), fxBuffer[idx2] + __SSAT((wet2 - fxBuffer[idx2]) * dryWet,16), 16);
 			//LERP dryWet
-			*stereoOut = __QADD16(*stereoOut, x);
-			stereoOut++;
+			mixer_addStereo(stereoOut, x);
+			stereoOut += 2;
 		}
 	}
 	else
@@ -69,9 +70,9 @@ void Ringmod_process(Ringmod *rm, int16_t *fxBuffer, int16_t* outL, int16_t* out
 			//*outL = val1>>16;
 			//*outR = val2>>16;
 
-			const int16_t wet = __QADD16(*outL, val1>>16);
+			const int16_t wet = __SSAT(__SSAT(*outL, 16) + (val1>>16), 16);
 			const int16_t dw = fxBuffer[idx1] + __SSAT((wet - fxBuffer[idx1]) * dryWet,16);
-			*outL = __QADD16(*outL, dw);
+			*outL += dw;
 			outL += 2;
 		}
 	}

@@ -307,7 +307,7 @@ void mixer_saturateOutputs(float gain,  int16_t* outL,int16_t* outR,int16_t* out
 }
 #endif
 //-----------------------------------------------------------------------
-IN_ITCM_RAM static inline void mixer_addDataToOutputFilteredPan(uint8_t dest, const float pan,  int16_t* data,int16_t* outL,int16_t* outR,int16_t* outL2, int16_t* outR2, int16_t *fxBuffer, OnePoleFilter* filter)
+IN_ITCM_RAM static inline void mixer_addDataToOutputFilteredPan(uint8_t dest, const float pan,  int16_t* data,int32_t* outL,int32_t* outR,int32_t* outL2, int32_t* outR2, int16_t *fxBuffer, OnePoleFilter* filter)
 {
 
 
@@ -354,23 +354,9 @@ IN_ITCM_RAM static inline void mixer_addDataToOutputFilteredPan(uint8_t dest, co
 			float panL = sqrtf((127-mixPan)/127.f);
 			float panR = sqrtf(mixPan/127.f);
 			//----
-#if 1
-			int32_t y;
-			int32_t x;
-			y = *((int32_t*)outL2);
-			//x = ((int16_t)(data[i] * panL)& 0xFFFF) | (((int16_t)(data[i] * panR)& 0xFFFF)<<16);
-			x = __PKHBT( (int16_t)(data[i] * panL), (int16_t)(data[i] * panR), 16);
-			*((int32_t*)outL2) = __QADD16(x, y);
+			outL2[0] += (int16_t)(data[i] * panL);
+			outL2[1] += (int16_t)(data[i] * panR);
 			outL2 += 2;
-#else
-
-
-			*outL2 = __QADD16(*outL2,(int16_t)(data[i] * panL)) & 0xFFFF;
-			outL2 += 2;
-
-			*outR2 = __QADD16(*outR2,(int16_t)(data[i] * panR)) & 0xFFFF;
-			outR2 += 2;
-#endif
 		}
 		break;
 	case MIXER_ROUTING_DAC2_STEREO:
@@ -381,53 +367,37 @@ IN_ITCM_RAM static inline void mixer_addDataToOutputFilteredPan(uint8_t dest, co
 			float panL = sqrtf((127-mixPan)/127.f);
 			float panR = sqrtf(mixPan/127.f);
 			//----
-#if 1
-			int32_t x,y;
-			y = *((int32_t*)outL);
-			//simdBuffer x;
-			//x = ((int16_t)(data[i] * panL)& 0xFFFF) | (((int16_t)(data[i] * panR)& 0xFFFF)<<16);
-			//*((int32_t*)outL) = __SADD16(x, y);
-			//x.word[0] = data[i] * panL;
-			//x.word[1] = data[i] * panR;
-			x = __PKHBT( (int16_t)(data[i] * panL), (int16_t)(data[i] * panR), 16);
-			//x = __PKHBT(data[i] * panL, data[i] * panR, 16);
-			*((int32_t*)outL) = __QADD16(x, y);
+			outL[0] += (int16_t)(data[i] * panL);
+			outL[1] += (int16_t)(data[i] * panR);
 			outL += 2;
-#else
-			*outL = __QADD16(*outL,(int16_t)(data[i] * panL)) & 0xFFFF;
-			outL += 2;
-
-			*outR = __QADD16(*outR,(int16_t)(data[i] * panR)) & 0xFFFF;
-			outR += 2;
-#endif
 		}
 		break;
 	case MIXER_ROUTING_DAC1_L:
 		for(i=0;i<OUTPUT_DMA_SIZE;i++)
 		{
 
-			*outL2 = __QADD16(*outL2,data[i]);
+			*outL2 += data[i];
 			outL2 += 2;
 		}
 		break;
 	case MIXER_ROUTING_DAC1_R:
 		for(i=0;i<OUTPUT_DMA_SIZE;i++)
 		{
-			*outR2 = __QADD16(*outR2,data[i]) ;
+			*outR2 += data[i];
 			outR2 += 2;
 		}
 		break;
 	case MIXER_ROUTING_DAC2_L:
 		for(i=0;i<OUTPUT_DMA_SIZE;i++)
 		{
-			*outL = __QADD16(*outL,data[i]);
+			*outL += data[i];
 			outL += 2;
 		}
 		break;
 	case MIXER_ROUTING_DAC2_R:
 		for(i=0;i<OUTPUT_DMA_SIZE;i++)
 		{
-			*outR = __QADD16(*outR,data[i]);
+			*outR += data[i];
 			outR += 2;
 		}
 		break;
@@ -435,7 +405,7 @@ IN_ITCM_RAM static inline void mixer_addDataToOutputFilteredPan(uint8_t dest, co
 	}
 }
 //-----------------------------------------------------------------------
-IN_ITCM_RAM static inline void mixer_addDataToOutput(uint8_t dest, const float panL, const float panR,  int16_t* data,int16_t* outL,int16_t* outR,int16_t* outL2, int16_t* outR2, int16_t *fxBuffer)
+IN_ITCM_RAM static inline void mixer_addDataToOutput(uint8_t dest, const float panL, const float panR,  int16_t* data,int32_t* outL,int32_t* outR,int32_t* outL2, int32_t* outR2, int16_t *fxBuffer)
 {
 	//check if a cable is in the selected out
 	dest = mixer_checkOutJackAvailable(dest);
@@ -469,74 +439,44 @@ IN_ITCM_RAM static inline void mixer_addDataToOutput(uint8_t dest, const float p
 	case MIXER_ROUTING_DAC1_STEREO:
 		for(i=0;i<OUTPUT_DMA_SIZE;i++)
 		{
-#if 1
-			int32_t y;
-			int32_t x;
-			y = *((int32_t*)outL2);
-			//x = ((int16_t)(data[i] * panL)& 0xFFFF) | (((int16_t)(data[i] * panR)& 0xFFFF)<<16);
-			x = __PKHBT( (int16_t)(data[i] * panL), (int16_t)(data[i] * panR), 16);
-			*((int32_t*)outL2) = __QADD16(x, y);
+			outL2[0] += (int16_t)(data[i] * panL);
+			outL2[1] += (int16_t)(data[i] * panR);
 			outL2 += 2;
-#else
-
-
-			*outL2 = __QADD16(*outL2,(int16_t)(data[i] * panL)) & 0xFFFF;
-			outL2 += 2;
-
-			*outR2 = __QADD16(*outR2,(int16_t)(data[i] * panR)) & 0xFFFF;
-			outR2 += 2;
-#endif
 		}
 		break;
 	case MIXER_ROUTING_DAC2_STEREO:
 		for(i=0;i<OUTPUT_DMA_SIZE;i++)
 		{
-#if 1
-			int32_t x,y;
-			y = *((int32_t*)outL);
-			//simdBuffer x;
-			//x = ((int16_t)(data[i] * panL)& 0xFFFF) | (((int16_t)(data[i] * panR)& 0xFFFF)<<16);
-			//*((int32_t*)outL) = __SADD16(x, y);
-			//x.word[0] = data[i] * panL;
-			//x.word[1] = data[i] * panR;
-			x = __PKHBT( (int16_t)(data[i] * panL), (int16_t)(data[i] * panR), 16);
-			//x = __PKHBT(data[i] * panL, data[i] * panR, 16);
-			*((int32_t*)outL) = __QADD16(x, y);
+			outL[0] += (int16_t)(data[i] * panL);
+			outL[1] += (int16_t)(data[i] * panR);
 			outL += 2;
-#else
-			*outL = __QADD16(*outL,(int16_t)(data[i] * panL)) & 0xFFFF;
-			outL += 2;
-
-			*outR = __QADD16(*outR,(int16_t)(data[i] * panR)) & 0xFFFF;
-			outR += 2;
-#endif
 		}
 		break;
 	case MIXER_ROUTING_DAC1_L:
 		for(i=0;i<OUTPUT_DMA_SIZE;i++)
 		{
-			*outL2 = __QADD16(*outL2,data[i]);
+			*outL2 += data[i];
 			outL2 += 2;
 		}
 		break;
 	case MIXER_ROUTING_DAC1_R:
 		for(i=0;i<OUTPUT_DMA_SIZE;i++)
 		{
-			*outR2 = __QADD16(*outR2,data[i]) ;
+			*outR2 += data[i];
 			outR2 += 2;
 		}
 		break;
 	case MIXER_ROUTING_DAC2_L:
 		for(i=0;i<OUTPUT_DMA_SIZE;i++)
 		{
-			*outL = __QADD16(*outL,data[i]);
+			*outL += data[i];
 			outL += 2;
 		}
 		break;
 	case MIXER_ROUTING_DAC2_R:
 		for(i=0;i<OUTPUT_DMA_SIZE;i++)
 		{
-			*outR = __QADD16(*outR,data[i]);
+			*outR += data[i];
 			outR += 2;
 		}
 		break;
@@ -544,6 +484,53 @@ IN_ITCM_RAM static inline void mixer_addDataToOutput(uint8_t dest, const float p
 	}
 }
 //#pragma GCC pop_options
+//-----------------------------------------------------------------------
+/* Output limiter, one per DAC (L and R linked, to keep the stereo image).
+ * Up to full scale the mix passes unchanged, so anything that did not clip
+ * before sounds exactly as before. When the sum of the voices and the FX
+ * return gets louder, the gain drops at once so that no sample exceeds full
+ * scale (no clipping), and then recovers smoothly. */
+#define MIXER_LIMITER_THRESHOLD	32768.f
+//gain recovery per sample: 1-exp(-1/(0.1s * REAL_FS)), i.e. ~100 ms time constant
+#define MIXER_LIMITER_RELEASE	0.000227f
+
+INDTCM float mixer_limiterGain[2] = {1.f, 1.f};
+
+IN_ITCM_RAM static void mixer_limitBlock(float* gainState, const int32_t* in, int16_t* out)
+{
+	float gain = *gainState;
+	for(uint32_t i=0;i<OUTPUT_DMA_SIZE*2;i+=2)
+	{
+		const int32_t l = in[i];
+		const int32_t r = in[i+1];
+		const int32_t absL = l < 0 ? -l : l;
+		const int32_t absR = r < 0 ? -r : r;
+		const int32_t peak = absL > absR ? absL : absR;
+
+		//instant attack: scale this sample down to full scale
+		if(peak * gain > MIXER_LIMITER_THRESHOLD)
+		{
+			gain = MIXER_LIMITER_THRESHOLD / peak;
+		}
+
+		if(gain < 1.f)
+		{
+			out[i]   = __SSAT((int32_t)(l * gain), 16);
+			out[i+1] = __SSAT((int32_t)(r * gain), 16);
+
+			gain += (1.f - gain) * MIXER_LIMITER_RELEASE;
+			//snap to exactly 1 (a step of < 0.01 dB): in float the release stalls
+			//at ~0.99987 and would never get back to a bit-exact pass-through
+			if(gain > 0.999f) gain = 1.f;
+		}
+		else
+		{
+			out[i]   = __SSAT(l, 16);
+			out[i+1] = __SSAT(r, 16);
+		}
+	}
+	*gainState = gain;
+}
 //-----------------------------------------------------------------------
 IN_ITCM_RAM void mixer_calcNextSampleBlock(int16_t* output,int16_t* output2)
 {
@@ -592,9 +579,13 @@ IN_ITCM_RAM void mixer_calcNextSampleBlock(int16_t* output,int16_t* output2)
 
 	const uint8_t pos = 0;
 
+	//32-bit mix buffers, interleaved L/R like the DMA buffers (see mixer.h)
+	int32_t mix[OUTPUT_DMA_SIZE*2];
+	int32_t mix2[OUTPUT_DMA_SIZE*2];
+
 	//Clear is necessary, otherwise we keep trash data on non routed outputs
-	bufferTool_clearBuffer(output,OUTPUT_DMA_SIZE*2);
-	bufferTool_clearBuffer(output2,OUTPUT_DMA_SIZE*2);
+	memset(mix, 0, sizeof(mix));
+	memset(mix2, 0, sizeof(mix2));
 
 	bufferTool_clearBuffer(fxBusData,OUTPUT_DMA_SIZE*2);
 
@@ -604,19 +595,19 @@ IN_ITCM_RAM void mixer_calcNextSampleBlock(int16_t* output,int16_t* output2)
 	mixer_decimateBlock(0,sampleData);
 	//copy to selected dma buffer
 #if USE_SQRT_LUT
-	mixer_addDataToOutput(mixer_audioRouting[0],squareRootLut[127-voiceArray[0].pan] ,squareRootLut[voiceArray[0].pan], sampleData,&output[pos],&output[pos+1],&output2[pos],&output2[pos+1], fxBusData);
+	mixer_addDataToOutput(mixer_audioRouting[0],squareRootLut[127-voiceArray[0].pan] ,squareRootLut[voiceArray[0].pan], sampleData,&mix[pos],&mix[pos+1],&mix2[pos],&mix2[pos+1], fxBusData);
 #else
 
 #if 0//SMOOTH_MIXER_VOL_PAN_DRIVE
 	//float mixPan 	= calcOnePole( &voiceArray[0].MixerPageFilter[1], voiceArray[0].pan);
-	//mixer_addDataToOutput(mixer_audioRouting[0],sqrtf((127-mixPan)/127.f) ,sqrtf(mixPan/127.f), sampleData,&output[pos],&output[pos+1],&output2[pos],&output2[pos+1], fxBusData);
-	mixer_addDataToOutputFilteredPan(mixer_audioRouting[0], voiceArray[0].pan, sampleData,&output[pos],&output[pos+1],&output2[pos],&output2[pos+1], fxBusData, &voiceArray[1].MixerPageFilter[0]);
+	//mixer_addDataToOutput(mixer_audioRouting[0],sqrtf((127-mixPan)/127.f) ,sqrtf(mixPan/127.f), sampleData,&mix[pos],&mix[pos+1],&mix2[pos],&mix2[pos+1], fxBusData);
+	mixer_addDataToOutputFilteredPan(mixer_audioRouting[0], voiceArray[0].pan, sampleData,&mix[pos],&mix[pos+1],&mix2[pos],&mix2[pos+1], fxBusData, &voiceArray[1].MixerPageFilter[0]);
 #else
 
 #if USE_TRIGGERED_PAN
-	mixer_addDataToOutput(mixer_audioRouting[0],voiceArray[0].triggeredPanL  ,voiceArray[0].triggeredPanR , sampleData,&output[pos],&output[pos+1],&output2[pos],&output2[pos+1], fxBusData);
+	mixer_addDataToOutput(mixer_audioRouting[0],voiceArray[0].triggeredPanL  ,voiceArray[0].triggeredPanR , sampleData,&mix[pos],&mix[pos+1],&mix2[pos],&mix2[pos+1], fxBusData);
 #else
-	mixer_addDataToOutput(mixer_audioRouting[0],sqrtf((127-voiceArray[0].pan)/127.f) ,sqrtf(voiceArray[0].pan/127.f), sampleData,&output[pos],&output[pos+1],&output2[pos],&output2[pos+1], fxBusData);
+	mixer_addDataToOutput(mixer_audioRouting[0],sqrtf((127-voiceArray[0].pan)/127.f) ,sqrtf(voiceArray[0].pan/127.f), sampleData,&mix[pos],&mix[pos+1],&mix2[pos],&mix2[pos+1], fxBusData);
 #endif
 #endif
 #endif
@@ -629,17 +620,17 @@ IN_ITCM_RAM void mixer_calcNextSampleBlock(int16_t* output,int16_t* output2)
 	mixer_decimateBlock(1,sampleData);
 	//copy to selected dma buffer
 #if USE_SQRT_LUT
-	mixer_addDataToOutput(mixer_audioRouting[1],squareRootLut[127-voiceArray[1].pan] ,squareRootLut[voiceArray[1].pan], sampleData,&output[pos],&output[pos+1],&output2[pos],&output2[pos+1], fxBusData);
+	mixer_addDataToOutput(mixer_audioRouting[1],squareRootLut[127-voiceArray[1].pan] ,squareRootLut[voiceArray[1].pan], sampleData,&mix[pos],&mix[pos+1],&mix2[pos],&mix2[pos+1], fxBusData);
 #else
 #if 0//SMOOTH_MIXER_VOL_PAN_DRIVE
 	//mixPan 	= calcOnePole( &voiceArray[1].MixerPageFilter[1], voiceArray[1].pan);
-	//mixer_addDataToOutput(mixer_audioRouting[1],sqrtf((127-mixPan)/127.f) ,sqrtf(mixPan/127.f), sampleData,&output[pos],&output[pos+1],&output2[pos],&output2[pos+1], fxBusData);
-	mixer_addDataToOutputFilteredPan(mixer_audioRouting[1], voiceArray[1].pan, sampleData,&output[pos],&output[pos+1],&output2[pos],&output2[pos+1], fxBusData, &voiceArray[1].MixerPageFilter[1]);
+	//mixer_addDataToOutput(mixer_audioRouting[1],sqrtf((127-mixPan)/127.f) ,sqrtf(mixPan/127.f), sampleData,&mix[pos],&mix[pos+1],&mix2[pos],&mix2[pos+1], fxBusData);
+	mixer_addDataToOutputFilteredPan(mixer_audioRouting[1], voiceArray[1].pan, sampleData,&mix[pos],&mix[pos+1],&mix2[pos],&mix2[pos+1], fxBusData, &voiceArray[1].MixerPageFilter[1]);
 #else
 #if USE_TRIGGERED_PAN
-	mixer_addDataToOutput(mixer_audioRouting[1],voiceArray[1].triggeredPanL  ,voiceArray[1].triggeredPanR , 			sampleData,&output[pos],&output[pos+1],&output2[pos],&output2[pos+1], fxBusData);
+	mixer_addDataToOutput(mixer_audioRouting[1],voiceArray[1].triggeredPanL  ,voiceArray[1].triggeredPanR , 			sampleData,&mix[pos],&mix[pos+1],&mix2[pos],&mix2[pos+1], fxBusData);
 #else
-	mixer_addDataToOutput(mixer_audioRouting[1],sqrtf((127-voiceArray[1].pan)/127.f) ,sqrtf(voiceArray[1].pan/127.f), 	sampleData,&output[pos],&output[pos+1],&output2[pos],&output2[pos+1], fxBusData);
+	mixer_addDataToOutput(mixer_audioRouting[1],sqrtf((127-voiceArray[1].pan)/127.f) ,sqrtf(voiceArray[1].pan/127.f), 	sampleData,&mix[pos],&mix[pos+1],&mix2[pos],&mix2[pos+1], fxBusData);
 #endif
 #endif
 #endif
@@ -649,16 +640,16 @@ IN_ITCM_RAM void mixer_calcNextSampleBlock(int16_t* output,int16_t* output2)
 	mixer_decimateBlock(2,sampleData);
 	//copy to selected dma buffer
 #if USE_SQRT_LUT
-	mixer_addDataToOutput(mixer_audioRouting[2],squareRootLut[127-voiceArray[2].pan] ,squareRootLut[voiceArray[2].pan], sampleData,&output[pos],&output[pos+1],&output2[pos],&output2[pos+1], fxBusData);
+	mixer_addDataToOutput(mixer_audioRouting[2],squareRootLut[127-voiceArray[2].pan] ,squareRootLut[voiceArray[2].pan], sampleData,&mix[pos],&mix[pos+1],&mix2[pos],&mix2[pos+1], fxBusData);
 #else
 #if 0//SMOOTH_MIXER_VOL_PAN_DRIVE
 
-	mixer_addDataToOutputFilteredPan(mixer_audioRouting[2], voiceArray[2].pan, sampleData,&output[pos],&output[pos+1],&output2[pos],&output2[pos+1], fxBusData, &voiceArray[2].MixerPageFilter[1]);
+	mixer_addDataToOutputFilteredPan(mixer_audioRouting[2], voiceArray[2].pan, sampleData,&mix[pos],&mix[pos+1],&mix2[pos],&mix2[pos+1], fxBusData, &voiceArray[2].MixerPageFilter[1]);
 #else
 #if USE_TRIGGERED_PAN
-	mixer_addDataToOutput(mixer_audioRouting[2],voiceArray[2].triggeredPanL  ,voiceArray[2].triggeredPanR , 			sampleData,&output[pos],&output[pos+1],&output2[pos],&output2[pos+1], fxBusData);
+	mixer_addDataToOutput(mixer_audioRouting[2],voiceArray[2].triggeredPanL  ,voiceArray[2].triggeredPanR , 			sampleData,&mix[pos],&mix[pos+1],&mix2[pos],&mix2[pos+1], fxBusData);
 #else
-	mixer_addDataToOutput(mixer_audioRouting[2],sqrtf((127-voiceArray[2].pan)/127.f) ,sqrtf(voiceArray[2].pan/127.f), 	sampleData,&output[pos],&output[pos+1],&output2[pos],&output2[pos+1], fxBusData);
+	mixer_addDataToOutput(mixer_audioRouting[2],sqrtf((127-voiceArray[2].pan)/127.f) ,sqrtf(voiceArray[2].pan/127.f), 	sampleData,&mix[pos],&mix[pos+1],&mix2[pos],&mix2[pos+1], fxBusData);
 #endif
 #endif
 #endif
@@ -668,13 +659,13 @@ IN_ITCM_RAM void mixer_calcNextSampleBlock(int16_t* output,int16_t* output2)
 	mixer_decimateBlock(3,sampleData);
 	//copy to selected dma buffer
 #if USE_SQRT_LUT
-	mixer_addDataToOutput(mixer_audioRouting[3],squareRootLut[127-snareVoice.pan], squareRootLut[snareVoice.pan], sampleData,&output[pos],&output[pos+1],&output2[pos],&output2[pos+1], fxBusData);
+	mixer_addDataToOutput(mixer_audioRouting[3],squareRootLut[127-snareVoice.pan], squareRootLut[snareVoice.pan], sampleData,&mix[pos],&mix[pos+1],&mix2[pos],&mix2[pos+1], fxBusData);
 #else
 
 #if USE_TRIGGERED_PAN
-	mixer_addDataToOutput(mixer_audioRouting[3],snareVoice.triggeredPanL  ,snareVoice.triggeredPanR , 			sampleData,&output[pos],&output[pos+1],&output2[pos],&output2[pos+1], fxBusData);
+	mixer_addDataToOutput(mixer_audioRouting[3],snareVoice.triggeredPanL  ,snareVoice.triggeredPanR , 			sampleData,&mix[pos],&mix[pos+1],&mix2[pos],&mix2[pos+1], fxBusData);
 #else
-	mixer_addDataToOutput(mixer_audioRouting[3],sqrtf((127-snareVoice.pan)/127.f), sqrtf(snareVoice.pan/127.f), sampleData,&output[pos],&output[pos+1],&output2[pos],&output2[pos+1], fxBusData);
+	mixer_addDataToOutput(mixer_audioRouting[3],sqrtf((127-snareVoice.pan)/127.f), sqrtf(snareVoice.pan/127.f), sampleData,&mix[pos],&mix[pos+1],&mix2[pos],&mix2[pos+1], fxBusData);
 #endif
 #endif
 	//calc cymbal
@@ -683,12 +674,12 @@ IN_ITCM_RAM void mixer_calcNextSampleBlock(int16_t* output,int16_t* output2)
 	mixer_decimateBlock(4,sampleData);
 	//copy to selected dma buffer
 #if USE_SQRT_LUT
-	mixer_addDataToOutput(mixer_audioRouting[4],squareRootLut[127-cymbalVoice.pan],	squareRootLut[cymbalVoice.pan], sampleData,&output[pos],&output[pos+1],&output2[pos],&output2[pos+1], fxBusData);
+	mixer_addDataToOutput(mixer_audioRouting[4],squareRootLut[127-cymbalVoice.pan],	squareRootLut[cymbalVoice.pan], sampleData,&mix[pos],&mix[pos+1],&mix2[pos],&mix2[pos+1], fxBusData);
 #else
 #if USE_TRIGGERED_PAN
-	mixer_addDataToOutput(mixer_audioRouting[4],cymbalVoice.triggeredPanL  ,cymbalVoice.triggeredPanR , 			sampleData,&output[pos],&output[pos+1],&output2[pos],&output2[pos+1], fxBusData);
+	mixer_addDataToOutput(mixer_audioRouting[4],cymbalVoice.triggeredPanL  ,cymbalVoice.triggeredPanR , 			sampleData,&mix[pos],&mix[pos+1],&mix2[pos],&mix2[pos+1], fxBusData);
 #else
-	mixer_addDataToOutput(mixer_audioRouting[4],sqrtf((127-cymbalVoice.pan)/127.f),	sqrtf(cymbalVoice.pan/127.f), sampleData,&output[pos],&output[pos+1],&output2[pos],&output2[pos+1], fxBusData);
+	mixer_addDataToOutput(mixer_audioRouting[4],sqrtf((127-cymbalVoice.pan)/127.f),	sqrtf(cymbalVoice.pan/127.f), sampleData,&mix[pos],&mix[pos+1],&mix2[pos],&mix2[pos+1], fxBusData);
 #endif
 #endif
 
@@ -699,21 +690,25 @@ IN_ITCM_RAM void mixer_calcNextSampleBlock(int16_t* output,int16_t* output2)
 	mixer_decimateBlock(5,sampleData);
 	//copy to selected dma buffer
 #if USE_SQRT_LUT
-	mixer_addDataToOutput(mixer_audioRouting[5],squareRootLut[127-hatVoice.pan],squareRootLut[hatVoice.pan], sampleData,&output[pos],&output[pos+1],&output2[pos],&output2[pos+1], fxBusData);
+	mixer_addDataToOutput(mixer_audioRouting[5],squareRootLut[127-hatVoice.pan],squareRootLut[hatVoice.pan], sampleData,&mix[pos],&mix[pos+1],&mix2[pos],&mix2[pos+1], fxBusData);
 #else
 #if USE_TRIGGERED_PAN
-	mixer_addDataToOutput(mixer_audioRouting[5],hatVoice.triggeredPanL  ,hatVoice.triggeredPanR , 			sampleData,&output[pos],&output[pos+1],&output2[pos],&output2[pos+1], fxBusData);
+	mixer_addDataToOutput(mixer_audioRouting[5],hatVoice.triggeredPanL  ,hatVoice.triggeredPanR , 			sampleData,&mix[pos],&mix[pos+1],&mix2[pos],&mix2[pos+1], fxBusData);
 #else
-	mixer_addDataToOutput(mixer_audioRouting[5],sqrtf((127-hatVoice.pan)/127.f),sqrtf(hatVoice.pan/127.f), sampleData,&output[pos],&output[pos+1],&output2[pos],&output2[pos+1], fxBusData);
+	mixer_addDataToOutput(mixer_audioRouting[5],sqrtf((127-hatVoice.pan)/127.f),sqrtf(hatVoice.pan/127.f), sampleData,&mix[pos],&mix[pos+1],&mix2[pos],&mix2[pos+1], fxBusData);
 #endif
 #endif
 
 #endif
-	FxBus_process(fxBusData,  &output[pos],&output[pos+1],&output2[pos],&output2[pos+1], OUTPUT_DMA_SIZE);
+	FxBus_process(fxBusData,  &mix[pos],&mix[pos+1],&mix2[pos],&mix2[pos+1], OUTPUT_DMA_SIZE);
+
+	//bring the sums back into the 16-bit range of the DACs
+	mixer_limitBlock(&mixer_limiterGain[0], mix, output);
+	mixer_limitBlock(&mixer_limiterGain[1], mix2, output2);
 /*
 	if(activeParameters[UNUSED_PAR_GLO_SAT])
 	{
-		mixer_saturateOutputs(activeParameters[UNUSED_PAR_GLO_SAT]/127.f, &output[pos],&output[pos+1],&output2[pos],&output2[pos+1]);
+		mixer_saturateOutputs(activeParameters[UNUSED_PAR_GLO_SAT]/127.f, &mix[pos],&mix[pos+1],&mix2[pos],&mix2[pos+1]);
 	}
 	*/
 

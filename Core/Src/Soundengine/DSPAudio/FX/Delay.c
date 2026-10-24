@@ -14,6 +14,7 @@
 
 
 #include "Soundengine/DSPAudio/FX/Delay.h"
+#include "Soundengine/DSPAudio/mixer.h"
 
 void Delay_init(Delay* d)
 {
@@ -90,11 +91,11 @@ void Delay_calcBuffer(Delay* d, uint8_t bufferIdx)
 }
 
 
-void Delay_processPingPong(Delay *d, int16_t *fxBuffer,int16_t* outL, int16_t* outR, uint16_t size,  uint8_t channels, float dryWet)
+void Delay_processPingPong(Delay *d, int16_t *fxBuffer,int32_t* outL, int32_t* outR, uint16_t size,  uint8_t channels, float dryWet)
 {
 
 	int32_t x;
-	int32_t* stereoOut = (int32_t*)outL;
+	int32_t* stereoOut = outL;
 
 	for(uint8_t i=0;i<size;i++)
 	{
@@ -170,13 +171,13 @@ void Delay_processPingPong(Delay *d, int16_t *fxBuffer,int16_t* outL, int16_t* o
 			//LERP dryWet
 			if (channels == 2)
       {
-        *stereoOut = __QADD16(*stereoOut, x);
-        stereoOut++;
+        mixer_addStereo(stereoOut, x);
+        stereoOut += 2;
       }
       else
       {
-        *(uint16_t*)stereoOut = __QADD16(*stereoOut, x);
-        stereoOut++;
+        *stereoOut += (int16_t)x;
+        stereoOut += 2;
       }
 
 			//*input1 = dryWet*out + (1-dryWet)* (*input1);
@@ -184,12 +185,12 @@ void Delay_processPingPong(Delay *d, int16_t *fxBuffer,int16_t* outL, int16_t* o
 	}
 }
 
-void Delay_process(Delay *d, int16_t *fxBuffer,int16_t* outL, int16_t* outR, uint16_t size,  uint8_t channels, float dryWet)
+void Delay_process(Delay *d, int16_t *fxBuffer,int32_t* outL, int32_t* outR, uint16_t size,  uint8_t channels, float dryWet)
 {
 	//FX_BUFFER[0] = 0;
 
 	int32_t x;
-	int32_t* stereoOut = (int32_t*)outL;
+	int32_t* stereoOut = outL;
 
 	for(uint8_t i=0;i<size;i++)
 	{
@@ -256,13 +257,13 @@ void Delay_process(Delay *d, int16_t *fxBuffer,int16_t* outL, int16_t* outR, uin
     //LERP dryWet
     if (channels == 2)
     {
-      *stereoOut = __QADD16(*stereoOut, x);
-      stereoOut++;
+      mixer_addStereo(stereoOut, x);
+      stereoOut += 2;
     }
     else
     {
-      *(uint16_t*)stereoOut = __QADD16(*stereoOut, x);
-      stereoOut++;
+      *stereoOut += (int16_t)x;
+      stereoOut += 2;
     }
 
     //*input1 = dryWet*out + (1-dryWet)* (*input1);

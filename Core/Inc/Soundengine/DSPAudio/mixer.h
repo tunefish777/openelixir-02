@@ -41,4 +41,16 @@ enum
 void mixer_init();
 void  mixer_calcNextSampleBlock(int16_t* output,int16_t* output2);
 
+/* The voices and the FX return are summed into 32-bit buffers (interleaved
+ * L/R like the DMA buffers), so that the sum can exceed the 16-bit range
+ * without wrapping or clipping. A limiter per DAC then brings it back into
+ * range before it is written to the DMA buffers. */
+
+/** Adds a packed stereo sample (as built with __PKHBT(left, right, 16)) to a 32-bit mix buffer. */
+static inline void mixer_addStereo(int32_t* out, int32_t x)
+{
+	out[0] += (int16_t)x;
+	out[1] += x >> 16;
+}
+
 #endif /* MIXER_H_ */

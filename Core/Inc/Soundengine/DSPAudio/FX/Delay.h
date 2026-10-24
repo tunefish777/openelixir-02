@@ -72,8 +72,8 @@ typedef struct DelayStruct
 
 void Delay_init(Delay* d);
 void Delay_calcBuffer(Delay* d, uint8_t bufferIdx);
-void Delay_process(Delay *d, int16_t *fxBuffer,int16_t* outL, int16_t* outR, uint16_t size,  uint8_t channels, float dryWet);
-void Delay_processPingPong(Delay *d, int16_t *fxBuffer,int16_t* outL, int16_t* outR, uint16_t size,  uint8_t channels, float dryWet);
+void Delay_process(Delay *d, int16_t *fxBuffer,int32_t* outL, int32_t* outR, uint16_t size,  uint8_t channels, float dryWet);
+void Delay_processPingPong(Delay *d, int16_t *fxBuffer,int32_t* outL, int32_t* outR, uint16_t size,  uint8_t channels, float dryWet);
 void Delay_setDelayTime(Delay* d, float t);
 void Delay_setFeedback(Delay* d, float fb);
 void Delay_setRange(Delay* d, float r);
