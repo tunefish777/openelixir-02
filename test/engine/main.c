@@ -384,6 +384,34 @@ static int blockTest(void)
 	printf("engine block in kit files: %s\n", fail ? "FAILED" : "ok");
 	return fail;
 }
+
+#if KIT_ENGINES_API >= 2
+//parameter mapping between slots (menu pages and value types of switched
+//slots): every parameter of a slot belongs to it and maps back and forth
+static int mapTest(void)
+{
+	int fail = 0;
+	for(uint16_t par = 1; par < END_OF_SOUND_PARAMETERS; par++)
+	{
+		const uint8_t slot = kitEngines_slotOfParam(par);
+		if(slot >= NUM_VOICE_SLOTS)
+			continue;
+		for(uint8_t to = 0; to < NUM_VOICE_SLOTS; to++)
+		{
+			const uint16_t mapped = kitEngines_mapParam(par, slot, to);
+			const uint16_t back = kitEngines_mapParam(mapped, to, slot);
+			const uint16_t expect = (par == PAR_VELOD6_OPEN && to != slot) ? PAR_VELOD6_CLOSED : par;	//decay B -> decay
+			if(kitEngines_slotOfParam(mapped) != to || back != expect)
+			{
+				printf("  map: par %u slot %u -> %u gives %u, back %u\n", par, slot + 1, to + 1, mapped, back);
+				fail = 1;
+			}
+		}
+	}
+	printf("parameter mapping between slots: %s\n", fail ? "FAILED" : "ok");
+	return fail;
+}
+#endif
 #endif
 
 //every slot gets every engine: each track must sound, track 7 must use decay B,
@@ -394,6 +422,9 @@ static int engineTest(void)
 	int fail = 0, peak, nan = 0;
 #ifdef HAVE_KIT_ENGINES
 	fail |= blockTest();
+#if KIT_ENGINES_API >= 2
+	fail |= mapTest();
+#endif
 #endif
 	for(int round = 0; round < NUM_ENGINES; round++)
 	{

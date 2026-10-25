@@ -209,7 +209,7 @@ void adc_checkPots()
       uint8_t activePage		= (getMenuIndx()&MASK_PAGE)>>PAGE_SHIFT;
       uint8_t activeParameter	= getMenuIndx() & MASK_PARAMETER;
       uint8_t isOn2ndPage		= ( activeParameter > 3) * 4;
-      uint16_t paramNr				= pgm_read_word(&menuPages[menu_activePage][activePage].bot1 +
+      uint16_t paramNr				= pgm_read_word(&menu_getPage(menu_activePage,activePage)->bot1 +
         i + isOn2ndPage);
       if (paramNr == PAR_BPM && (activeParameters[paramNr] == 0 || activeParameters[paramNr] == 1))
       {

@@ -30,6 +30,11 @@ void paramToModTargetInit();
 // return the total number of mod targets that exist (all voices)
 uint8_t getNumModTargets();
 
+//name (index into valueNames) of a mod target for the engine its voice slot
+//runs, MOD_TARGET_HIDDEN if that engine doesn't have the setting
+#define MOD_TARGET_HIDDEN 0xff
+uint8_t modTargetNameIdx(const uint8_t idx);
+
 // returns 1 based index or 0 for invalid
 uint8_t voiceFromModTargValue(uint8_t val);
 

@@ -75,6 +75,7 @@ enum SelectModes
 	SELECT_MODE_LAST_STEP_TRACK,
 	SELECT_MODE_LAST_STEP_ALL,
 
+	SELECT_MODE_ENGINE,		//engine menu (OpenElixir-02)
 };
 		
 enum SeqButtonFunctions

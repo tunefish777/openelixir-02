@@ -20,6 +20,7 @@
 #include "IO/DIO.h"
 #include "menu/screensaver.h"
 #include "menu/copyClearTools.h"
+#include "menu/engineMenu.h"
 #include "config.h"
 #include "front.h"
 #include "Soundengine/globals.h"
@@ -675,6 +676,7 @@ static void buttonHandler_handleSelectButton(uint8_t buttonNr) {
 			break;
 
 		case SELECT_MODE_FX:
+		case SELECT_MODE_ENGINE:
 			//return to voice mode
 			buttonHandler_handleModeButtons(0);
 			buttonHandler_handleSelectButton(buttonNr);
@@ -843,7 +845,8 @@ static void buttonHandler_seqButtonPressed(uint8_t seqButtonPressed)
 			//single instrument buttons
 			break;
 
-		case SEQ_KIT: //kit
+		case SEQ_KIT: //kit: engine menu of the active voice
+			engineMenu_open();
 			break;
 
 		case SEQ_MORPH: //morph
@@ -1570,6 +1573,10 @@ static void buttonHandler_voiceButtonPressed(uint8_t voiceNr)
 					led_clearAllBlinkLeds();
 					buttonHandler_enterSeqModeStepMode();
 
+				}
+				else if (buttonHandler_stateMemory.selectButtonMode == SELECT_MODE_ENGINE) {
+					//engine menu of the new voice
+					engineMenu_open();
 				}
 
 

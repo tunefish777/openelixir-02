@@ -31,6 +31,9 @@
 //stock firmware ignores the block.
 #define KIT_ENGINES_BLOCK_SIZE	(5 + NUM_VOICE_SLOTS)
 
+//version of this interface (for the host tests, which also build older trees)
+#define KIT_ENGINES_API		2
+
 extern uint8_t kitEngines[NUM_VOICE_SLOTS];							//the active kit
 extern uint8_t kitEngines_ram[NUM_KIT_SLOTS][NUM_VOICE_SLOTS];		//the kits in RAM (mainParameters)
 
@@ -47,6 +50,17 @@ void kitEngines_apply(void);
 
 //the slot whose engine specific parameter par is, NUM_VOICE_SLOTS if none
 uint8_t kitEngines_rolePar2Slot(const uint16_t par);
+
+//the slot whose sound parameter par is (incl. its modulation targets and slot 6
+//decay B), NUM_VOICE_SLOTS if none
+uint8_t kitEngines_slotOfParam(const uint16_t par);
+
+//the parameter of slot toSlot with the same function as par of slot fromSlot
+//(slot 6 decay B maps to decay); par itself if it isn't a sound parameter of fromSlot
+uint16_t kitEngines_mapParam(uint16_t par, const uint8_t fromSlot, const uint8_t toSlot);
+
+//the slot whose stock engine engine is (where its defaults and menu pages come from)
+uint8_t kitEngines_stockSlot(const uint8_t engine);
 
 //engines -> block, returns its size (KIT_ENGINES_BLOCK_SIZE)
 uint8_t kitEngines_encode(const uint8_t* engines, uint8_t* block);

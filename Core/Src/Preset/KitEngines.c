@@ -16,6 +16,7 @@
 #include "Soundengine/MIDI/MidiMessages.h"
 #include "frontPanelParser_ui.h"
 #include "Preset/PresetManager.h"
+#include "Soundengine/Sequencer/sequencer.h"
 #include <string.h>
 
 uint8_t kitEngines[NUM_VOICE_SLOTS] = { ENGINE_DRUM, ENGINE_DRUM, ENGINE_DRUM, ENGINE_SNARE, ENGINE_CYMBAL, ENGINE_HIHAT };
@@ -60,8 +61,7 @@ void kitEngines_decode(const uint8_t* block, const uint16_t size, uint8_t* engin
 	}
 }
 //---------------------------------------------------
-//the slot whose stock engine this is (where its defaults are taken from)
-static uint8_t kitEngines_stockSlot(const uint8_t engine)
+uint8_t kitEngines_stockSlot(const uint8_t engine)
 {
 	switch(engine)
 	{
@@ -133,6 +133,53 @@ static void kitEngines_slotParams(const uint8_t slot, uint8_t* list)
 	}
 }
 //---------------------------------------------------
+//parameters of a slot that are not in kitEngines_slotParams(), with one entry per slot
+static const uint8_t kitEngines_extraParams[] = { PAR_VEL_DEST_1, PAR_VOICE_LFO1, PAR_TARGET_LFO1 };
+//---------------------------------------------------
+uint8_t kitEngines_slotOfParam(const uint16_t par)
+{
+	if(par == PAR_VELOD6_OPEN)
+		return NUM_VOICE_SLOTS-1;
+	uint8_t list[NUM_SLOT_PARAMS];
+	for(uint8_t slot=0;slot<NUM_VOICE_SLOTS;slot++)
+	{
+		for(uint8_t i=0;i<sizeof(kitEngines_extraParams);i++)
+		{
+			if(par == kitEngines_extraParams[i] + slot)
+				return slot;
+		}
+		kitEngines_slotParams(slot, list);
+		for(uint8_t i=0;i<NUM_SLOT_PARAMS;i++)
+		{
+			if(list[i] == par)
+				return slot;
+		}
+	}
+	return NUM_VOICE_SLOTS;
+}
+//---------------------------------------------------
+uint16_t kitEngines_mapParam(uint16_t par, const uint8_t fromSlot, const uint8_t toSlot)
+{
+	if(fromSlot == toSlot)
+		return par;
+	if(par == PAR_VELOD6_OPEN && fromSlot == NUM_VOICE_SLOTS-1)
+		par = PAR_VELOD6_CLOSED;
+	for(uint8_t i=0;i<sizeof(kitEngines_extraParams);i++)
+	{
+		if(par == kitEngines_extraParams[i] + fromSlot)
+			return kitEngines_extraParams[i] + toSlot;
+	}
+	uint8_t from[NUM_SLOT_PARAMS], to[NUM_SLOT_PARAMS];
+	kitEngines_slotParams(fromSlot, from);
+	kitEngines_slotParams(toSlot, to);
+	for(uint8_t i=0;i<NUM_SLOT_PARAMS;i++)
+	{
+		if(from[i] == par)
+			return to[i];
+	}
+	return par;
+}
+//---------------------------------------------------
 static uint8_t kitEngines_initValue(const uint8_t par)
 {
 	return par < INIT_KIT_SIZE - 8 ? initKit[8 + par] : 0;
@@ -151,6 +198,7 @@ void kitEngines_assign(const uint8_t slot, const uint8_t engine)
 
 	kitEngines[slot] = engine;
 	slot_setEngine(slot, engine);
+	menu_updateVoicePages();
 
 	//every sound parameter of the slot starts from the new engine's defaults:
 	//the values of the engine's stock slot in the init kit
@@ -188,6 +236,28 @@ void kitEngines_assign(const uint8_t slot, const uint8_t engine)
 		}
 	}
 
+	//the same for step automation in the patterns in RAM
+	for(uint8_t pattern=0;pattern<NUM_PATTERN;pattern++)
+	{
+		for(uint8_t track=0;track<NUM_TRACKS;track++)
+		{
+			for(uint8_t step=0;step<NUM_STEPS;step++)
+			{
+				Step* st = &seq_patternSet.seq_subStepPattern[pattern][track][step];
+				if(kitEngines_isRolePar(slot, st->param1Nr))
+				{
+					st->param1Nr = NO_AUTOMATION;
+					st->param1Val = 0;
+				}
+				if(kitEngines_isRolePar(slot, st->param2Nr))
+				{
+					st->param2Nr = NO_AUTOMATION;
+					st->param2Val = 0;
+				}
+			}
+		}
+	}
+
 	//autosave (tmp.snd) like any other kit edit
 	preset_touchTimer(PRESET_KIT_TIMER);
 
@@ -209,4 +279,5 @@ void kitEngines_apply(void)
 	{
 		slot_setEngine(slot, kitEngines[slot]);
 	}
+	menu_updateVoicePages();
 }

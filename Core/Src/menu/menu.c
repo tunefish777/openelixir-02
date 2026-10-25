@@ -26,6 +26,7 @@
 #include "menu/screensaver.h"
 #include "menu/CcNr2Text.h"
 #include "menu/copyClearTools.h"
+#include "menu/engineMenu.h"
 #include "buttonHandler.h"
 #include <ctype.h>
 #include <frontPanelParser_ui.h>
@@ -573,6 +574,98 @@ const enum Datatypes PROGMEM parameter_dtypes[NUM_PARAMS] = {
 	    /*PAR_MIDI_NOTE7*/		DTYPE_NOTE_NAME,
 		/*PAR_PATTERN_MODE*/ DTYPE_MENU | (MENU_PAT_MODE<<8),
 };
+//---------------------------------------------------------------
+//Voice pages of slots that run a non-stock engine: built from the engine's stock
+//page, every parameter moved to the slot's parameter with the same function
+static Page menu_voicePages[VOICE7_PAGE-VOICE1_PAGE+1][NUM_SUB_PAGES];
+static uint8_t menu_voicePageBuilt[VOICE7_PAGE-VOICE1_PAGE+1];
+
+static uint16_t menu_trackPar(const uint16_t par, const uint8_t fromTrack, const uint8_t toTrack)
+{
+	static const uint16_t midiChan[7] = { PAR_MIDI_CHAN_1, PAR_MIDI_CHAN_2, PAR_MIDI_CHAN_3, PAR_MIDI_CHAN_4, PAR_MIDI_CHAN_5, PAR_MIDI_CHAN_6, PAR_MIDI_CHAN_7 };
+	if(par == midiChan[fromTrack])
+		return midiChan[toTrack];
+	if(par == PAR_MIDI_NOTE1 + fromTrack)
+		return PAR_MIDI_NOTE1 + toTrack;
+	return par;
+}
+
+void menu_updateVoicePages()
+{
+	for(uint8_t page=VOICE1_PAGE;page<=VOICE7_PAGE;page++)
+	{
+		//voice 7 is the 2nd trigger of slot 6
+		const uint8_t slot = page < NUM_VOICE_SLOTS ? page : NUM_VOICE_SLOTS-1;
+		const uint8_t engine = kitEngines[slot];
+		menu_voicePageBuilt[page] = engine != slot_stockEngine(slot);
+		if(!menu_voicePageBuilt[page])
+			continue;
+
+		const uint8_t stockSlot = kitEngines_stockSlot(engine);	//its page: VOICE1_PAGE + stockSlot
+		for(uint8_t sub=0;sub<NUM_SUB_PAGES;sub++)
+		{
+			Page* dst = &menu_voicePages[page][sub];
+			*dst = menuPages[VOICE1_PAGE + stockSlot][sub];
+			uint16_t* par = &dst->bot1;
+			uint8_t* text = &dst->top1;
+			for(uint8_t i=0;i<8;i++)
+			{
+				par[i] = menu_trackPar(par[i], stockSlot, page);
+				par[i] = kitEngines_mapParam(par[i], stockSlot, slot);
+				if(page == VOICE7_PAGE && par[i] == PAR_VELOD6_CLOSED)
+					par[i] = PAR_VELOD6_OPEN;	//decay B
+
+				//slot 6 has decay A (d1, voice 6) and B (d2, voice 7) whatever the
+				//engine, the other slots one decay (also for a hi-hat)
+				if(par[i] == PAR_VELOD6_CLOSED)
+					text[i] = TEXT_DECAY_CLOSED;
+				else if(par[i] == PAR_VELOD6_OPEN)
+					text[i] = TEXT_DECAY_OPEN;
+				else if(text[i] == TEXT_DECAY_CLOSED || text[i] == TEXT_DECAY_OPEN)
+					text[i] = TEXT_DECAY;
+			}
+		}
+	}
+}
+
+const Page* menu_getPage(const uint8_t page, const uint8_t sub)
+{
+	if(page <= VOICE7_PAGE && menu_voicePageBuilt[page])
+		return &menu_voicePages[page][sub];
+	return &menuPages[page][sub];
+}
+
+//for a sound parameter of a slot with a non-stock engine: the parameter with
+//the same function in the engine's stock slot (its type, display, ...)
+static uint16_t menu_stockParam(const uint16_t par)
+{
+	const uint8_t slot = kitEngines_slotOfParam(par);
+	if(slot < NUM_VOICE_SLOTS && kitEngines[slot] != slot_stockEngine(slot))
+	{
+		return kitEngines_mapParam(par, slot, kitEngines_stockSlot(kitEngines[slot]));
+	}
+	return par;
+}
+
+uint16_t menu_paramDtype(const uint16_t par)
+{
+	return parameter_dtypes[menu_stockParam(par)];
+}
+
+//tuning parameters show +-63 around 60 instead of 63
+static uint8_t menu_isTuningParam(const uint16_t parNr)
+{
+	switch(menu_stockParam(parNr))
+	{
+	case PAR_COARSE1: case PAR_COARSE2: case PAR_COARSE3: case PAR_COARSE4: case PAR_COARSE5: case PAR_COARSE6:
+	case PAR_FM_FREQ1: case PAR_FM_FREQ2: case PAR_FM_FREQ3:
+	case PAR_MOD_OSC_F1_CYM: case PAR_MOD_OSC_F2_CYM: case PAR_MOD_OSC_F1: case PAR_MOD_OSC_F2:
+		return 1;
+	default:
+		return 0;
+	}
+}
+
 
 
 
@@ -1094,7 +1187,11 @@ static void menu_repaintCpuMeter()
 static void menu_repaintSimplePage()
 {
 
-	if(copyClear_showClearMenu == 1)
+	if(engineMenu_shown)
+	{
+		engineMenu_repaint(editDisplayBuffer);
+	}
+	else if(copyClear_showClearMenu == 1)
 	{
 		strcpy(&editDisplayBuffer[0][0], "clear [");
 		switch(copyClear_clearTarget)
@@ -1444,7 +1541,7 @@ static void menu_repaintLoadSavePage()
 //-----------------------------------------------------------------
 static uint8_t has2ndPage(uint8_t menuPage)
 {
-	const uint8_t textType = pgm_read_byte(&menuPages[menu_activePage][menuPage].top1 + 4);
+	const uint8_t textType = pgm_read_byte(&menu_getPage(menu_activePage,menuPage)->top1 + 4);
 	if(textType != TEXT_EMPTY)
 	{
 		return 1;
@@ -1463,7 +1560,7 @@ static uint8_t checkScrollSign(uint8_t activePage, uint8_t activeParameter)
 	if(menu_activePage==MENU_MIDI_PAGE) {
 		if(is2ndPage) {
 			//if we are on 2nd screen, and there are more sub-pages after this show "*" to signify both ways are available
-			if((activePage < NUM_SUB_PAGES-1) && (pgm_read_byte(&menuPages[MENU_MIDI_PAGE][activePage+1].top1) != TEXT_EMPTY))
+			if((activePage < NUM_SUB_PAGES-1) && (pgm_read_byte(&menu_getPage(MENU_MIDI_PAGE,activePage+1)->top1) != TEXT_EMPTY))
 				return '*';
 			else // on 2nd screen, no sub-pages after this
 				return '<';
@@ -1484,7 +1581,7 @@ static uint8_t checkScrollSign(uint8_t activePage, uint8_t activeParameter)
 	else if(menu_activePage==SEQ_PAGE) {
 		if(is2ndPage) {
 			//if we are on 2nd screen, and there are more sub-pages after this show "*" to signify both ways are available
-			if((activePage < NUM_SUB_PAGES-1) && (pgm_read_byte(&menuPages[SEQ_PAGE][activePage+1].top1) != TEXT_EMPTY))
+			if((activePage < NUM_SUB_PAGES-1) && (pgm_read_byte(&menu_getPage(SEQ_PAGE,activePage+1)->top1) != TEXT_EMPTY))
 				return '*';
 			else // on 2nd screen, no sub-pages after this
 				return '<';
@@ -1524,12 +1621,11 @@ static void menu_displayModTargetFull(uint8_t curParmVal)
 	//**AUTOM **VELO - determine the full name to display for edit mode
 	// a letters for the category and 8 letters for the name
 
-	if( pgm_read_word(&modTargets[curParmVal].param)==PAR_NONE ) {
+	const uint8_t nameidx = modTargetNameIdx(curParmVal);
+	if( pgm_read_word(&modTargets[curParmVal].param)==PAR_NONE || nameidx == MOD_TARGET_HIDDEN ) {
 		strcpy(&editDisplayBuffer[1][0],menuText_off);
 		return;
 	}
-
-	uint8_t nameidx = pgm_read_byte(&modTargets[curParmVal].nameIdx);
 
 	strcpy(&editDisplayBuffer[1][0],
 		(const char PROGMEM *)(&catNames[
@@ -1545,7 +1641,8 @@ static void menu_displayModTargetShort(uint8_t curParmVal, char *valueAsText, ch
 {
 	//**AUTOM **VELO - render a short name for non edit mode (encoder mode)
 
-	if( pgm_read_word(&modTargets[curParmVal].param)==PAR_NONE ) {
+	const uint8_t name = modTargetNameIdx(curParmVal);
+	if( pgm_read_word(&modTargets[curParmVal].param)==PAR_NONE || name == MOD_TARGET_HIDDEN ) {
 		memcpy(valueAsText,menuText_off,3);
 	} else {
 		uint8_t off=0;
@@ -1555,7 +1652,6 @@ static void menu_displayModTargetShort(uint8_t curParmVal, char *valueAsText, ch
 			valueAsText[off++]=(char)(voiceFromModTargValue(curParmVal) + '0');
 		}
 
-		const uint8_t name = pgm_read_byte(&modTargets[curParmVal].nameIdx);
 		memcpy(&valueAsText[off],shortNames[pgm_read_byte(&valueNames[name].shortName)],(size_t)(3-off));
 
 	}
@@ -1572,7 +1668,7 @@ void menu_repaintGeneric()
 	uint8_t curParmVal;
 
 	// the active page
-	const Page *ap=&menuPages[menu_activePage][activePage];
+	const Page *ap=menu_getPage(menu_activePage,activePage);
 
 	if(editModeActive) //show single parameter with full name
 	{
@@ -1586,7 +1682,7 @@ void menu_repaintGeneric()
 		memset(&editDisplayBuffer[0][0],' ',16);
 		memset(&editDisplayBuffer[1][0],' ',16);
 
-		if((parameter_dtypes[parNr] & 0xff) == DTYPE_AUTOM_TARGET)
+		if((menu_paramDtype(parNr) & 0xff) == DTYPE_AUTOM_TARGET)
 		{
 			//**AUTOM this is an index into modTargets now
 			//Top row (which destination (1 or 2) and which voice it's targeting)
@@ -1619,7 +1715,7 @@ void menu_repaintGeneric()
 				(const char PROGMEM *)(&longNames[pgm_read_byte(&valueNames[parName].longName)]));
 
 			//Bottom row -> parameter value (set below)
-			switch(parameter_dtypes[parNr] & 0xFF)
+			switch(menu_paramDtype(parNr) & 0xFF)
 			{
 			case DTYPE_TARGET_SELECTION_VELO: //switch(parameters_dtypes[parNr] & 0x0F)
 			case DTYPE_TARGET_SELECTION_LFO:
@@ -1645,7 +1741,7 @@ void menu_repaintGeneric()
 			case DTYPE_MENU: //switch(parameters_dtypes[parNr] & 0x0F)
 			{
 				//get the used menu (upper 4 bit)
-				const uint8_t menuId = (parameter_dtypes[parNr] >> 8);
+				const uint8_t menuId = (menu_paramDtype(parNr) >> 8);
 				// get the value name
 				getMenuItemNameForValue(menuId, curParmVal, &editDisplayBuffer[1][13]);
 			}
@@ -1653,7 +1749,7 @@ void menu_repaintGeneric()
 
 			case DTYPE_PM63: //switch(parameters_dtypes[parNr] & 0x0F)
 				// -63 to +63
-				if( (parNr == PAR_COARSE1) || (parNr == PAR_COARSE2) || (parNr == PAR_COARSE3) || (parNr == PAR_COARSE4) || (parNr == PAR_COARSE5) || (parNr == PAR_COARSE6)  || (parNr == PAR_FM_FREQ1) || (parNr == PAR_FM_FREQ2) || (parNr == PAR_FM_FREQ3) || (parNr == PAR_MOD_OSC_F1_CYM)  || (parNr == PAR_MOD_OSC_F2_CYM) || (parNr == PAR_MOD_OSC_F1) || (parNr == PAR_MOD_OSC_F2) )
+				if(menu_isTuningParam(parNr))
 				{
 					numtostrps(&editDisplayBuffer[1][13],(int8_t)(curParmVal - 60));
 				}
@@ -1754,7 +1850,7 @@ void menu_repaintGeneric()
 				memcpy(valueAsText,menuText_blank,3);
 			} else { //not if(parNr==PAR_NONE)
 
-				switch(parameter_dtypes[parNr] & 0xFF) {
+				switch(menu_paramDtype(parNr) & 0xFF) {
 				case DTYPE_TARGET_SELECTION_VELO: //switch(parameters[parNr].dtype&0x0F)
 				case DTYPE_TARGET_SELECTION_LFO: //switch(parameters[parNr].dtype&0x0F)
 					//**LFO **VELO non-edit mode display short name with no numeric prefix
@@ -1766,7 +1862,7 @@ void menu_repaintGeneric()
 					break;
 				case DTYPE_PM63: //switch(parameters[parNr].dtype&0x0F)
 					// -63 to 64
-					if( (parNr == PAR_COARSE1) || (parNr == PAR_COARSE2) || (parNr == PAR_COARSE3) || (parNr == PAR_COARSE4) || (parNr == PAR_COARSE5) || (parNr == PAR_COARSE6)  || (parNr == PAR_FM_FREQ1) || (parNr == PAR_FM_FREQ2) || (parNr == PAR_FM_FREQ3) || (parNr == PAR_MOD_OSC_F1_CYM)  || (parNr == PAR_MOD_OSC_F2_CYM) || (parNr == PAR_MOD_OSC_F1) || (parNr == PAR_MOD_OSC_F2) )
+					if(menu_isTuningParam(parNr))
 					{
 						numtostrps(valueAsText,(int8_t)(curParmVal - 60));
 					}
@@ -1803,7 +1899,7 @@ void menu_repaintGeneric()
 				case DTYPE_MENU: //switch(parameters[parNr].dtype&0x0F)
 				{
 					//get the used menu (upper 4 bit)
-					const uint8_t menuId = parameter_dtypes[parNr] >> 8;
+					const uint8_t menuId = menu_paramDtype(parNr) >> 8;
 					getMenuItemNameForValue(menuId, curParmVal, valueAsText);
 				}
 					break;
@@ -1879,7 +1975,7 @@ void menu_repaint()
 		menu_repaintLoadSavePage();
 
 	}
-	else if((menu_activePage >= PATTERN_LOAD_PAGE  && menu_activePage <= SONG_MODE_PAGE) || (copyClear_showClearMenu == 1))
+	else if((menu_activePage >= PATTERN_LOAD_PAGE  && menu_activePage <= SONG_MODE_PAGE) || (copyClear_showClearMenu == 1) || engineMenu_shown)
 	{
 		menu_repaintSimplePage();
 	}
@@ -2794,7 +2890,11 @@ void menu_parseEncoder(int8_t inc, uint8_t button)
 		btnClicked=button;
 		if(btnClicked)
 		{
-			if (copyClear_Mode == MODE_CLEAR)
+			if(engineMenu_shown)
+			{
+				engineMenu_apply();
+			}
+			else if (copyClear_Mode == MODE_CLEAR)
 			{
 				//execute
 				copyClear_executeClear();
@@ -2856,7 +2956,10 @@ void menu_parseEncoder(int8_t inc, uint8_t button)
 	}
 	else if(inc!=0) {
 		//============================= handle encoder change ==============================
-		if(copyClear_isClearModeActive()) {
+		if(engineMenu_shown) {
+			engineMenu_encoder(inc);
+			return;
+		} else if(copyClear_isClearModeActive()) {
 			//encoder selects clear target
 			uint8_t target = copyClear_getClearTarget();
 			if(inc<0) {
@@ -2892,6 +2995,27 @@ void menu_parseEncoder(int8_t inc, uint8_t button)
 // called when edit mode is active
 // encoder controls parameter value
 // given a delta, will apply that to the current parameter
+//skip mod targets the engine of their voice doesn't have (in the direction the
+//encoder turned; 0 = off is always allowed)
+static void menu_skipHiddenTargets(uint8_t* value, int8_t inc, const uint8_t start, const uint8_t end)
+{
+	while(*value != 0 && modTargetNameIdx(*value) == MOD_TARGET_HIDDEN)
+	{
+		if(inc < 0)
+		{
+			*value = *value > start ? (uint8_t)(*value - 1) : 0;
+		}
+		else if(*value < end)
+		{
+			(*value)++;
+		}
+		else
+		{
+			inc = -1;	//hidden entries at the end: back to the last one shown
+		}
+	}
+}
+//-----------------------------------------------------------------
 static void menu_encoderChangeParameter(int8_t inc)
 {
 	preset_touchTimer(PRESET_KIT_TIMER);
@@ -2900,7 +3024,7 @@ static void menu_encoderChangeParameter(int8_t inc)
 	const uint8_t activePage		= (menuIndex&MASK_PAGE)>>PAGE_SHIFT;
 
 	//get address from top1-8 from activeParameter (base adress top1 + offset)
-	uint16_t paramNr		= pgm_read_word(&menuPages[menu_activePage][activePage].bot1 + activeParameter);
+	uint16_t paramNr		= pgm_read_word(&menu_getPage(menu_activePage,activePage)->bot1 + activeParameter);
 	//uint8_t *paramValue = &mainParameters[paramNr];
 	uint8_t *paramValue;
 
@@ -2922,7 +3046,7 @@ static void menu_encoderChangeParameter(int8_t inc)
 		}
 	}
 
-	switch(parameter_dtypes[paramNr] & 0xFF)
+	switch(menu_paramDtype(paramNr) & 0xFF)
 	{
 	case DTYPE_TARGET_SELECTION_VELO: //parameter_dtypes[paramNr] & 0x0F
 	{
@@ -2937,6 +3061,7 @@ static void menu_encoderChangeParameter(int8_t inc)
 		} else if (*paramValue > pgm_read_byte(&modTargetVoiceOffsets[voiceNr].end)) {
 			*paramValue = pgm_read_byte(&modTargetVoiceOffsets[voiceNr].end);
 		}
+		menu_skipHiddenTargets(paramValue, inc, pgm_read_byte(&modTargetVoiceOffsets[voiceNr].start), pgm_read_byte(&modTargetVoiceOffsets[voiceNr].end));
 
 		// determine the parameter id to send across
 		uint8_t value = (uint8_t)pgm_read_word(&modTargets[*paramValue].param);
@@ -2963,7 +3088,10 @@ static void menu_encoderChangeParameter(int8_t inc)
 
 		// **LFOTARGFIX - ensure that the lfo mod target is pointing to the same type of modulation
 		// on the new voice
-		const uint8_t newTargVal=getModTargetIdxFromGapIdx((uint8_t)(*paramValue-1),menu_TargetVoiceGapIndex);
+		uint8_t newTargVal=getModTargetIdxFromGapIdx((uint8_t)(*paramValue-1),menu_TargetVoiceGapIndex);
+		//a setting the engine of the new voice doesn't have: off
+		if(modTargetNameIdx(newTargVal) == MOD_TARGET_HIDDEN)
+			newTargVal = 0;
 		// update the lfo mod target
 		activeParameters[PAR_TARGET_LFO1 + (paramNr - PAR_VOICE_LFO1)] = newTargVal;
 
@@ -2994,6 +3122,7 @@ static void menu_encoderChangeParameter(int8_t inc)
 		} else if (*paramValue > pgm_read_byte(&modTargetVoiceOffsets[voiceNr].end)) {
 			*paramValue = pgm_read_byte(&modTargetVoiceOffsets[voiceNr].end);
 		}
+		menu_skipHiddenTargets(paramValue, inc, pgm_read_byte(&modTargetVoiceOffsets[voiceNr].start), pgm_read_byte(&modTargetVoiceOffsets[voiceNr].end));
 
 		// **LFOTARGFIX - save the gap index
 		menu_TargetVoiceGapIndex = getModTargetGapIndex(*paramValue);
@@ -3012,6 +3141,7 @@ static void menu_encoderChangeParameter(int8_t inc)
 		//**AUTOM - limit to valid range for encoder
 		if(*paramValue >= nmt)
 			*paramValue = (uint8_t)(nmt-1);
+		menu_skipHiddenTargets(paramValue, inc, 1, (uint8_t)(nmt-1));
 		break;
 	}
 
@@ -3053,13 +3183,13 @@ static void menu_encoderChangeParameter(int8_t inc)
 	case DTYPE_MENU://parameter_dtypes[paramNr] & 0x0F
 	{
 		//get the used menu (upper 4 bit)
-		const uint8_t menuId = parameter_dtypes[paramNr] >> 8;
+		const uint8_t menuId = menu_paramDtype(paramNr) >> 8;
 		//get the number of entries
 		uint8_t numEntries = getMaxEntriesForMenu(menuId);
 		if(*paramValue >= numEntries)
 			*paramValue = (uint8_t)(numEntries-1);
 
-	} // parameter_dtypes[paramNr] & 0x0F case DTYPE_MENU
+	} // menu_paramDtype(paramNr) & 0x0F case DTYPE_MENU
 		break;
 
 	default://parameter_dtypes[paramNr] & 0x0F
@@ -3137,7 +3267,7 @@ checkvalid:
 	}
 
 	// read the new param
-	param = pgm_read_byte(&menuPages[menu_activePage][activePage].top1 + activeParameter);
+	param = pgm_read_byte(&menu_getPage(menu_activePage,activePage)->top1 + activeParameter);
 	if(param == TEXT_SKIP) {
 		if(allowedSkips--) // skip this one and check the next
 			goto checkvalid;
@@ -3214,8 +3344,7 @@ void menu_resetSaveParameters()
 // and has multiple screens, will toggle to the other screen
 // if its the global menu, and there are multiple pages will toggle to the next page
 void menu_switchSubPage(uint8_t subPageNr, uint8_t toggle)
-{
-	//leave edit mode if active
+{	//leave edit mode if active
 	editModeActive = 0;
 
 	//get current position
@@ -3237,7 +3366,7 @@ void menu_switchSubPage(uint8_t subPageNr, uint8_t toggle)
 			if((menu_activePage==MENU_MIDI_PAGE) || (menu_activePage==SEQ_PAGE)){
 				// in global mode, we move to next page if possible (or wrap to first)
 				if(activePage < NUM_SUB_PAGES-1 &&
-				   pgm_read_byte(&menuPages[menu_activePage][activePage+1].top1) != TEXT_EMPTY) {
+				   pgm_read_byte(&menu_getPage(menu_activePage,activePage+1)->top1) != TEXT_EMPTY) {
 					activePage++;
 				} else {
 					activePage=0;
@@ -3276,6 +3405,10 @@ uint8_t menu_getSubPage()
 //-----------------------------------------------------------------
 void menu_switchPage(uint8_t pageNr)
 {
+	//leaving the engine menu: stop the KIT button blinking
+	if(menu_activePage == ENGINE_PAGE && pageNr != ENGINE_PAGE)
+		led_setBlinkLed(LED_STEP8, 0);
+
 	//autosave config page settings
 	/*
 	if(menu_activePage == MENU_MIDI_PAGE)
@@ -3790,7 +3923,7 @@ static uint8_t limitPotValue(int8_t diff, uint16_t paramNr)
 
 	//limit to range
 
-	switch(parameter_dtypes[paramNr] & 0xFF)
+	switch(menu_paramDtype(paramNr) & 0xFF)
 	{
 	case DTYPE_TARGET_SELECTION_VELO:
 	case DTYPE_TARGET_SELECTION_LFO: {
@@ -3859,7 +3992,7 @@ static uint8_t limitPotValue(int8_t diff, uint16_t paramNr)
 	case DTYPE_MENU:
 	{
 		//get the used menu (upper 4 bit)
-		const uint8_t menuId = parameter_dtypes[paramNr] >> 8;
+		const uint8_t menuId = menu_paramDtype(paramNr) >> 8;
 		//get the number of entries
 		uint8_t numEntries=getMaxEntriesForMenu(menuId);
 		//return (uint8_t)(frac * (numEntries-1));
@@ -3889,7 +4022,7 @@ static uint8_t getDtypeValue(uint8_t value, uint16_t paramNr)
 {
 	const float frac = (value/255.f); // yield a fraction from 0 to 1
 
-	switch(pgm_read_word(&parameter_dtypes[paramNr]) & 0xFF)
+	switch(menu_paramDtype(paramNr) & 0xFF)
 	{
 	case DTYPE_TARGET_SELECTION_VELO:
 	case DTYPE_TARGET_SELECTION_LFO: {
@@ -3939,7 +4072,7 @@ static uint8_t getDtypeValue(uint8_t value, uint16_t paramNr)
 	case DTYPE_MENU:
 	{
 		//get the used menu (upper 4 bit)
-		const uint8_t menuId = pgm_read_word(&parameter_dtypes[paramNr]) >> 8;
+		const uint8_t menuId = menu_paramDtype(paramNr) >> 8;
 		//get the number of entries
 		uint8_t numEntries=getMaxEntriesForMenu(menuId);
 		return (uint8_t)(frac * (numEntries-1));
@@ -3963,10 +4096,10 @@ uint8_t menu_getDisplayParameterType(uint8_t pos)
 	const uint8_t activePage		= (menuIndex&MASK_PAGE)>>PAGE_SHIFT;
 	const uint8_t activeParameter	= menuIndex & MASK_PARAMETER;
 	const uint8_t isOn2ndPage		= ( activeParameter > 3) * 4;
-	uint16_t paramNr				= pgm_read_word(&menuPages[menu_activePage][activePage].bot1 +
+	uint16_t paramNr				= pgm_read_word(&menu_getPage(menu_activePage,activePage)->bot1 +
 			pos + isOn2ndPage);
 
-	return parameter_dtypes[paramNr] & 0xFF;
+	return menu_paramDtype(paramNr) & 0xFF;
 }
 
 uint8_t getMenuIndx(void)
@@ -3982,7 +4115,7 @@ uint8_t menu_parseKnobValue(uint8_t potNr, int16_t diff)
 	const uint8_t activePage		= (menuIndex&MASK_PAGE)>>PAGE_SHIFT;
 	const uint8_t activeParameter	= menuIndex & MASK_PARAMETER;
 	const uint8_t isOn2ndPage		= ( activeParameter > 3) * 4;
-	uint16_t paramNr				= pgm_read_word(&menuPages[menu_activePage][activePage].bot1 +
+	uint16_t paramNr				= pgm_read_word(&menu_getPage(menu_activePage,activePage)->bot1 +
 										potNr + isOn2ndPage);
 
 	//-------------------------------------------------
@@ -4187,7 +4320,7 @@ uint8_t menu_parseKnobValue(uint8_t potNr, int16_t diff)
 		activeParameters[paramNr] = dtypeValue;
 	}
 
-	switch(parameter_dtypes[paramNr] & 0xFF)
+	switch(menu_paramDtype(paramNr) & 0xFF)
 	{
 	case DTYPE_TARGET_SELECTION_VELO:
 	{

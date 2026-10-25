@@ -13,6 +13,7 @@
  */ 
 #include "menu/CcNr2Text.h"
 #include "menu/menu.h"
+#include "Preset/KitEngines.h"
 
 
 //-----------------------------------------------------------------
@@ -433,6 +434,25 @@ uint8_t getModTargetIdxFromGapIdx(uint8_t v, uint8_t gapidx)
 	// calc index into modTargets using input voice and calculated value above
 	return (uint8_t)(pgm_read_byte(&modTargetVoiceOffsets[v].start) + ctr);
 
+}
+
+uint8_t modTargetNameIdx(const uint8_t idx)
+{
+	const uint16_t par = pgm_read_word(&modTargets[idx].param);
+	const uint8_t slot = kitEngines_rolePar2Slot(par);
+	if(slot >= NUM_VOICE_SLOTS || kitEngines[slot] == slot_stockEngine(slot))
+		return pgm_read_byte(&modTargets[idx].nameIdx);
+
+	//engine specific setting of a slot with a non-stock engine: named like the
+	//same role in the engine's stock voice, hidden if it has none there
+	const uint8_t stockSlot = kitEngines_stockSlot(kitEngines[slot]);
+	const uint16_t stockPar = kitEngines_mapParam(par, slot, stockSlot);
+	for(uint8_t i=pgm_read_byte(&modTargetVoiceOffsets[stockSlot].start);i<=pgm_read_byte(&modTargetVoiceOffsets[stockSlot].end);i++)
+	{
+		if(pgm_read_word(&modTargets[i].param) == stockPar)
+			return pgm_read_byte(&modTargets[i].nameIdx);
+	}
+	return MOD_TARGET_HIDDEN;
 }
 
 //**AUTOM getNumModTargets() definition

@@ -111,6 +111,8 @@ enum PageNames
 	KIT_SAVE_PAGE_OK,
 	SONG_MODE_PAGE,
 
+	ENGINE_PAGE,	//engine menu (OpenElixir-02), drawn by engineMenu.c
+
 	//must be last... special case
 	//CLEAR_PAGE,
 
@@ -555,6 +557,10 @@ typedef struct PageStruct
 	uint16_t bot7;
 	uint16_t bot8;
 }Page;
+//a menu page (use instead of menuPages: voice pages follow the engine of their slot)
+const Page* menu_getPage(const uint8_t page, const uint8_t sub);
+//rebuild the voice pages after an engine change
+void menu_updateVoicePages();
 
 //-----------------------------------------------------------------
 // for storing valueNames which is defined in menu.c
@@ -612,6 +618,8 @@ enum Datatypes
 
 //-----------------------------------------------------------------
 extern const enum Datatypes parameter_dtypes[NUM_PARAMS];
+//the type of a parameter, following the engine of its slot (use instead of parameter_dtypes)
+uint16_t menu_paramDtype(const uint16_t par);
 extern uint8_t mainParameters[NUM_KIT_SLOTS][END_OF_SOUND_PARAMETERS];		// keeps all kits from sd card in memory
 extern uint8_t activeParameters[NUM_PARAMS];					// keeps the currently used kit in memory -> editBuffer
 //extern uint8_t morphParameters[END_OF_SOUND_PARAMETERS];
