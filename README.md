@@ -25,10 +25,11 @@ Custom firmware for the Erica Synths LXR-02 drum machine. It is based on the ope
 | 0.1 | Voices and FX are summed in 32 bit, followed by a limiter on each output: loud kits no longer hard-clip. Levels that didn't clip before are unchanged. |
 | 0.1 | Memory usage report after every build, compared with the stock firmware. |
 | 0.1 | Renamed to OpenElixir-02: shown on the start-up screen and as the USB-MIDI device name. |
-| next | Development build option `-DLXR_CPU_METER=ON`: CPU load per voice and FX on the display. |
-| next | About 10 % less CPU load in the worst case and 2.4 KB more free fast RAM (ITCM), with identical sound. Host test (`test/engine/`) that proves engine changes render bit-identical. |
-| next | Fix: switching the FX delay to ping-pong could write up to 32 KB past the delay buffer and corrupt other sound data (also in the stock firmware). |
-| next | Each of the 6 voice slots can run any engine (drum, snare, cymbal, hi-hat): select a voice, SHIFT + KIT, or NRPN 98. Saved in kits; kits from the stock firmware load with the stock engines and sound as before. See [docs/ENGINES.md](docs/ENGINES.md). |
+| 0.2 | Each of the 6 voice slots can run any engine (drum, snare, cymbal, hi-hat): select a voice, SHIFT + KIT, or NRPN 98. Saved in kits; kits from the stock firmware load with the stock engines and sound as before. See [docs/ENGINES.md](docs/ENGINES.md). |
+| 0.2 | About 10 % less CPU load in the worst case and 2.6 KB more free fast RAM (ITCM), with identical sound. |
+| 0.2 | Fix: switching the FX delay to ping-pong could write up to 32 KB past the delay buffer and corrupt other sound data (also in the stock firmware). |
+| 0.2 | Fix: saving a project into an existing project slot renamed kit 1 to ".SNG" (also in the stock firmware). |
+| 0.2 | Development: build option `-DLXR_CPU_METER=ON` (CPU load per voice and FX on the display); host test (`test/engine/`) that proves engine changes render bit-identical. |
 
 ## Building and installing
 
