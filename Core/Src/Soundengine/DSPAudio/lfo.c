@@ -13,6 +13,7 @@
 
 //-------------------------------------------------------------
 #include "Soundengine/DSPAudio/lfo.h"
+#include "Soundengine/DSPAudio/VoiceSlot.h"
 #include "Soundengine/DSPAudio/random.h"
 #include <math.h>
 
@@ -202,7 +203,7 @@ void lfo_recalcSync()
 {
 	for(uint8_t i=0;i<6;i++)
 	{
-		Lfo* lfo = &voiceCommon[i]->lfo;
+		Lfo* lfo = &voiceSlots[i].u.c.lfo;
 		lfo->phaseInc = lfo_calcPhaseInc(lfo->freq,lfo->sync);
 	}
 }
@@ -212,7 +213,7 @@ void lfo_retrigger(uint8_t voice)
 	//restart the LFOs that are retriggered by this voice
 	for(uint8_t i=0;i<6;i++)
 	{
-		Lfo* lfo = &voiceCommon[i]->lfo;
+		Lfo* lfo = &voiceSlots[i].u.c.lfo;
 		if(lfo->retrigger == voice+1)
 		{
 			lfo->phase = lfo->phaseOffset;

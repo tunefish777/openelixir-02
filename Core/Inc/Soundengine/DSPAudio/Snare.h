@@ -51,9 +51,6 @@ typedef struct SnareStruct
 	float		egPitchModAmount;
 } SnareVoice;
 
-//array holding all the voices
-extern SnareVoice snareVoice;
-
 //initialize all the parameters to sane values
 void Snare_init(SnareVoice* v, uint8_t slot);
 

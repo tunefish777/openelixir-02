@@ -21,7 +21,6 @@
 #include "IO/adcPots.h"
 #include "Soundengine/FxBus.h"
 
-INDTCMZ CymbalVoice cymbalVoice;
 //---------------------------------------------------
 void Cymbal_setPan(CymbalVoice* v, const uint8_t pan)
 {

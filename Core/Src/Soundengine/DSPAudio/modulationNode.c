@@ -14,6 +14,7 @@
 
 
 #include "Soundengine/DSPAudio/modulationNode.h"
+#include "Soundengine/DSPAudio/VoiceSlot.h"
 #include "Soundengine/DSPAudio/DrumVoice.h"
 #include "Soundengine/DSPAudio/CymbalVoice.h"
 #include "Soundengine/DSPAudio/HiHat.h"
@@ -81,7 +82,7 @@ void modNode_originalValueChanged(uint16_t idx)
 
 	for(i=0;i<6;i++)
 	{
-		modNode_setOriginalValueChanged(&voiceCommon[i]->lfo.modTarget,idx);
+		modNode_setOriginalValueChanged(&voiceSlots[i].u.c.lfo.modTarget,idx);
 	}
 }
 //-----------------------------------------------------------------------
@@ -95,7 +96,7 @@ IN_ITCM_RAM void modNode_resetTargets()
 
 	for(i=0;i<6;i++)
 	{
-		const ModulationNode* target = &voiceCommon[i]->lfo.modTarget;
+		const ModulationNode* target = &voiceSlots[i].u.c.lfo.modTarget;
 		paramArray_setParameter(target->destination,target->originalValue);
 	}
 

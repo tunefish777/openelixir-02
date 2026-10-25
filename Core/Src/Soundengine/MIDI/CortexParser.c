@@ -13,6 +13,7 @@
 
 
 #include "menu/menu.h"
+#include "Soundengine/DSPAudio/VoiceSlot.h"
 #include <Soundengine/MIDI/CortexParser.h>
 #include "Soundengine/MIDI/MidiMessages.h"
 #include "Soundengine/MIDI/MidiParser.h"
@@ -474,7 +475,7 @@ static void frontParser_handleMidiMessage()
 
 		if(lfoNr < 6)
 		{
-			modNode_setDestination(&voiceCommon[lfoNr]->lfo.modTarget, value);
+			modNode_setDestination(&voiceSlots[lfoNr].u.c.lfo.modTarget, value);
 		}
 
 	}

@@ -54,7 +54,4 @@ typedef struct
 	VOICE_COMMON_FIELDS
 } VoiceCommon;
 
-/** the common part of the voice in each voice slot 0-5 (defined in mixer.c) */
-extern VoiceCommon* const voiceCommon[6];
-
 #endif /* VOICECOMMON_H_ */

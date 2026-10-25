@@ -47,8 +47,6 @@ typedef struct CymbalStruct
 	int32_t		noiseSample;
 } CymbalVoice;
 
-extern CymbalVoice cymbalVoice;
-
 
 //initialize all the parameters to sane values
 void Cymbal_init(CymbalVoice* v, uint8_t slot);

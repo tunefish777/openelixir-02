@@ -78,15 +78,9 @@ typedef struct VoiceStruct
 //------------------------------------------------------------------------
 
 
-//array holding all the voices
-extern DrumVoice voiceArray[NUM_DRUM_VOICES];
-
 //initialize all the parameters to sane values
 /** initialize one drum voice instance for the given voice slot */
 void Drum_init(DrumVoice* v, uint8_t slot);
-//initialize all the parameters to sane values
-void initDrumVoice();
-
 void Drum_trigger(DrumVoice* v, const uint8_t vol, const uint8_t note);
 
 void Drum_updatePan(DrumVoice* v);

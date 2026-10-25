@@ -24,9 +24,9 @@
 #include "Soundengine/MIDI/MidiVoiceControl.h"
 #include "IO/adcPots.h"
 
+#ifdef USE_AMP_FILTER
 INDTCM static float ampSmoothValue = 0.1f;
-//---------------------------------------------------
-INDTCMZ DrumVoice voiceArray[NUM_DRUM_VOICES];
+#endif
 //---------------------------------------------------
 IN_ITCM_RAM void Drum_setPan(DrumVoice* v, const uint8_t pan)
 {
@@ -81,7 +81,7 @@ void Drum_init(DrumVoice* v, uint8_t slot)
 
 	v->osc.freq = 440;
 	v->osc.modNodeValue = 1;
-	v->osc.waveform = TRI+slot; //for testing init to tri,saw,rec
+	v->osc.waveform = TRI+slot%3; //for testing init to tri,saw,rec
 	v->osc.fmMod = 0;
 	v->osc.midiFreq = 70<<8 | 64;
 
@@ -102,20 +102,6 @@ void Drum_init(DrumVoice* v, uint8_t slot)
 	v->decimationCnt = 0;
 	v->decimationRate = 1;
 
-}
-//---------------------------------------------------
-void initDrumVoice()
-{
-	ampSmoothValue = 0.1f;
-
-
-
-
-	uint8_t i;
-	for(i=0;i<NUM_DRUM_VOICES;i++)
-	{
-		Drum_init(&voiceArray[i], i);
-	}
 }
 //---------------------------------------------------
 void Drum_updatePan(DrumVoice* v)

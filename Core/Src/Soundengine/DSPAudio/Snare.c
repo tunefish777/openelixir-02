@@ -21,7 +21,6 @@
 #include "IO/adcPots.h"
 #include "Soundengine/FxBus.h"
 //instance of the snare voice
-INDTCMZ SnareVoice snareVoice;
 
 //---------------------------------------------------
 void Snare_setPan(SnareVoice* v, const uint8_t pan)

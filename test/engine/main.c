@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <math.h>
 #include "stm32f7xx_hal.h"
 #include "main.h"
 #include "Soundengine/Soundengine.h"
@@ -22,8 +23,11 @@
 #include "Soundengine/MIDI/CortexParser.h"
 #include "Soundengine/MIDI/MidiMessages.h"
 #include "Parameters.h"
+#include "menu/menu.h"
 #include "Preset/InitKit.h"
 #include "Soundengine/MIDI/ParameterArray.h"
+#include "Soundengine/DSPAudio/wavetable.h"
+#include "Soundengine/DSPAudio/transientTables.h"
 
 #define NUM_KITS		32
 #define BLOCKS_PER_KIT	400
@@ -88,6 +92,9 @@ static void sendFront(uint8_t status, uint8_t data1, uint8_t data2)
 
 static void sendParam(uint16_t par, uint8_t value)
 {
+	//the UI keeps the kit in activeParameters; the engine reads it back when it
+	//resets modulation targets to the unmodulated values
+	activeParameters[par] = value;
 	if(par < 128)
 	{
 		sendFront(MIDI_CC, (uint8_t)par, value);
@@ -151,12 +158,121 @@ static void loadKit(int kit)
 	setJackSwitches(kit == 0 ? 0xf : rnd(16));
 }
 
+//---------------------------------------------------------------- integrity
+//the constant tables in DTCM are writable memory on the target: an out-of-bounds
+//write from a neighbouring buffer would silently change them (and the sound)
+static uint32_t fnv(const void* p, size_t n)
+{
+	const uint8_t* b = p;
+	uint32_t h = 2166136261u;
+	while(n--) h = (h ^ *b++) * 16777619u;
+	return h;
+}
+static uint32_t tablesHash(void)
+{
+	return fnv(transientData, sizeof(transientData)) ^ fnv(transientVolumeTable, sizeof(transientVolumeTable)) * 3u
+		^ fnv(sine_table, sizeof(sine_table)) * 7u;
+}
+
+//---------------------------------------------------------------- engine switching
+#if __has_include("Soundengine/DSPAudio/VoiceSlot.h")
+#include "Soundengine/DSPAudio/VoiceSlot.h"
+#define HAVE_VOICE_SLOTS 1
+
+static int16_t engOut[OUTPUT_DMA_SIZE * 2], engOut2[OUTPUT_DMA_SIZE * 2];
+
+static int slotHasNan(void)
+{
+	for(int s = 0; s < NUM_VOICE_SLOTS; s++)
+	{
+		const VoiceCommon* c = &voiceSlots[s].u.c;
+		if(isnan(c->egValueOscVol) || isnan(c->filter.s1) || isnan(c->filter.s2) || isnan(c->combinedVolume)) return 1;
+	}
+	return 0;
+}
+
+//render until silent; returns the number of blocks that had sound, peak in *peak
+static int renderSound(int maxBlocks, int* peak, int* nan)
+{
+	int last = -1;
+	*peak = 0;
+	for(int b = 0; b < maxBlocks; b++)
+	{
+		mixer_calcNextSampleBlock(engOut, engOut2);
+		for(int i = 0; i < OUTPUT_DMA_SIZE * 2; i++)
+		{
+			const int a = abs(engOut[i]) > abs(engOut2[i]) ? abs(engOut[i]) : abs(engOut2[i]);
+			if(a > *peak) *peak = a;
+			if(a > 32) last = b;
+		}
+		*nan |= slotHasNan();
+	}
+	return last + 1;
+}
+
+//every slot gets every engine (with the engine's init values; the parameter
+//routing for non-stock engines comes later): each track must sound, track 7
+//must use decay B, and track 6 must cut track 7
+static int engineTest(void)
+{
+	static const char* const names[NUM_ENGINES] = { "drum", "snare", "cymbal", "hihat" };
+	int fail = 0, peak, nan = 0;
+	for(int round = 0; round < NUM_ENGINES; round++)
+	{
+		loadKit(0);
+		for(uint8_t v = 0; v < 6; v++)
+		{
+			sendTarget(FRONT_CC_LFO_TARGET, v, 0);
+			sendTarget(FRONT_CC_VELO_TARGET, v, 0);
+		}
+		for(uint8_t s = 0; s < NUM_VOICE_SLOTS; s++)
+		{
+			slot_setEngine(s, (s + round) % NUM_ENGINES);
+		}
+		sendParam(PAR_VELOD6_CLOSED, 40);
+		sendParam(PAR_VELOD6_OPEN, 90);
+		renderSound(400, &peak, &nan);
+
+		printf("round %d:", round);
+		int len[7];
+		for(uint8_t track = 0; track < 7; track++)
+		{
+			voiceControl_noteOn(track, 60, 127);
+			len[track] = renderSound(1500, &peak, &nan);
+			printf("  %d %s %d/%d", track + 1, names[voiceSlots[track < 6 ? track : 5].engine], len[track], peak);
+			if(len[track] == 0) fail = 1;
+		}
+		//track 6 after track 7 cuts it: decay A from the current level, so it
+		//ends no later than track 6 alone (same as the stock hi-hat)
+		voiceControl_noteOn(6, 60, 127);
+		renderSound(5, &peak, &nan);
+		voiceControl_noteOn(5, 60, 127);
+		const int cut = renderSound(1500, &peak, &nan);
+		printf("  cut %d\n", cut);
+		if(!(len[6] > len[5] && cut <= len[5])) fail = 1;
+	}
+	if(nan) printf("NaN in a voice\n");
+	printf(fail || nan ? "ENGINE TEST FAILED\n" : "engine test passed\n");
+	return fail || nan;
+}
+#endif
+
 //---------------------------------------------------------------- main
 int main(int argc, char** argv)
 {
+#ifdef HAVE_VOICE_SLOTS
+	if(argc == 2 && strcmp(argv[1], "--engines") == 0)
+	{
+		mapPeripherals();
+		for(int i = 0; i < 6; i++) faders[i] = 1.f;
+		setJackSwitches(0xf);
+		soundengine_init();
+		return engineTest();
+	}
+#endif
 	if(argc != 2)
 	{
-		fprintf(stderr, "usage: %s <output file>\n", argv[0]);
+		fprintf(stderr, "usage: %s <output file> | --engines\n", argv[0]);
 		return 2;
 	}
 	mapPeripherals();
@@ -174,6 +290,7 @@ int main(int argc, char** argv)
 	int16_t output[OUTPUT_DMA_SIZE * 2];
 	int16_t output2[OUTPUT_DMA_SIZE * 2];
 
+	const uint32_t tables = tablesHash();
 	for(int kit = 0; kit < NUM_KITS; kit++)
 	{
 		loadKit(kit);
@@ -206,6 +323,11 @@ int main(int argc, char** argv)
 			}
 		}
 		printf("kit %2d %08x\n", kit, hash);
+		if(tablesHash() != tables)
+		{
+			fprintf(stderr, "kit %d: constant tables in DTCM were overwritten (out-of-bounds write)\n", kit);
+			return 3;
+		}
 	}
 	fclose(out);
 	return 0;

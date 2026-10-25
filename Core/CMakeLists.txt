@@ -88,6 +88,7 @@ add_library(lxr_dsp OBJECT
     Src/Soundengine/DSPAudio/TiltEq.c
     Src/Soundengine/DSPAudio/transientGenerator.c
     Src/Soundengine/DSPAudio/transientTables.c
+    Src/Soundengine/DSPAudio/VoiceSlot.c
     Src/Soundengine/DSPAudio/wavetable.c
     Src/Soundengine/DSPAudio/FX/Compressor.c
     Src/Soundengine/DSPAudio/FX/Delay.c

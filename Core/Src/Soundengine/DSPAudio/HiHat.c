@@ -21,8 +21,6 @@
 #include "IO/adcPots.h"
 #include "Soundengine/FxBus.h"
 
-INDTCMZ HiHatVoice hatVoice;
-
 //---------------------------------------------------
 void HiHat_setPan(HiHatVoice* v, const uint8_t pan)
 {
@@ -115,7 +113,6 @@ void HiHat_trigger(HiHatVoice* v, uint8_t vel, uint8_t isOpen, const uint8_t not
 	osc_setBaseNote(&v->modOsc2,note);
 
 	v->isOpen = isOpen;
-	v->oscVolEg.decay = isOpen?v->decayOpen:v->decayClosed;
 
 	slopeEg2_trigger(&v->oscVolEg);
 	v->velo = vel/127.f;

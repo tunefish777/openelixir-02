@@ -10,12 +10,20 @@
 #define __QADD   arm_QADD_unused
 #define __QSUB   arm_QSUB_unused
 #define __get_APSR arm_get_APSR_unused
+#define __get_PRIMASK arm_get_PRIMASK_unused
+#define __set_PRIMASK arm_set_PRIMASK_unused
+#define __disable_irq arm_disable_irq_unused
+#define __enable_irq arm_enable_irq_unused
 #include <cmsis_gcc.h>
 #undef __QADD16
 #undef __QSUB16
 #undef __QADD
 #undef __QSUB
 #undef __get_APSR
+#undef __get_PRIMASK
+#undef __set_PRIMASK
+#undef __disable_irq
+#undef __enable_irq
 #undef __SSAT
 #undef __PKHBT
 
@@ -41,6 +49,12 @@ static inline int32_t __QSUB(int32_t a, int32_t b) { return host_sat((int64_t)a 
 /* Oscillator.c calcNoise() reads the overflow flag after a C addition; on the
  * target that flag is not reliably set by the add. Host: always clear. */
 static inline uint32_t __get_APSR(void) { return 0; }
+/* interrupt masking: no interrupts on the host */
+static uint32_t host_primask;
+static inline uint32_t __get_PRIMASK(void) { return host_primask; }
+static inline void __set_PRIMASK(uint32_t m) { host_primask = m; }
+static inline void __disable_irq(void) { host_primask = 1; }
+static inline void __enable_irq(void) { host_primask = 0; }
 #define __SSAT(ARG1, ARG2) host_sat((int32_t)(ARG1), (ARG2))
 #define __PKHBT(ARG1, ARG2, ARG3) ((((uint32_t)(ARG1)) & 0x0000FFFFUL) | ((((uint32_t)(ARG2)) << (ARG3)) & 0xFFFF0000UL))
 

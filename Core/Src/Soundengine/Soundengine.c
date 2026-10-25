@@ -18,6 +18,7 @@
 #include "Soundengine/USB/usb_manager.h"
 #include "Soundengine/MIDI/Uart.h"
 #include "Soundengine/CpuMeter.h"
+#include "Soundengine/DSPAudio/VoiceSlot.h"
 
 uint8_t soundengine_calcNextSampleBlock()
 {
@@ -70,10 +71,7 @@ void soundengine_init()
 	memset(midi_MidiChannels,0,8);
 //	memset(midi_NoteOverride,0,7);
 
-	initDrumVoice();
-	Snare_init(&snareVoice, 3);
-	HiHat_init(&hatVoice, 5);
-	Cymbal_init(&cymbalVoice, 4);
+	slot_init();
 
 	//precalc the first dma buffer block
 	soundengine_calcNextSampleBlock();

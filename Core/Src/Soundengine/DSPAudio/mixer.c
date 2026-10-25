@@ -18,6 +18,7 @@
 #include "Soundengine/DSPAudio/DrumVoice.h"
 #include "Soundengine/DSPAudio/Snare.h"
 #include "Soundengine/DSPAudio/HiHat.h"
+#include "Soundengine/DSPAudio/VoiceSlot.h"
 #include "Soundengine/DSPAudio/BufferTools.h"
 #include "Soundengine/DSPAudio/squareRootLut.h"
 #include "main.h"
@@ -40,6 +41,10 @@ INDTCMZ float mixer_decimation_rate[7];		/**<sets the sample rate decimation. 0.
 INDTCMZ float mixer_decimation_cnt[6];		/**<s'n'h counter for decimator*/
 INDTCMZ int16_t mixer_voice_samples[6];		/**< stores the last outputted sample of the 6 voices*/
 #endif
+#if CPU_METER
+//an extra cymbal voice, rendered to simulate kits with more FM voices
+INDTCMZ static CymbalVoice mixer_stressVoice;
+#endif
 //-----------------------------------------------------------------------
 void mixer_init()
 {
@@ -56,6 +61,9 @@ void mixer_init()
 #endif
 
 	FxBus_init();
+#if CPU_METER
+	Cymbal_init(&mixer_stressVoice, 4);
+#endif
 }
 //-----------------------------------------------------------------------
 IN_ITCM_RAM void mixer_decimateBlock(const uint8_t voiceNr, int16_t* buffer)
@@ -533,36 +541,25 @@ IN_ITCM_RAM static void mixer_limitBlock(float* gainState, const int32_t* in, in
 	*gainState = gain;
 }
 //-----------------------------------------------------------------------
-//the voices in mixing order, index = voice slot 0-5
-VoiceCommon* const voiceCommon[6] =
+//engine functions of the voice in a slot
+IN_ITCM_RAM static inline void mixer_calcVoiceAsync(VoiceSlot* s)
 {
-	(VoiceCommon*)&voiceArray[0],
-	(VoiceCommon*)&voiceArray[1],
-	(VoiceCommon*)&voiceArray[2],
-	(VoiceCommon*)&snareVoice,
-	(VoiceCommon*)&cymbalVoice,
-	(VoiceCommon*)&hatVoice,
-};
-//-----------------------------------------------------------------------
-//engine functions of the voice in slot v
-IN_ITCM_RAM static inline void mixer_calcVoiceAsync(const uint8_t v, VoiceCommon* voice)
-{
-	switch(v)
+	switch(s->engine)
 	{
-	case 3:		Snare_calcAsync((SnareVoice*)voice);	break;
-	case 4:		Cymbal_calcAsync((CymbalVoice*)voice);	break;
-	case 5:		HiHat_calcAsync((HiHatVoice*)voice);	break;
-	default:	calcDrumVoiceAsync((DrumVoice*)voice);	break;
+	case ENGINE_SNARE:	Snare_calcAsync(&s->u.snare);		break;
+	case ENGINE_CYMBAL:	Cymbal_calcAsync(&s->u.cymbal);	break;
+	case ENGINE_HIHAT:	HiHat_calcAsync(&s->u.hat);		break;
+	default:			calcDrumVoiceAsync(&s->u.drum);	break;
 	}
 }
-IN_ITCM_RAM static inline void mixer_calcVoiceSyncBlock(const uint8_t v, VoiceCommon* voice, int16_t* buf)
+IN_ITCM_RAM static inline void mixer_calcVoiceSyncBlock(VoiceSlot* s, int16_t* buf)
 {
-	switch(v)
+	switch(s->engine)
 	{
-	case 3:		Snare_calcSyncBlock((SnareVoice*)voice, buf, OUTPUT_DMA_SIZE);		break;
-	case 4:		Cymbal_calcSyncBlock((CymbalVoice*)voice, buf, OUTPUT_DMA_SIZE);	break;
-	case 5:		HiHat_calcSyncBlock((HiHatVoice*)voice, buf, OUTPUT_DMA_SIZE);		break;
-	default:	calcDrumVoiceSyncBlock((DrumVoice*)voice, buf, OUTPUT_DMA_SIZE);		break;
+	case ENGINE_SNARE:	Snare_calcSyncBlock(&s->u.snare, buf, OUTPUT_DMA_SIZE);		break;
+	case ENGINE_CYMBAL:	Cymbal_calcSyncBlock(&s->u.cymbal, buf, OUTPUT_DMA_SIZE);	break;
+	case ENGINE_HIHAT:	HiHat_calcSyncBlock(&s->u.hat, buf, OUTPUT_DMA_SIZE);		break;
+	default:			calcDrumVoiceSyncBlock(&s->u.drum, buf, OUTPUT_DMA_SIZE);		break;
 	}
 }
 //-----------------------------------------------------------------------
@@ -582,19 +579,19 @@ IN_ITCM_RAM void mixer_calcNextSampleBlock(int16_t* output,int16_t* output2)
 	uint8_t v;
 	for(v=0;v<6;v++)
 	{
-		lfo_dispatchNextValue(&voiceCommon[v]->lfo);
+		lfo_dispatchNextValue(&voiceSlots[v].u.c.lfo);
 	}
 
 	//update filter frequencies
 	for(v=0;v<6;v++)
 	{
-		SVF_recalcFreq(&voiceCommon[v]->filter);
+		SVF_recalcFreq(&voiceSlots[v].u.c.filter);
 	}
 
 	//--- Calc async -----
 	for(v=0;v<6;v++)
 	{
-		mixer_calcVoiceAsync(v, voiceCommon[v]);
+		mixer_calcVoiceAsync(&voiceSlots[v]);
 	}
 
 	//calculate trigger io phase
@@ -623,11 +620,11 @@ IN_ITCM_RAM void mixer_calcNextSampleBlock(int16_t* output,int16_t* output2)
 	//calc the voices, decimate them and add them to the selected outputs
 	for(v=0;v<6;v++)
 	{
-		VoiceCommon* const voice = voiceCommon[v];
+		VoiceCommon* const voice = &voiceSlots[v].u.c;
 #if CPU_METER
 		meterStart = DWT->CYCCNT;
 #endif
-		mixer_calcVoiceSyncBlock(v, voice, sampleData);
+		mixer_calcVoiceSyncBlock(&voiceSlots[v], sampleData);
 #if CPU_METER
 		cpuMeter_section(CPU_SECTION_VOICE1+v, meterStart);
 #endif
@@ -648,11 +645,11 @@ IN_ITCM_RAM void mixer_calcNextSampleBlock(int16_t* output,int16_t* output2)
 	}
 
 #if CPU_METER
-	//simulate kits with more FM voices: render the cymbal engine again (into the
-	//no longer needed sampleData). This also advances the cymbal state faster.
+	//simulate kits with more FM voices: render an extra cymbal voice (into the
+	//no longer needed sampleData)
 	for(uint8_t i=0;i<cpuMeter.stressFm;i++)
 	{
-		Cymbal_calcSyncBlock(&cymbalVoice, sampleData,OUTPUT_DMA_SIZE);
+		Cymbal_calcSyncBlock(&mixer_stressVoice, sampleData,OUTPUT_DMA_SIZE);
 	}
 #endif
 #if CPU_METER

@@ -11,6 +11,10 @@ test/engine/compare.sh            # working tree vs. HEAD
 test/engine/compare.sh v0.1       # working tree vs. a tag/commit
 ```
 
+`render --engines` (built by `build.sh`, e.g. `build/engine-test/out-work/render --engines`)
+checks engine switching instead: every slot gets every engine, each track must sound, no
+voice state may become NaN, track 7 must use decay B and track 6 must cut track 7.
+
 How it works:
 - The engine is driven only through entry points that stay stable across refactorings:
   `soundengine_init()`, `frontParser_parseUartData()` (the UI's byte stream: parameters,
@@ -22,6 +26,11 @@ How it works:
 - `stubs.c`: no-op stand-ins for the sequencer, UI, UART, USB and codec. If the link fails
   with new undefined references outside the engine, add stubs there.
 - Value ranges are extracted from `menu.c` at build time (`gen_ranges.py`).
+- The harness keeps `activeParameters` (the UI's copy of the kit) up to date, because the
+  engine reads it back when it resets modulation targets.
+- After every kit the constant tables in DTCM (transient samples, sine table) must be
+  unchanged; otherwise `render` stops with exit status 3. An out-of-bounds write into them
+  changes the sound depending on the memory layout. (This found the ping-pong delay bug.)
 - `mutate.sh`: checks that a tiny change in each voice engine is detected.
 - `stats.py`: level statistics per kit of a render file.
 

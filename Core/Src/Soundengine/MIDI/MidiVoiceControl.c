@@ -13,11 +13,8 @@
 
 
 #include "Soundengine/MIDI/MidiVoiceControl.h"
-#include "Soundengine/DSPAudio/DrumVoice.h"
-#include "Soundengine/DSPAudio/Snare.h"
-#include "Soundengine/DSPAudio/HiHat.h"
+#include "Soundengine/DSPAudio/VoiceSlot.h"
 #include "Soundengine/MIDI/MidiMessages.h"
-#include "Soundengine/DSPAudio/CymbalVoice.h"
 #include "Soundengine/Sequencer/sequencer.h"
 #include "Soundengine/TriggerOut.h"
 #include "Soundengine/MIDI/Uart.h"
@@ -31,14 +28,7 @@ void voiceControl_noteOn(uint8_t voice, uint8_t note, uint8_t vel)
 {
 	active_voices |= (1<<voice);
 
-	if(voice < 3)
-		Drum_trigger(&voiceArray[voice], vel, note);
-	else if(voice < 4)
-		Snare_trigger(&snareVoice, vel, note);
-	else if(voice < 5)
-		Cymbal_trigger(&cymbalVoice, vel, note);
-	else
-		HiHat_trigger(&hatVoice, vel,voice-5,note);
+	slot_trigger(voice, vel, note);
 	
 	//Send trigger out signal
 	/*

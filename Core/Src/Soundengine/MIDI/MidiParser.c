@@ -13,6 +13,7 @@
 
 
 #include <Soundengine/MIDI/CortexParser.h>
+#include "Soundengine/DSPAudio/VoiceSlot.h"
 #include "Soundengine/MIDI/MidiParser.h"
 #include "Soundengine/MIDI/MidiNoteNumbers.h"
 #include "Soundengine/DSPAudio/DrumVoice.h"
@@ -202,32 +203,32 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 			break;
 
 		case VOL_SLOPE1:
-			slopeEg2_setSlope(&voiceArray[0].oscVolEg,value.itg);
+			slopeEg2_setSlope(&voiceSlots[0].u.drum.oscVolEg,value.itg);
 
 			break;
 		case PITCH_SLOPE1:
-			DecayEg_setSlope(&voiceArray[0].oscPitchEg,value.itg);
+			DecayEg_setSlope(&voiceSlots[0].u.drum.oscPitchEg,value.itg);
 			break;
 
 		case VOL_SLOPE2:
-			slopeEg2_setSlope(&voiceArray[1].oscVolEg,value.itg);
+			slopeEg2_setSlope(&voiceSlots[1].u.drum.oscVolEg,value.itg);
 			break;
 		case PITCH_SLOPE2:
-			DecayEg_setSlope(&voiceArray[1].oscPitchEg,value.itg);
+			DecayEg_setSlope(&voiceSlots[1].u.drum.oscPitchEg,value.itg);
 			break;
 
 		case VOL_SLOPE3:
-			slopeEg2_setSlope(&voiceArray[2].oscVolEg,value.itg);
+			slopeEg2_setSlope(&voiceSlots[2].u.drum.oscVolEg,value.itg);
 			break;
 		case PITCH_SLOPE3:
-			DecayEg_setSlope(&voiceArray[2].oscPitchEg,value.itg);
+			DecayEg_setSlope(&voiceSlots[2].u.drum.oscPitchEg,value.itg);
 			break;
 
 		case PITCH_SLOPE4:
-			DecayEg_setSlope(&snareVoice.oscPitchEg,value.itg);
+			DecayEg_setSlope(&voiceSlots[3].u.snare.oscPitchEg,value.itg);
 			break;
 		case VOL_SLOPE6:
-			slopeEg2_setSlope(&hatVoice.oscVolEg,value.itg);
+			slopeEg2_setSlope(&voiceSlots[5].u.hat.oscVolEg,value.itg);
 			break;
 
 		case FILTER_FREQ_DRUM1:
@@ -236,115 +237,115 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 		{
 			const float f = value.flt;//value.itg/127.f;
 			//exponential full range freq
-			SVF_directSetFilterValue(&voiceArray[msg.data1-FILTER_FREQ_DRUM1].filter,valueShaperF2F(f,FILTER_SHAPER) );
+			SVF_directSetFilterValue(&voiceSlots[msg.data1-FILTER_FREQ_DRUM1].u.drum.filter,valueShaperF2F(f,FILTER_SHAPER) );
 		}
 			break;
 		case RESO_DRUM1:
 		case RESO_DRUM2:
 		case RESO_DRUM3:
-			SVF_setReso(&voiceArray[msg.data1-RESO_DRUM1].filter, value.flt);
+			SVF_setReso(&voiceSlots[msg.data1-RESO_DRUM1].u.drum.filter, value.flt);
 			break;
 
 		case F_OSC1_COARSE:
 		{
 			//clear upper nibble
-			voiceArray[0].osc.midiFreq &= 0x00ff;
+			voiceSlots[0].u.drum.osc.midiFreq &= 0x00ff;
 			//set upper nibble
-			voiceArray[0].osc.midiFreq |= value.itg << 8;
-			osc_recalcFreq(&voiceArray[0].osc);
+			voiceSlots[0].u.drum.osc.midiFreq |= value.itg << 8;
+			osc_recalcFreq(&voiceSlots[0].u.drum.osc);
 		}
 			break;
 		case F_OSC2_COARSE:
 		{
 			//clear upper nibble
-			voiceArray[1].osc.midiFreq &= 0x00ff;
+			voiceSlots[1].u.drum.osc.midiFreq &= 0x00ff;
 			//set upper nibble
-			voiceArray[1].osc.midiFreq |= value.itg << 8;
-			osc_recalcFreq(&voiceArray[1].osc);
+			voiceSlots[1].u.drum.osc.midiFreq |= value.itg << 8;
+			osc_recalcFreq(&voiceSlots[1].u.drum.osc);
 		}
 				break;
 		case F_OSC3_COARSE:
 		{
 			//clear upper nibble
-			voiceArray[2].osc.midiFreq &= 0x00ff;
+			voiceSlots[2].u.drum.osc.midiFreq &= 0x00ff;
 			//set upper nibble
-			voiceArray[2].osc.midiFreq |= value.itg << 8;
-			osc_recalcFreq(&voiceArray[2].osc);
+			voiceSlots[2].u.drum.osc.midiFreq |= value.itg << 8;
+			osc_recalcFreq(&voiceSlots[2].u.drum.osc);
 		}
 				break;
 		case F_OSC4_COARSE:
 		{
 			//clear upper nibble
-			snareVoice.osc.midiFreq &= 0x00ff;
+			voiceSlots[3].u.snare.osc.midiFreq &= 0x00ff;
 			//set upper nibble
-			snareVoice.osc.midiFreq |= value.itg << 8;
-			osc_recalcFreq(&snareVoice.osc);
+			voiceSlots[3].u.snare.osc.midiFreq |= value.itg << 8;
+			osc_recalcFreq(&voiceSlots[3].u.snare.osc);
 		}
 				break;
 		case F_OSC5_COARSE:
 		{
 			//clear upper nibble
-			cymbalVoice.osc.midiFreq &= 0x00ff;
+			voiceSlots[4].u.cymbal.osc.midiFreq &= 0x00ff;
 			//set upper nibble
-			cymbalVoice.osc.midiFreq |= value.itg << 8;
-			osc_recalcFreq(&cymbalVoice.osc);
+			voiceSlots[4].u.cymbal.osc.midiFreq |= value.itg << 8;
+			osc_recalcFreq(&voiceSlots[4].u.cymbal.osc);
 		}
 				break;
 
 		case F_OSC1_FINE:
 		{
 			//clear lower nibble
-			voiceArray[0].osc.midiFreq &= 0xff00;
+			voiceSlots[0].u.drum.osc.midiFreq &= 0xff00;
 			//set lower nibble
-			voiceArray[0].osc.midiFreq |= value.itg;
-			osc_recalcFreq(&voiceArray[0].osc);
+			voiceSlots[0].u.drum.osc.midiFreq |= value.itg;
+			osc_recalcFreq(&voiceSlots[0].u.drum.osc);
 		}
 			break;
 		case F_OSC2_FINE:
 		{
 			//clear lower nibble
-			voiceArray[1].osc.midiFreq &= 0xff00;
+			voiceSlots[1].u.drum.osc.midiFreq &= 0xff00;
 			//set lower nibble
-			voiceArray[1].osc.midiFreq |= value.itg;
-			osc_recalcFreq(&voiceArray[1].osc);
+			voiceSlots[1].u.drum.osc.midiFreq |= value.itg;
+			osc_recalcFreq(&voiceSlots[1].u.drum.osc);
 		}
 				break;
 		case F_OSC3_FINE:
 		{
 			//clear lower nibble
-			voiceArray[2].osc.midiFreq &= 0xff00;
+			voiceSlots[2].u.drum.osc.midiFreq &= 0xff00;
 			//set lower nibble
-			voiceArray[2].osc.midiFreq |= value.itg;
-			osc_recalcFreq(&voiceArray[2].osc);
+			voiceSlots[2].u.drum.osc.midiFreq |= value.itg;
+			osc_recalcFreq(&voiceSlots[2].u.drum.osc);
 		}
 				break;
 		case F_OSC4_FINE:
 		{
 			//clear lower nibble
-			snareVoice.osc.midiFreq &= 0xff00;
+			voiceSlots[3].u.snare.osc.midiFreq &= 0xff00;
 			//set lower nibble
-			snareVoice.osc.midiFreq |= value.itg;
-			osc_recalcFreq(&snareVoice.osc);
+			voiceSlots[3].u.snare.osc.midiFreq |= value.itg;
+			osc_recalcFreq(&voiceSlots[3].u.snare.osc);
 		}
 				break;
 
 		case F_OSC5_FINE:
 		{
 			//clear lower nibble
-			cymbalVoice.osc.midiFreq &= 0xff00;
+			voiceSlots[4].u.cymbal.osc.midiFreq &= 0xff00;
 			//set lower nibble
-			cymbalVoice.osc.midiFreq |= value.itg;
-			osc_recalcFreq(&cymbalVoice.osc);
+			voiceSlots[4].u.cymbal.osc.midiFreq |= value.itg;
+			osc_recalcFreq(&voiceSlots[4].u.cymbal.osc);
 		}
 				break;
 
 		case F_OSC6_FINE:
 		{
 			//clear lower nibble
-			hatVoice.osc.midiFreq &= 0xff00;
+			voiceSlots[5].u.hat.osc.midiFreq &= 0xff00;
 			//set lower nibble
-			hatVoice.osc.midiFreq |= value.itg;
-			osc_recalcFreq(&hatVoice.osc);
+			voiceSlots[5].u.hat.osc.midiFreq |= value.itg;
+			osc_recalcFreq(&voiceSlots[5].u.hat.osc);
 		}
 				break;
 
@@ -353,11 +354,11 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 			{
 				uint8_t wave = NUM_OSC_WAVEFORMS * value.flt;
 				wave = wave >= NUM_OSC_WAVEFORMS ? NUM_OSC_WAVEFORMS-1 : wave;
-				voiceArray[0].osc.waveform = wave;
+				voiceSlots[0].u.drum.osc.waveform = wave;
 			}
 			else
 			{
-				voiceArray[0].osc.waveform = value.itg;
+				voiceSlots[0].u.drum.osc.waveform = value.itg;
 			}
 			break;
 
@@ -366,11 +367,11 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 			{
 				uint8_t wave = NUM_OSC_WAVEFORMS * value.flt;
 				wave = wave >= NUM_OSC_WAVEFORMS ? NUM_OSC_WAVEFORMS-1 : wave;
-				voiceArray[0].modOsc.waveform = wave;
+				voiceSlots[0].u.drum.modOsc.waveform = wave;
 			}
 			else
 			{
-				voiceArray[0].modOsc.waveform = value.itg;
+				voiceSlots[0].u.drum.modOsc.waveform = value.itg;
 			}
 			break;
 
@@ -379,11 +380,11 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 			{
 				uint8_t wave = NUM_OSC_WAVEFORMS * value.flt;
 				wave = wave >= NUM_OSC_WAVEFORMS ? NUM_OSC_WAVEFORMS-1 : wave;
-				voiceArray[1].osc.waveform = wave;
+				voiceSlots[1].u.drum.osc.waveform = wave;
 			}
 			else
 			{
-				voiceArray[1].osc.waveform = value.itg;
+				voiceSlots[1].u.drum.osc.waveform = value.itg;
 			}
 			break;
 
@@ -392,11 +393,11 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 			{
 				uint8_t wave = NUM_OSC_WAVEFORMS * value.flt;
 				wave = wave >= NUM_OSC_WAVEFORMS ? NUM_OSC_WAVEFORMS-1 : wave;
-				voiceArray[1].modOsc.waveform = wave;
+				voiceSlots[1].u.drum.modOsc.waveform = wave;
 			}
 			else
 			{
-				voiceArray[1].modOsc.waveform = value.itg;
+				voiceSlots[1].u.drum.modOsc.waveform = value.itg;
 			}
 			break;
 
@@ -405,11 +406,11 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 			{
 				uint8_t wave = NUM_OSC_WAVEFORMS * value.flt;
 				wave = wave >= NUM_OSC_WAVEFORMS ? NUM_OSC_WAVEFORMS-1 : wave;
-				voiceArray[2].osc.waveform = wave;
+				voiceSlots[2].u.drum.osc.waveform = wave;
 			}
 			else
 			{
-				voiceArray[2].osc.waveform = value.itg;
+				voiceSlots[2].u.drum.osc.waveform = value.itg;
 			}
 			break;
 
@@ -418,11 +419,11 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 			{
 				uint8_t wave = NUM_OSC_WAVEFORMS * value.flt;
 				wave = wave >= NUM_OSC_WAVEFORMS ? NUM_OSC_WAVEFORMS-1 : wave;
-				voiceArray[2].modOsc.waveform = wave;
+				voiceSlots[2].u.drum.modOsc.waveform = wave;
 			}
 			else
 			{
-				voiceArray[2].modOsc.waveform = value.itg;
+				voiceSlots[2].u.drum.modOsc.waveform = value.itg;
 			}
 			break;
 
@@ -431,218 +432,218 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 			{
 				uint8_t wave = NUM_OSC_WAVEFORMS * value.flt;
 				wave = wave >= NUM_OSC_WAVEFORMS ? NUM_OSC_WAVEFORMS-1 : wave;
-				snareVoice.osc.waveform = wave;
+				voiceSlots[3].u.snare.osc.waveform = wave;
 			}
 			else
 			{
-				snareVoice.osc.waveform = value.itg;
+				voiceSlots[3].u.snare.osc.waveform = value.itg;
 			}
 			break;
 
 
 		case OSC1_DIST:
 #if USE_FILTER_DRIVE
-			voiceArray[0].filter.drive = 0.5f + (value.itg/127.f) *6;
+			voiceSlots[0].u.drum.filter.drive = 0.5f + (value.itg/127.f) *6;
 #else
-			setDistortionShape(&voiceArray[0].distortion,value.flt);
+			setDistortionShape(&voiceSlots[0].u.drum.distortion,value.flt);
 #endif
 			break;
 		case OSC2_DIST:
 #if USE_FILTER_DRIVE
-			voiceArray[1].filter.drive = 0.5f + (value.itg/127.f)*6;
+			voiceSlots[1].u.drum.filter.drive = 0.5f + (value.itg/127.f)*6;
 #else
-			setDistortionShape(&voiceArray[1].distortion,value.flt);
+			setDistortionShape(&voiceSlots[1].u.drum.distortion,value.flt);
 #endif
 			break;
 		case OSC3_DIST:
 #if USE_FILTER_DRIVE
-			voiceArray[3].filter.drive = 0.5f + (value.itg/127.f)*6;
+			voiceSlots[3].u.drum.filter.drive = 0.5f + (value.itg/127.f)*6;
 #else
-			setDistortionShape(&voiceArray[2].distortion,value.flt);
+			setDistortionShape(&voiceSlots[2].u.drum.distortion,value.flt);
 #endif
 			break;
 
 		case VELOA1:
-			slopeEg2_setAttack(&voiceArray[0].oscVolEg,value.itg,AMP_EG_SYNC);
+			slopeEg2_setAttack(&voiceSlots[0].u.drum.oscVolEg,value.itg,AMP_EG_SYNC);
 			break;
 
 		case VELOD1:
 		{
-			slopeEg2_setDecay(&voiceArray[0].oscVolEg,value.itg,AMP_EG_SYNC);
+			slopeEg2_setDecay(&voiceSlots[0].u.drum.oscVolEg,value.itg,AMP_EG_SYNC);
 		}
 			break;
 
 		case PITCHD1:
 		{
-			DecayEg_setDecay(&voiceArray[0].oscPitchEg,value.itg);
+			DecayEg_setDecay(&voiceSlots[0].u.drum.oscPitchEg,value.itg);
 		}
 			break;
 
 		case MODAMNT1:
-			voiceArray[0].egPitchModAmount = calcPitchModAmount(value.itg);
+			voiceSlots[0].u.drum.egPitchModAmount = calcPitchModAmount(value.itg);
 			break;
 
 		case FMAMNT1:
-			voiceArray[0].fmModAmount = value.flt;
+			voiceSlots[0].u.drum.fmModAmount = value.flt;
 			break;
 
 		case FMDTN1:
 			//clear upper nibble
-			voiceArray[0].modOsc.midiFreq &= 0x00ff;
+			voiceSlots[0].u.drum.modOsc.midiFreq &= 0x00ff;
 			//set upper nibble
-			voiceArray[0].modOsc.midiFreq |= value.itg << 8;
-			osc_recalcFreq(&voiceArray[0].modOsc);
+			voiceSlots[0].u.drum.modOsc.midiFreq |= value.itg << 8;
+			osc_recalcFreq(&voiceSlots[0].u.drum.modOsc);
 			break;
 
 		case VOL1:
-			voiceArray[0].vol = value.flt;
+			voiceSlots[0].u.drum.vol = value.flt;
 			break;
 
 		case PAN1:
-			Drum_setPan(&voiceArray[0],value.itg);
+			Drum_setPan(&voiceSlots[0].u.drum,value.itg);
 			break;
 
 		case VELOA2:
-			slopeEg2_setAttack(&voiceArray[1].oscVolEg,value.itg,AMP_EG_SYNC);
+			slopeEg2_setAttack(&voiceSlots[1].u.drum.oscVolEg,value.itg,AMP_EG_SYNC);
 			break;
 
 			case VELOD2:
-			slopeEg2_setDecay(&voiceArray[1].oscVolEg,value.itg,AMP_EG_SYNC);
+			slopeEg2_setDecay(&voiceSlots[1].u.drum.oscVolEg,value.itg,AMP_EG_SYNC);
 			break;
 
 			case PITCHD2:
-			DecayEg_setDecay(&voiceArray[1].oscPitchEg,value.itg);
+			DecayEg_setDecay(&voiceSlots[1].u.drum.oscPitchEg,value.itg);
 			break;
 
 			case MODAMNT2:
-			voiceArray[1].egPitchModAmount = calcPitchModAmount(value.itg);
+			voiceSlots[1].u.drum.egPitchModAmount = calcPitchModAmount(value.itg);
 			break;
 
 			case FMAMNT2:
-			voiceArray[1].fmModAmount = value.flt;
+			voiceSlots[1].u.drum.fmModAmount = value.flt;
 				break;
 
 			case FMDTN2:
 				//clear upper nibble
-				voiceArray[1].modOsc.midiFreq &= 0x00ff;
+				voiceSlots[1].u.drum.modOsc.midiFreq &= 0x00ff;
 				//set upper nibble
-				voiceArray[1].modOsc.midiFreq |= value.itg << 8;
-				osc_recalcFreq(&voiceArray[1].modOsc);
+				voiceSlots[1].u.drum.modOsc.midiFreq |= value.itg << 8;
+				osc_recalcFreq(&voiceSlots[1].u.drum.modOsc);
 				break;
 
 			case VOL2:
-				voiceArray[1].vol = value.flt;
+				voiceSlots[1].u.drum.vol = value.flt;
 				break;
 
 			case PAN2:
-				Drum_setPan(&voiceArray[1],value.itg);
+				Drum_setPan(&voiceSlots[1].u.drum,value.itg);
 				break;
 
 
 			case VELOA3:
-				slopeEg2_setAttack(&voiceArray[2].oscVolEg,value.itg,AMP_EG_SYNC);
+				slopeEg2_setAttack(&voiceSlots[2].u.drum.oscVolEg,value.itg,AMP_EG_SYNC);
 				break;
 
 			case VELOD3:
-				slopeEg2_setDecay(&voiceArray[2].oscVolEg,value.itg,AMP_EG_SYNC);
+				slopeEg2_setDecay(&voiceSlots[2].u.drum.oscVolEg,value.itg,AMP_EG_SYNC);
 				break;
 
 			case PITCHD3:
-				DecayEg_setDecay(&voiceArray[2].oscPitchEg,value.itg);
+				DecayEg_setDecay(&voiceSlots[2].u.drum.oscPitchEg,value.itg);
 				break;
 
 			case MODAMNT3:
-				voiceArray[2].egPitchModAmount = calcPitchModAmount(value.itg);
+				voiceSlots[2].u.drum.egPitchModAmount = calcPitchModAmount(value.itg);
 				break;
 
 			case FMAMNT3:
-				voiceArray[2].fmModAmount = value.flt;
+				voiceSlots[2].u.drum.fmModAmount = value.flt;
 				break;
 
 			case FMDTN3:
 				//clear upper nibble
-				voiceArray[2].modOsc.midiFreq &= 0x00ff;
+				voiceSlots[2].u.drum.modOsc.midiFreq &= 0x00ff;
 				//set upper nibble
-				voiceArray[2].modOsc.midiFreq |= value.itg << 8;
-				osc_recalcFreq(&voiceArray[2].modOsc);
+				voiceSlots[2].u.drum.modOsc.midiFreq |= value.itg << 8;
+				osc_recalcFreq(&voiceSlots[2].u.drum.modOsc);
 				break;
 
 			case VOL3:
-				voiceArray[2].vol = value.flt;
+				voiceSlots[2].u.drum.vol = value.flt;
 				break;
 
 			case PAN3:
-				Drum_setPan(&voiceArray[2],value.itg);
+				Drum_setPan(&voiceSlots[2].u.drum,value.itg);
 				break;
 
 			//snare
 			case VOL4:
-				snareVoice.vol = value.flt;
+				voiceSlots[3].u.snare.vol = value.flt;
 				break;
 
 			case PAN4:
-				Snare_setPan(&snareVoice, value.itg);
+				Snare_setPan(&voiceSlots[3].u.snare, value.itg);
 
 				break;
 
 			case SNARE_NOISE_F:
-				snareVoice.noiseOsc.freq = value.flt*22000;
+				voiceSlots[3].u.snare.noiseOsc.freq = value.flt*22000;
 				//TODO respond to midi note
 				break;
 			case VELOA4:
-				slopeEg2_setAttack(&snareVoice.oscVolEg,value.itg,false);
+				slopeEg2_setAttack(&voiceSlots[3].u.snare.oscVolEg,value.itg,false);
 				break;
 
 			case VELOD4:
-				slopeEg2_setDecay(&snareVoice.oscVolEg,value.itg,false);
+				slopeEg2_setDecay(&voiceSlots[3].u.snare.oscVolEg,value.itg,false);
 				break;
 
 			case PITCHD4:
-				DecayEg_setDecay(&snareVoice.oscPitchEg,value.itg);
+				DecayEg_setDecay(&voiceSlots[3].u.snare.oscPitchEg,value.itg);
 				break;
 
 			case MODAMNT4:
-				snareVoice.egPitchModAmount = calcPitchModAmount(value.itg);
+				voiceSlots[3].u.snare.egPitchModAmount = calcPitchModAmount(value.itg);
 				break;
 			case SNARE_FILTER_F:
 				{
 					#if USE_PEAK
-						peak_setFreq(&snareVoice.filter, value.itg/127.f*20000.f);
+						peak_setFreq(&voiceSlots[3].u.snare.filter, value.itg/127.f*20000.f);
 					#else
 						const float f = value.flt;
 						//exponential full range freq
-						SVF_directSetFilterValue(&snareVoice.filter,valueShaperF2F(f,FILTER_SHAPER) );
+						SVF_directSetFilterValue(&voiceSlots[3].u.snare.filter,valueShaperF2F(f,FILTER_SHAPER) );
 					#endif
 				}
 					break;
 
 			case SNARE_RESO:
 #if USE_PEAK
-				peak_setGain(&snareVoice.filter, value.itg/127.f);
+				peak_setGain(&voiceSlots[3].u.snare.filter, value.itg/127.f);
 #else
-				SVF_setReso(&snareVoice.filter, value.flt);
+				SVF_setReso(&voiceSlots[3].u.snare.filter, value.flt);
 #endif
 				break;
 
 			case SNARE_MIX:
-				snareVoice.mix = value.flt;
+				voiceSlots[3].u.snare.mix = value.flt;
 				break;
 
 			//snare 2
 			case VOL5:
-				cymbalVoice.vol = value.flt;
+				voiceSlots[4].u.cymbal.vol = value.flt;
 				break;
 
 			case PAN5:
-				Cymbal_setPan(&cymbalVoice, value.itg);
+				Cymbal_setPan(&voiceSlots[4].u.cymbal, value.itg);
 				break;
 
 			case VELOA5:
-				slopeEg2_setAttack(&cymbalVoice.oscVolEg,value.itg,false);
+				slopeEg2_setAttack(&voiceSlots[4].u.cymbal.oscVolEg,value.itg,false);
 				break;
 
 			case VELOD5:
-				slopeEg2_setDecay(&cymbalVoice.oscVolEg,value.itg,false);
+				slopeEg2_setDecay(&voiceSlots[4].u.cymbal.oscVolEg,value.itg,false);
 				break;
 
 			case CYM_WAVE1:
@@ -650,11 +651,11 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				{
 					uint8_t wave = NUM_OSC_WAVEFORMS * value.flt;
 					wave = wave >= NUM_OSC_WAVEFORMS ? NUM_OSC_WAVEFORMS-1 : wave;
-					cymbalVoice.osc.waveform = wave;
+					voiceSlots[4].u.cymbal.osc.waveform = wave;
 				}
 				else
 				{
-					cymbalVoice.osc.waveform = value.itg;
+					voiceSlots[4].u.cymbal.osc.waveform = value.itg;
 				}
 				break;
 
@@ -663,11 +664,11 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				{
 					uint8_t wave = NUM_OSC_WAVEFORMS * value.flt;
 					wave = wave >= NUM_OSC_WAVEFORMS ? NUM_OSC_WAVEFORMS-1 : wave;
-					cymbalVoice.modOsc.waveform = wave;
+					voiceSlots[4].u.cymbal.modOsc.waveform = wave;
 				}
 				else
 				{
-					cymbalVoice.modOsc.waveform = value.itg;
+					voiceSlots[4].u.cymbal.modOsc.waveform = value.itg;
 				}
 				break;
 
@@ -676,56 +677,56 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				{
 					uint8_t wave = NUM_OSC_WAVEFORMS * value.flt;
 					wave = wave >= NUM_OSC_WAVEFORMS ? NUM_OSC_WAVEFORMS-1 : wave;
-					cymbalVoice.modOsc2.waveform = wave;
+					voiceSlots[4].u.cymbal.modOsc2.waveform = wave;
 				}
 				else
 				{
-					cymbalVoice.modOsc2.waveform = value.itg;
+					voiceSlots[4].u.cymbal.modOsc2.waveform = value.itg;
 				}
 				break;
 
 			case CYM_MOD_OSC_F1:
-				//cymbalVoice.modOsc.freq = MidiNoteFrequencies[value.itg];
+				//voiceSlots[4].u.cymbal.modOsc.freq = MidiNoteFrequencies[value.itg];
 				//clear upper nibble
-				cymbalVoice.modOsc.midiFreq &= 0x00ff;
+				voiceSlots[4].u.cymbal.modOsc.midiFreq &= 0x00ff;
 				//set upper nibble
-				cymbalVoice.modOsc.midiFreq |= value.itg << 8;
-				osc_recalcFreq(&cymbalVoice.modOsc);
+				voiceSlots[4].u.cymbal.modOsc.midiFreq |= value.itg << 8;
+				osc_recalcFreq(&voiceSlots[4].u.cymbal.modOsc);
 				break;
 
 			case CYM_MOD_OSC_F2:
 				//clear upper nibble
-				cymbalVoice.modOsc2.midiFreq &= 0x00ff;
+				voiceSlots[4].u.cymbal.modOsc2.midiFreq &= 0x00ff;
 				//set upper nibble
-				cymbalVoice.modOsc2.midiFreq |= value.itg << 8;
-				osc_recalcFreq(&cymbalVoice.modOsc2);
+				voiceSlots[4].u.cymbal.modOsc2.midiFreq |= value.itg << 8;
+				osc_recalcFreq(&voiceSlots[4].u.cymbal.modOsc2);
 				break;
 
 			case CYM_MOD_OSC_GAIN1:
-				cymbalVoice.fmModAmount1 = value.flt;
+				voiceSlots[4].u.cymbal.fmModAmount1 = value.flt;
 				break;
 
 			case CYM_MOD_OSC_GAIN2:
-				cymbalVoice.fmModAmount2 = value.flt;
+				voiceSlots[4].u.cymbal.fmModAmount2 = value.flt;
 				break;
 
 			case CYM_FIL_FREQ:
 			{
 				const float f = value.flt;
 				//exponential full range freq
-				SVF_directSetFilterValue(&cymbalVoice.filter,valueShaperF2F(f,FILTER_SHAPER) );
+				SVF_directSetFilterValue(&voiceSlots[4].u.cymbal.filter,valueShaperF2F(f,FILTER_SHAPER) );
 			}
 				break;
 
 			case CYM_RESO:
-				SVF_setReso(&cymbalVoice.filter, value.flt);
+				SVF_setReso(&voiceSlots[4].u.cymbal.filter, value.flt);
 				break;
 
 			case CYM_REPEAT:
-				cymbalVoice.oscVolEg.repeat = value.itg;
+				voiceSlots[4].u.cymbal.oscVolEg.repeat = value.itg;
 				break;
 			case CYM_SLOPE:
-				slopeEg2_setSlope(&cymbalVoice.oscVolEg,value.itg);
+				slopeEg2_setSlope(&voiceSlots[4].u.cymbal.oscVolEg,value.itg);
 				break;
 
 			// hat
@@ -734,11 +735,11 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				{
 					uint8_t wave = NUM_OSC_WAVEFORMS * value.flt;
 					wave = wave >= NUM_OSC_WAVEFORMS ? NUM_OSC_WAVEFORMS-1 : wave;
-					hatVoice.osc.waveform = wave;
+					voiceSlots[5].u.hat.osc.waveform = wave;
 				}
 				else
 				{
-					hatVoice.osc.waveform = value.itg;
+					voiceSlots[5].u.hat.osc.waveform = value.itg;
 				}
 				break;
 
@@ -747,11 +748,11 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				{
 					uint8_t wave = NUM_OSC_WAVEFORMS * value.flt;
 					wave = wave >= NUM_OSC_WAVEFORMS ? NUM_OSC_WAVEFORMS-1 : wave;
-					hatVoice.modOsc.waveform = wave;
+					voiceSlots[5].u.hat.modOsc.waveform = wave;
 				}
 				else
 				{
-					hatVoice.modOsc.waveform = value.itg;
+					voiceSlots[5].u.hat.modOsc.waveform = value.itg;
 				}
 				break;
 			case WAVE3_HH:
@@ -759,129 +760,129 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				{
 					uint8_t wave = NUM_OSC_WAVEFORMS * value.flt;
 					wave = wave >= NUM_OSC_WAVEFORMS ? NUM_OSC_WAVEFORMS-1 : wave;
-					hatVoice.modOsc2.waveform = wave;
+					voiceSlots[5].u.hat.modOsc2.waveform = wave;
 				}
 				else
 				{
-					hatVoice.modOsc2.waveform = value.itg;
+					voiceSlots[5].u.hat.modOsc2.waveform = value.itg;
 				}
 				break;
 
 			case VELOD6:
-				hatVoice.decayClosed = slopeEg2_calcDecay(value.itg);
+				voiceSlots[5].decay[0] = slopeEg2_calcDecay(value.itg);
 				break;
 
 			case VELOD6_OPEN:
-				hatVoice.decayOpen = slopeEg2_calcDecay(value.itg);
+				voiceSlots[5].decay[1] = slopeEg2_calcDecay(value.itg);
 				break;
 
 			case HAT_FILTER_F:
 				{
 					const float f = value.flt;
 					//exponential full range freq
-					SVF_directSetFilterValue(&hatVoice.filter,valueShaperF2F(f,FILTER_SHAPER) );
+					SVF_directSetFilterValue(&voiceSlots[5].u.hat.filter,valueShaperF2F(f,FILTER_SHAPER) );
 				}
 				break;
 
 			case HAT_RESO:
-				SVF_setReso(&hatVoice.filter, value.flt);
+				SVF_setReso(&voiceSlots[5].u.hat.filter, value.flt);
 				break;
 
 			case VOL6:
-				hatVoice.vol = value.flt;
+				voiceSlots[5].u.hat.vol = value.flt;
 				break;
 
 			case PAN6:
-				HiHat_setPan(&hatVoice, value.itg);
+				HiHat_setPan(&voiceSlots[5].u.hat, value.itg);
 				break;
 
 			case F_OSC6_COARSE:
 				{
 					//clear upper nibble
-					hatVoice.osc.midiFreq &= 0x00ff;
+					voiceSlots[5].u.hat.osc.midiFreq &= 0x00ff;
 					//set upper nibble
-					hatVoice.osc.midiFreq |= value.itg << 8;
-					osc_recalcFreq(&hatVoice.osc);
+					voiceSlots[5].u.hat.osc.midiFreq |= value.itg << 8;
+					osc_recalcFreq(&voiceSlots[5].u.hat.osc);
 				}
 				break;
 
 			case MOD_OSC_F1:
 				//clear upper nibble
-				hatVoice.modOsc.midiFreq &= 0x00ff;
+				voiceSlots[5].u.hat.modOsc.midiFreq &= 0x00ff;
 				//set upper nibble
-				hatVoice.modOsc.midiFreq |= value.itg << 8;
-				osc_recalcFreq(&hatVoice.modOsc);
+				voiceSlots[5].u.hat.modOsc.midiFreq |= value.itg << 8;
+				osc_recalcFreq(&voiceSlots[5].u.hat.modOsc);
 				break;
 
 			case MOD_OSC_F2:
 				//clear upper nibble
-				hatVoice.modOsc2.midiFreq &= 0x00ff;
+				voiceSlots[5].u.hat.modOsc2.midiFreq &= 0x00ff;
 				//set upper nibble
-				hatVoice.modOsc2.midiFreq |= value.itg << 8;
-				osc_recalcFreq(&hatVoice.modOsc2);
+				voiceSlots[5].u.hat.modOsc2.midiFreq |= value.itg << 8;
+				osc_recalcFreq(&voiceSlots[5].u.hat.modOsc2);
 				break;
 
 			case MOD_OSC_GAIN1:
-				hatVoice.fmModAmount1 = value.flt;
+				voiceSlots[5].u.hat.fmModAmount1 = value.flt;
 				break;
 
 			case MOD_OSC_GAIN2:
-				hatVoice.fmModAmount2 = value.flt;
+				voiceSlots[5].u.hat.fmModAmount2 = value.flt;
 				break;
 
 			case VELOA6:
-				slopeEg2_setAttack(&hatVoice.oscVolEg,value.itg,false);
+				slopeEg2_setAttack(&voiceSlots[5].u.hat.oscVolEg,value.itg,false);
 				break;
 
 			case REPEAT1:
-				snareVoice.oscVolEg.repeat = value.itg;
+				voiceSlots[3].u.snare.oscVolEg.repeat = value.itg;
 				break;
 
 
 			case EG_SNARE1_SLOPE:
-				slopeEg2_setSlope(&snareVoice.oscVolEg,value.itg);
+				slopeEg2_setSlope(&voiceSlots[3].u.snare.oscVolEg,value.itg);
 				break;
 
 			case SNARE_DISTORTION:
-				setDistortionShape(&snareVoice.distortion,value.flt);
+				setDistortionShape(&voiceSlots[3].u.snare.distortion,value.flt);
 				break;
 
 			case CYMBAL_DISTORTION:
-				setDistortionShape(&cymbalVoice.distortion,value.flt);
+				setDistortionShape(&voiceSlots[4].u.cymbal.distortion,value.flt);
 				break;
 
 			case HAT_DISTORTION:
-				setDistortionShape(&hatVoice.distortion,value.flt);
+				setDistortionShape(&voiceSlots[5].u.hat.distortion,value.flt);
 				break;
 
 			case FREQ_LFO1:
 			case FREQ_LFO2:
 			case FREQ_LFO3:
-				lfo_setFreq(&voiceArray[msg.data1-FREQ_LFO1].lfo,value.flt);
+				lfo_setFreq(&voiceSlots[msg.data1-FREQ_LFO1].u.drum.lfo,value.flt);
 								break;
 			case FREQ_LFO4:
-				lfo_setFreq(&snareVoice.lfo,value.flt);
+				lfo_setFreq(&voiceSlots[3].u.snare.lfo,value.flt);
 								break;
 			case FREQ_LFO5:
-				lfo_setFreq(&cymbalVoice.lfo,value.flt);
+				lfo_setFreq(&voiceSlots[4].u.cymbal.lfo,value.flt);
 								break;
 			case FREQ_LFO6:
-				lfo_setFreq(&hatVoice.lfo,value.flt);
+				lfo_setFreq(&voiceSlots[5].u.hat.lfo,value.flt);
 				break;
 
 			case AMOUNT_LFO1:
 			case AMOUNT_LFO2:
 			case AMOUNT_LFO3:
-				voiceArray[msg.data1-AMOUNT_LFO1].lfo.modTarget.amount = value.flt;
+				voiceSlots[msg.data1-AMOUNT_LFO1].u.drum.lfo.modTarget.amount = value.flt;
 				break;
 			case AMOUNT_LFO4:
-				snareVoice.lfo.modTarget.amount = value.flt;
+				voiceSlots[3].u.snare.lfo.modTarget.amount = value.flt;
 				break;
 			case AMOUNT_LFO5:
-				cymbalVoice.lfo.modTarget.amount = value.flt;
+				voiceSlots[4].u.cymbal.lfo.modTarget.amount = value.flt;
 				break;
 			case AMOUNT_LFO6:
-				hatVoice.lfo.modTarget.amount = value.flt;
+				voiceSlots[5].u.hat.lfo.modTarget.amount = value.flt;
 				break;
 
 			case VOICE_DECIMATION1:
@@ -918,20 +919,20 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				{
 					uint8_t wave = NUM_TRANSIENTS * value.flt;
 					wave = wave >= NUM_TRANSIENTS ? NUM_TRANSIENTS-1 : wave;
-					transient_setWaveform(&voiceArray[0].transGen, wave);
+					transient_setWaveform(&voiceSlots[0].u.drum.transGen, wave);
 				}
 				else
 				{
-					transient_setWaveform(&voiceArray[0].transGen, value.itg);
+					transient_setWaveform(&voiceSlots[0].u.drum.transGen, value.itg);
 				}
 				break;
 
 			case CC2_TRANS1_VOL:
-				voiceArray[0].transGen.volume = value.flt;
+				voiceSlots[0].u.drum.transGen.volume = value.flt;
 				break;
 
 			case CC2_TRANS1_FREQ:
-				voiceArray[0].transGen.pitch = 1.f + ((value.itg/33.9f)-0.75f) ;// range about  0.25 to 4 => 1/4 to 1*4
+				voiceSlots[0].u.drum.transGen.pitch = 1.f + ((value.itg/33.9f)-0.75f) ;// range about  0.25 to 4 => 1/4 to 1*4
 				break;
 
 			case CC2_TRANS2_WAVE:
@@ -939,20 +940,20 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				{
 					uint8_t wave = NUM_TRANSIENTS * value.flt;
 					wave = wave >= NUM_TRANSIENTS ? NUM_TRANSIENTS-1 : wave;
-					transient_setWaveform(&voiceArray[1].transGen, wave);
+					transient_setWaveform(&voiceSlots[1].u.drum.transGen, wave);
 				}
 				else
 				{
-					transient_setWaveform(&voiceArray[1].transGen, value.itg);
+					transient_setWaveform(&voiceSlots[1].u.drum.transGen, value.itg);
 				}
 				break;
 
 			case CC2_TRANS2_VOL:
-				voiceArray[1].transGen.volume = value.flt;
+				voiceSlots[1].u.drum.transGen.volume = value.flt;
 				break;
 
 			case CC2_TRANS2_FREQ:
-				voiceArray[1].transGen.pitch = 1.f + ((value.itg/33.9f)-0.75f) ;
+				voiceSlots[1].u.drum.transGen.pitch = 1.f + ((value.itg/33.9f)-0.75f) ;
 				break;
 
 			case CC2_TRANS3_WAVE:
@@ -960,20 +961,20 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				{
 					uint8_t wave = NUM_TRANSIENTS * value.flt;
 					wave = wave >= NUM_TRANSIENTS ? NUM_TRANSIENTS-1 : wave;
-					transient_setWaveform(&voiceArray[2].transGen, wave);
+					transient_setWaveform(&voiceSlots[2].u.drum.transGen, wave);
 				}
 				else
 				{
-					transient_setWaveform(&voiceArray[2].transGen, value.itg);
+					transient_setWaveform(&voiceSlots[2].u.drum.transGen, value.itg);
 				}
 				break;
 
 			case CC2_TRANS3_VOL:
-				voiceArray[2].transGen.volume = value.flt;
+				voiceSlots[2].u.drum.transGen.volume = value.flt;
 				break;
 
 			case CC2_TRANS3_FREQ:
-				voiceArray[2].transGen.pitch = 1.f + ((value.itg/33.9f)-0.75f) ;
+				voiceSlots[2].u.drum.transGen.pitch = 1.f + ((value.itg/33.9f)-0.75f) ;
 				break;
 
 			case CC2_TRANS4_WAVE:
@@ -981,19 +982,19 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				{
 					uint8_t wave = NUM_TRANSIENTS * value.flt;
 					wave = wave >= NUM_TRANSIENTS ? NUM_TRANSIENTS-1 : wave;
-					transient_setWaveform(&snareVoice.transGen, wave);
+					transient_setWaveform(&voiceSlots[3].u.snare.transGen, wave);
 				}
 				else
 				{
-					transient_setWaveform(&snareVoice.transGen, value.itg);
+					transient_setWaveform(&voiceSlots[3].u.snare.transGen, value.itg);
 				}
 				break;
 
 			case CC2_TRANS4_VOL:
-				snareVoice.transGen.volume = value.flt;
+				voiceSlots[3].u.snare.transGen.volume = value.flt;
 				break;
 			case CC2_TRANS4_FREQ:
-				snareVoice.transGen.pitch = 1.f + ((value.itg/33.9f)-0.75f) ;
+				voiceSlots[3].u.snare.transGen.pitch = 1.f + ((value.itg/33.9f)-0.75f) ;
 				break;
 
 			case CC2_TRANS5_WAVE:
@@ -1001,19 +1002,19 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				{
 					uint8_t wave = NUM_TRANSIENTS * value.flt;
 					wave = wave >= NUM_TRANSIENTS ? NUM_TRANSIENTS-1 : wave;
-					transient_setWaveform(&cymbalVoice.transGen, wave);
+					transient_setWaveform(&voiceSlots[4].u.cymbal.transGen, wave);
 				}
 				else
 				{
-					transient_setWaveform(&cymbalVoice.transGen, value.itg);
+					transient_setWaveform(&voiceSlots[4].u.cymbal.transGen, value.itg);
 				}
 				break;
 
 			case CC2_TRANS5_VOL:
-				cymbalVoice.transGen.volume = value.flt;
+				voiceSlots[4].u.cymbal.transGen.volume = value.flt;
 				break;
 			case CC2_TRANS5_FREQ:
-				cymbalVoice.transGen.pitch = 1.f + ((value.itg/33.9f)-0.75f) ;
+				voiceSlots[4].u.cymbal.transGen.pitch = 1.f + ((value.itg/33.9f)-0.75f) ;
 				break;
 
 			case CC2_TRANS6_WAVE:
@@ -1021,19 +1022,19 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				{
 					uint8_t wave = NUM_TRANSIENTS * value.flt;
 					wave = wave >= NUM_TRANSIENTS ? NUM_TRANSIENTS-1 : wave;
-					transient_setWaveform(&hatVoice.transGen, wave);
+					transient_setWaveform(&voiceSlots[5].u.hat.transGen, wave);
 				}
 				else
 				{
-					transient_setWaveform(&hatVoice.transGen, value.itg);
+					transient_setWaveform(&voiceSlots[5].u.hat.transGen, value.itg);
 				}
 				break;
 
 			case CC2_TRANS6_VOL:
-				hatVoice.transGen.volume = value.flt;
+				voiceSlots[5].u.hat.transGen.volume = value.flt;
 				break;
 			case CC2_TRANS6_FREQ:
-				hatVoice.transGen.pitch = 1.f + ((value.itg/33.9f)-0.75f) ;
+				voiceSlots[5].u.hat.transGen.pitch = 1.f + ((value.itg/33.9f)-0.75f) ;
 				break;
 
 			case CC2_FILTER_TYPE_1:
@@ -1043,11 +1044,11 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				{
 					uint8_t type = FILTER_NAIVE_2_POLE * value.flt + 1;
 					type = type >= FILTER_OFF ? FILTER_OFF-1 : type;
-					voiceArray[msg.data1-CC2_FILTER_TYPE_1].filterType = type;
+					voiceSlots[msg.data1-CC2_FILTER_TYPE_1].u.drum.filterType = type;
 				}
 				else
 				{
-					voiceArray[msg.data1-CC2_FILTER_TYPE_1].filterType = value.itg+1;
+					voiceSlots[msg.data1-CC2_FILTER_TYPE_1].u.drum.filterType = value.itg+1;
 				}
 				break;
 
@@ -1056,11 +1057,11 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				{
 					uint8_t type = FILTER_NAIVE_2_POLE * value.flt + 1;
 					type = type >= FILTER_OFF ? FILTER_OFF-1 : type;
-					snareVoice.filterType = type;
+					voiceSlots[3].u.snare.filterType = type;
 				}
 				else
 				{
-					snareVoice.filterType = value.itg + 1; // +1 because 0 is filter off which results in silence
+					voiceSlots[3].u.snare.filterType = value.itg + 1; // +1 because 0 is filter off which results in silence
 				}
 				break;
 
@@ -1070,11 +1071,11 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				{
 					uint8_t type = FILTER_NAIVE_2_POLE * value.flt + 1;
 					type = type >= FILTER_OFF ? FILTER_OFF-1 : type;
-					cymbalVoice.filterType = type;
+					voiceSlots[4].u.cymbal.filterType = type;
 				}
 				else
 				{
-					cymbalVoice.filterType = value.itg+1;
+					voiceSlots[4].u.cymbal.filterType = value.itg+1;
 				}
 				break;
 
@@ -1084,45 +1085,45 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				{
 					uint8_t type = FILTER_NAIVE_2_POLE * value.flt + 1;
 					type = type >= FILTER_OFF ? FILTER_OFF-1 : type;
-					hatVoice.filterType = type;
+					voiceSlots[5].u.hat.filterType = type;
 				}
 				else
 				{
-					hatVoice.filterType = value.itg+1;
+					voiceSlots[5].u.hat.filterType = value.itg+1;
 				}
-				//SVF_reset(&hatVoice.filter);
+				//SVF_reset(&voiceSlots[5].u.hat.filter);
 				break;
 
 			case CC2_FILTER_DRIVE_1:
 			case CC2_FILTER_DRIVE_2:
 			case CC2_FILTER_DRIVE_3:
 #if UNIT_GAIN_DRIVE
-				voiceArray[msg.data1-CC2_FILTER_DRIVE_1].filter.drive = (value.itg/127.f);
+				voiceSlots[msg.data1-CC2_FILTER_DRIVE_1].u.drum.filter.drive = (value.itg/127.f);
 #else
-				SVF_setDrive(&voiceArray[msg.data1-CC2_FILTER_DRIVE_1].filter, value.flt);
+				SVF_setDrive(&voiceSlots[msg.data1-CC2_FILTER_DRIVE_1].u.drum.filter, value.flt);
 #endif
 				break;
 			case CC2_FILTER_DRIVE_4:
 #if UNIT_GAIN_DRIVE
-				snareVoice.filter.drive = (value.itg/127.f);
+				voiceSlots[3].u.snare.filter.drive = (value.itg/127.f);
 #else
-				SVF_setDrive(&snareVoice.filter, value.flt);
+				SVF_setDrive(&voiceSlots[3].u.snare.filter, value.flt);
 #endif
 
 				break;
 			case CC2_FILTER_DRIVE_5:
 #if UNIT_GAIN_DRIVE
-				cymbalVoice.filter.drive = (value.itg/127.f);
+				voiceSlots[4].u.cymbal.filter.drive = (value.itg/127.f);
 #else
-				SVF_setDrive(&cymbalVoice.filter, value.flt);
+				SVF_setDrive(&voiceSlots[4].u.cymbal.filter, value.flt);
 #endif
 
 				break;
 			case CC2_FILTER_DRIVE_6:
 #if UNIT_GAIN_DRIVE
-				hatVoice.filter.drive = (value.itg/127.f);
+				voiceSlots[5].u.hat.filter.drive = (value.itg/127.f);
 #else
-				SVF_setDrive(&hatVoice.filter, value.flt);
+				SVF_setDrive(&voiceSlots[5].u.hat.filter, value.flt);
 #endif
 
 				break;
@@ -1130,22 +1131,22 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 			case CC2_MIX_MOD_1:
 			case CC2_MIX_MOD_2:
 			case CC2_MIX_MOD_3:
-				voiceArray[msg.data1-CC2_MIX_MOD_1].mixOscs = value.itg != 0;
+				voiceSlots[msg.data1-CC2_MIX_MOD_1].u.drum.mixOscs = value.itg != 0;
 				break;
 
 			case CC2_VOLUME_MOD_ON_OFF1:
 			case CC2_VOLUME_MOD_ON_OFF2:
 			case CC2_VOLUME_MOD_ON_OFF3:
-				voiceArray[msg.data1-CC2_VOLUME_MOD_ON_OFF1].volumeMod = value.itg != 0;
+				voiceSlots[msg.data1-CC2_VOLUME_MOD_ON_OFF1].u.drum.volumeMod = value.itg != 0;
 				break;
 			case CC2_VOLUME_MOD_ON_OFF4:
-				snareVoice.volumeMod = value.itg != 0;
+				voiceSlots[3].u.snare.volumeMod = value.itg != 0;
 				break;
 			case CC2_VOLUME_MOD_ON_OFF5:
-				cymbalVoice.volumeMod = value.itg != 0;
+				voiceSlots[4].u.cymbal.volumeMod = value.itg != 0;
 				break;
 			case CC2_VOLUME_MOD_ON_OFF6:
-				hatVoice.volumeMod = value.itg != 0;
+				voiceSlots[5].u.hat.volumeMod = value.itg != 0;
 				break;
 
 			case CC2_VELO_MOD_AMT_1:
@@ -1164,11 +1165,11 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				{
 					uint8_t wave = NUM_LFO_WAVEFORMS * value.flt;
 					wave = wave >= NUM_LFO_WAVEFORMS ? NUM_LFO_WAVEFORMS-1 : wave;
-					voiceArray[msg.data1-CC2_WAVE_LFO1].lfo.waveform = wave;
+					voiceSlots[msg.data1-CC2_WAVE_LFO1].u.drum.lfo.waveform = wave;
 				}
 				else
 				{
-					voiceArray[msg.data1-CC2_WAVE_LFO1].lfo.waveform = value.itg;
+					voiceSlots[msg.data1-CC2_WAVE_LFO1].u.drum.lfo.waveform = value.itg;
 				}
 				break;
 
@@ -1177,11 +1178,11 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				{
 					uint8_t wave = NUM_LFO_WAVEFORMS * value.flt;
 					wave = wave >= NUM_LFO_WAVEFORMS ? NUM_LFO_WAVEFORMS-1 : wave;
-					snareVoice.lfo.waveform = wave;
+					voiceSlots[3].u.snare.lfo.waveform = wave;
 				}
 				else
 				{
-					snareVoice.lfo.waveform = value.itg;
+					voiceSlots[3].u.snare.lfo.waveform = value.itg;
 				}
 				break;
 
@@ -1190,11 +1191,11 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				{
 					uint8_t wave = NUM_LFO_WAVEFORMS * value.flt;
 					wave = wave >= NUM_LFO_WAVEFORMS ? NUM_LFO_WAVEFORMS-1 : wave;
-					cymbalVoice.lfo.waveform = wave;
+					voiceSlots[4].u.cymbal.lfo.waveform = wave;
 				}
 				else
 				{
-					cymbalVoice.lfo.waveform = value.itg;
+					voiceSlots[4].u.cymbal.lfo.waveform = value.itg;
 				}
 				break;
 
@@ -1203,11 +1204,11 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				{
 					uint8_t wave = NUM_LFO_WAVEFORMS * value.flt;
 					wave = wave >= NUM_LFO_WAVEFORMS ? NUM_LFO_WAVEFORMS-1 : wave;
-					hatVoice.lfo.waveform = wave;
+					voiceSlots[5].u.hat.lfo.waveform = wave;
 				}
 				else
 				{
-					hatVoice.lfo.waveform = value.itg;
+					voiceSlots[5].u.hat.lfo.waveform = value.itg;
 				}
 				break;
 
@@ -1217,22 +1218,22 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				if(isFloatModulator)
 				{
 					uint8_t voice = 7 * value.flt;
-					voiceArray[msg.data1-CC2_RETRIGGER_LFO1].lfo.retrigger = voice;
+					voiceSlots[msg.data1-CC2_RETRIGGER_LFO1].u.drum.lfo.retrigger = voice;
 				}
 				else
 				{
-					voiceArray[msg.data1-CC2_RETRIGGER_LFO1].lfo.retrigger = value.itg;
+					voiceSlots[msg.data1-CC2_RETRIGGER_LFO1].u.drum.lfo.retrigger = value.itg;
 				}
 				break;
 			case CC2_RETRIGGER_LFO4:
 				if(isFloatModulator)
 				{
 					uint8_t voice = 7 * value.flt;
-					snareVoice.lfo.retrigger = voice;
+					voiceSlots[3].u.snare.lfo.retrigger = voice;
 				}
 				else
 				{
-					snareVoice.lfo.retrigger = value.itg;
+					voiceSlots[3].u.snare.lfo.retrigger = value.itg;
 				}
 				break;
 
@@ -1240,11 +1241,11 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				if(isFloatModulator)
 				{
 					uint8_t voice = 7 * value.flt;
-					cymbalVoice.lfo.retrigger = voice;
+					voiceSlots[4].u.cymbal.lfo.retrigger = voice;
 				}
 				else
 				{
-					cymbalVoice.lfo.retrigger = value.itg;
+					voiceSlots[4].u.cymbal.lfo.retrigger = value.itg;
 				}
 				break;
 
@@ -1252,27 +1253,27 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				if(isFloatModulator)
 				{
 					uint8_t voice = 7 * value.flt;
-					hatVoice.lfo.retrigger = voice;
+					voiceSlots[5].u.hat.lfo.retrigger = voice;
 				}
 				else
 				{
-					hatVoice.lfo.retrigger = value.itg;
+					voiceSlots[5].u.hat.lfo.retrigger = value.itg;
 				}
 				break;
 
 			case CC2_SYNC_LFO1:
 			case CC2_SYNC_LFO2:
 			case CC2_SYNC_LFO3:
-				lfo_setSync(&voiceArray[msg.data1-CC2_SYNC_LFO1].lfo, value.itg);
+				lfo_setSync(&voiceSlots[msg.data1-CC2_SYNC_LFO1].u.drum.lfo, value.itg);
 				break;
 			case CC2_SYNC_LFO4:
-				lfo_setSync(&snareVoice.lfo, value.itg);
+				lfo_setSync(&voiceSlots[3].u.snare.lfo, value.itg);
 				break;
 			case CC2_SYNC_LFO5:
-				lfo_setSync(&cymbalVoice.lfo, value.itg);
+				lfo_setSync(&voiceSlots[4].u.cymbal.lfo, value.itg);
 				break;
 			case CC2_SYNC_LFO6:
-				lfo_setSync(&hatVoice.lfo, value.itg);
+				lfo_setSync(&voiceSlots[5].u.hat.lfo, value.itg);
 				break;
 
 			case CC2_VOICE_LFO1:
@@ -1296,16 +1297,16 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 			case CC2_OFFSET_LFO1:
 			case CC2_OFFSET_LFO2:
 			case CC2_OFFSET_LFO3:
-				voiceArray[msg.data1-CC2_OFFSET_LFO1].lfo.phaseOffset = value.flt * 0xffffffff;
+				voiceSlots[msg.data1-CC2_OFFSET_LFO1].u.drum.lfo.phaseOffset = value.flt * 0xffffffff;
 				break;
 			case CC2_OFFSET_LFO4:
-				snareVoice.lfo.phaseOffset = value.flt * 0xffffffff;
+				voiceSlots[3].u.snare.lfo.phaseOffset = value.flt * 0xffffffff;
 				break;
 			case CC2_OFFSET_LFO5:
-				cymbalVoice.lfo.phaseOffset = value.flt * 0xffffffff;
+				voiceSlots[4].u.cymbal.lfo.phaseOffset = value.flt * 0xffffffff;
 				break;
 			case CC2_OFFSET_LFO6:
-				hatVoice.lfo.phaseOffset = value.flt * 0xffffffff;
+				voiceSlots[5].u.hat.lfo.phaseOffset = value.flt * 0xffffffff;
 				break;
 
 			case CC2_AUDIO_OUT1:
@@ -1355,16 +1356,16 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 			case CC2_PWM_1:
 			case CC2_PWM_2:
 			case CC2_PWM_3:
-				voiceArray[msg.data1-CC2_PWM_1].pwm = value.flt;
+				voiceSlots[msg.data1-CC2_PWM_1].u.drum.pwm = value.flt;
 				break;
 			case CC2_PWM_4:
-				snareVoice.pwm = value.flt;
+				voiceSlots[3].u.snare.pwm = value.flt;
 				break;
 			case CC2_PWM_5:
-				cymbalVoice.pwm = value.flt;
+				voiceSlots[4].u.cymbal.pwm = value.flt;
 				break;
 			case CC2_PWM_6:
-				hatVoice.pwm = value.flt;
+				voiceSlots[5].u.hat.pwm = value.flt;
 				break;
 
 			case CC2_FX_TYPE:

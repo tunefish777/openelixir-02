@@ -48,13 +48,8 @@ typedef struct HiHatStruct
 
 	int32_t		noiseSample;
 
-	float		decayClosed;
-	float		decayOpen;
-
 	uint8_t isOpen;		//is 1 if urrent playing voice is open hihat, 0 for closed
 } HiHatVoice;
-
-extern HiHatVoice hatVoice;
 
 //initialize all the parameters to sane values
 void HiHat_init(HiHatVoice* v, uint8_t slot);
