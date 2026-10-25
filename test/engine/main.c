@@ -182,7 +182,9 @@ static uint32_t tablesHash(void)
 #if __has_include("Preset/KitEngines.h")
 #include "Preset/KitEngines.h"
 #include "Soundengine/MIDI/MidiParser.h"
+#ifdef KIT_ENGINES_BLOCK_SIZE	//the engine checks need the current KitEngines API (older trees only render)
 #define HAVE_KIT_ENGINES 1
+#endif
 
 //the UI sends to the sound engine like this in the firmware too
 void frontPanel_sendData(uint8_t status, uint8_t data1, uint8_t data2)
@@ -356,16 +358,48 @@ static int roleTest(int round)
 }
 #endif
 
+#ifdef HAVE_KIT_ENGINES
+//the engine block in kit files: round trip, and stock engines for anything else
+static int blockTest(void)
+{
+	static const uint8_t engines[NUM_VOICE_SLOTS] = { ENGINE_HIHAT, ENGINE_SNARE, ENGINE_DRUM, ENGINE_CYMBAL, ENGINE_DRUM, ENGINE_SNARE };
+	uint8_t stock[NUM_VOICE_SLOTS], out[NUM_VOICE_SLOTS], block[32];
+	int fail = 0;
+	kitEngines_setStock(stock);
+	const uint8_t size = kitEngines_encode(engines, block);
+	kitEngines_decode(block, size, out);
+	fail |= memcmp(out, engines, sizeof(out)) != 0;
+	kitEngines_decode(block, (uint16_t)(size + 10), out);		//more bytes after the block
+	fail |= memcmp(out, engines, sizeof(out)) != 0;
+	kitEngines_decode(block, (uint16_t)(size - 1), out);		//truncated
+	fail |= memcmp(out, stock, sizeof(out)) != 0;
+	kitEngines_decode(block, 0, out);							//no block (stock firmware kit)
+	fail |= memcmp(out, stock, sizeof(out)) != 0;
+	block[1] = 'X';												//not a block
+	kitEngines_decode(block, size, out);
+	fail |= memcmp(out, stock, sizeof(out)) != 0;
+	block[1] = 'E'; block[5] = 9;								//invalid engine: that slot stock
+	kitEngines_decode(block, size, out);
+	fail |= out[0] != stock[0] || memcmp(&out[1], &engines[1], NUM_VOICE_SLOTS - 1) != 0;
+	printf("engine block in kit files: %s\n", fail ? "FAILED" : "ok");
+	return fail;
+}
+#endif
+
 //every slot gets every engine: each track must sound, track 7 must use decay B,
 //track 6 must cut track 7, and the engine specific parameters must reach the engine
 static int engineTest(void)
 {
 	static const char* const names[NUM_ENGINES] = { "drum", "snare", "cymbal", "hihat" };
 	int fail = 0, peak, nan = 0;
+#ifdef HAVE_KIT_ENGINES
+	fail |= blockTest();
+#endif
 	for(int round = 0; round < NUM_ENGINES; round++)
 	{
 #ifdef HAVE_KIT_ENGINES
-		kitEngines_restoreStock();	//like a kit load
+		kitEngines_setStock(kitEngines);	//like loading a stock kit
+		kitEngines_apply();
 #endif
 		loadKit(0);
 		for(uint8_t v = 0; v < 6; v++)

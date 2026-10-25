@@ -85,6 +85,38 @@ uint32_t preset_patTimer = 0;
 uint8_t preset_kitDirty = 0;
 uint8_t preset_patDirty = 0;
 
+//the engines of the RAM kit morphParameters points to (the active kit's if it
+//doesn't point to one yet: it is NULL during the first kit loads at boot)
+static uint8_t* preset_morphEngines()
+{
+	const uint8_t* first = &mainParameters[0][0];
+	if(morphParameters < first || morphParameters >= first + sizeof(mainParameters))
+		return kitEngines;
+	return kitEngines_ram[(morphParameters - first) / END_OF_SOUND_PARAMETERS];
+}
+//is par an engine specific parameter of a slot that has another engine in the morph kit?
+static uint8_t preset_isMorphEngineMismatch(uint16_t par)
+{
+	const uint8_t slot = kitEngines_rolePar2Slot(par);
+	return slot < NUM_VOICE_SLOTS && kitEngines[slot] != preset_morphEngines()[slot];
+}
+//write the engine block after the kit parameters
+static FRESULT preset_writeEngines(const uint8_t* engines)
+{
+	uint8_t block[KIT_ENGINES_BLOCK_SIZE];
+	unsigned int bytesWritten;
+	return f_write((FIL*)&SDFile, block, kitEngines_encode(engines, block), &bytesWritten);
+}
+//read the engine block after the kit parameters (stock engines if there is none)
+static void preset_readEngines(uint8_t* engines)
+{
+	uint8_t block[32];
+	unsigned int bytesRead = 0;
+	if(f_read((FIL*)&SDFile, block, sizeof(block), &bytesRead) != FR_OK)
+		bytesRead = 0;
+	kitEngines_decode(block, (uint16_t)bytesRead, engines);
+}
+
 void preset_initTmpFolder()
 {
 	char folderName[13];
@@ -229,6 +261,7 @@ FRESULT preset_saveTmpKit()
 	}
 	//write the preset data
 	f_write((FIL*)&SDFile,activeParameters,END_OF_SOUND_PARAMETERS,&bytesWritten);
+	preset_writeEngines(kitEngines);
 
 	//close the file
 	f_close((FIL*)&SDFile);
@@ -273,6 +306,7 @@ FRESULT preset_LoadTmpKit()
 			// set to 0 for any that were not read from the file
 			if(END_OF_SOUND_PARAMETERS-bytesRead)
 				memset(para+bytesRead,0,END_OF_SOUND_PARAMETERS-bytesRead);
+			preset_readEngines(kitEngines);
 
 			//special case mod targets. normalize.
 			const uint8_t nmt=getNumModTargets();
@@ -793,8 +827,11 @@ void preset_init(uint8_t presetNr)
 			para[PAR_TARGET_LFO1+i] = 0;
 	}
 
+	kitEngines_setStock(kitEngines_ram[presetNr]);
+
 	//copy parameters to edit buffer
 	memcpy(activeParameters, mainParameters[presetNr], sizeof(uint8_t) * END_OF_SOUND_PARAMETERS);
+	memcpy(kitEngines, kitEngines_ram[presetNr], NUM_VOICE_SLOTS);
 	preset_sendDrumsetParameters();
 	//frontPanel_sendData(PRESET,PRESET_LOAD,presetNr);
 
@@ -828,11 +865,14 @@ static void preset_writeDrumsetData(uint8_t presetNr, uint8_t isMorph)
 			}					
 			f_write((FIL*)&SDFile,&value,1,&bytesWritten);
 		}
+		//a morphed kit keeps the engines of the source kit
+		preset_writeEngines(kitEngines);
 	} else {
 		for(i=0;i<END_OF_SOUND_PARAMETERS;i++)
 		{
 			f_write((FIL*)&SDFile,&mainParameters[presetNr][i],1,&bytesWritten);
 		}
+		preset_writeEngines(kitEngines_ram[presetNr]);
 	}
 }
 
@@ -848,6 +888,7 @@ void preset_loadDrumsetRam(uint8_t presetNr, uint8_t isMorph, uint8_t sendImmedi
 	{
 		//copy parameters to edit buffer
 		memcpy(activeParameters, mainParameters[presetNr], sizeof(uint8_t) * END_OF_SOUND_PARAMETERS);
+		memcpy(kitEngines, kitEngines_ram[presetNr], NUM_VOICE_SLOTS);
 		//if(activeParameters[PAR_PATTERN_MODE] = 1)
 		//load asociated morph kit as well
 
@@ -899,6 +940,8 @@ void preset_saveDrumsetRam(uint8_t presetNr, uint8_t isMorph)
 		//copy edit buffer to parameter array
 		memcpy(mainParameters[presetNr], activeParameters, sizeof(uint8_t) * END_OF_SOUND_PARAMETERS);
 	}
+	//a morphed kit keeps the engines of the source kit
+	memcpy(kitEngines_ram[presetNr], kitEngines, NUM_VOICE_SLOTS);
 }
 //----------------------------------------------------
 FRESULT preset_saveDrumsetSD(uint8_t presetNr, uint8_t isMorph)
@@ -1160,6 +1203,7 @@ static FRESULT preset_readDrumsetData(uint8_t presetNr, uint8_t isMorph)
 		// set to 0 for any that were not read from the file
 		if(END_OF_SOUND_PARAMETERS-bytesRead)
 			memset(para+bytesRead,0,END_OF_SOUND_PARAMETERS-bytesRead);
+		preset_readEngines(isMorph ? preset_morphEngines() : kitEngines_ram[presetNr]);
 		
 		//special case mod targets. normalize.
 		const uint8_t nmt=getNumModTargets();
@@ -1269,8 +1313,8 @@ static uint8_t interpolate(uint8_t a, uint8_t b, uint8_t x)
 //kit load: not time critical, runs from flash (frees ITCM)
 void preset_sendDrumsetParametersImmediate()
 {
-		//kits don't store engines yet: the parameters are for the stock engines
-		kitEngines_restoreStock();
+		//the kit's engines first: its parameters are for them
+		kitEngines_apply();
 
 		//special case mod targets
 		for(uint8_t i=0;i<6;i++)
@@ -1360,8 +1404,8 @@ void preset_sendDrumsetParametersImmediate()
 void preset_sendDrumsetParameters()
 {
 	uint8_t i;
-	//kits don't store engines yet: the parameters are for the stock engines
-	kitEngines_restoreStock();
+	//the kit's engines first: its parameters are for them
+	kitEngines_apply();
 	//special case mod targets
 	for(i=0;i<6;i++)
 	{
@@ -2152,6 +2196,12 @@ void preset_morph_tick()
 			//always use source kit (morph = 0) for audio routing
 			morph = 0;
 		}
+		else if(preset_isMorphEngineMismatch(morph_index))
+		{
+			//engine specific parameter of a slot whose engine differs in the morph
+			//kit: the values mean different things, use the source kit's
+			morph = 0;
+		}
 		else
 		{
 			morph = activeParameters[PAR_MORPH];
@@ -2251,6 +2301,8 @@ void preset_morph(uint8_t morph)
 //----------------------------------------------------
 uint8_t preset_getMorphValue(uint16_t index, uint8_t morph)
 {
+	if(preset_isMorphEngineMismatch(index))
+		return activeParameters[index];
 	return interpolate(activeParameters[index],morphParameters[index],morph);
 };
 //----------------------------------------------------

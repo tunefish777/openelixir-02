@@ -23,13 +23,35 @@
 #include "stm32f7xx_hal.h"
 #include "Soundengine/DSPAudio/VoiceSlot.h"
 
-extern uint8_t kitEngines[NUM_VOICE_SLOTS];
+//Kit files (.snd, also in projects and the tmp folder) and tmp.snd carry the
+//engines in a block appended after the 247 parameter bytes:
+//	"OE02", payload size, payload: the engine of each slot (6 bytes)
+//Later versions may only append to the payload. Files without the block (from
+//the stock firmware or anywhere else) load with the stock engines, and the
+//stock firmware ignores the block.
+#define KIT_ENGINES_BLOCK_SIZE	(5 + NUM_VOICE_SLOTS)
+
+extern uint8_t kitEngines[NUM_VOICE_SLOTS];							//the active kit
+extern uint8_t kitEngines_ram[NUM_KIT_SLOTS][NUM_VOICE_SLOTS];		//the kits in RAM (mainParameters)
+
+//all kits: stock engines
+void kitEngines_init(void);
+void kitEngines_setStock(uint8_t* engines);
 
 //change the engine of a slot in the active kit
 void kitEngines_assign(const uint8_t slot, const uint8_t engine);
 
-//all slots back to their stock engines, without changing the kit's parameter
-//values (before a kit is loaded: kits don't store engines yet)
-void kitEngines_restoreStock(void);
+//set the sound engine's slots to the active kit's engines (before the kit's
+//parameters are sent)
+void kitEngines_apply(void);
+
+//the slot whose engine specific parameter par is, NUM_VOICE_SLOTS if none
+uint8_t kitEngines_rolePar2Slot(const uint16_t par);
+
+//engines -> block, returns its size (KIT_ENGINES_BLOCK_SIZE)
+uint8_t kitEngines_encode(const uint8_t* engines, uint8_t* block);
+//block (size bytes read after the parameters, maybe 0) -> engines; the stock
+//engines if it isn't a valid block
+void kitEngines_decode(const uint8_t* block, const uint16_t size, uint8_t* engines);
 
 #endif /* KITENGINES_H_ */

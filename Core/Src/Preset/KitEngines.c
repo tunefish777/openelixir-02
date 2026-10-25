@@ -15,8 +15,50 @@
 #include "menu/menu.h"
 #include "Soundengine/MIDI/MidiMessages.h"
 #include "frontPanelParser_ui.h"
+#include "Preset/PresetManager.h"
+#include <string.h>
 
 uint8_t kitEngines[NUM_VOICE_SLOTS] = { ENGINE_DRUM, ENGINE_DRUM, ENGINE_DRUM, ENGINE_SNARE, ENGINE_CYMBAL, ENGINE_HIHAT };
+uint8_t kitEngines_ram[NUM_KIT_SLOTS][NUM_VOICE_SLOTS];
+
+static const char kitEngines_signature[4] = { 'O', 'E', '0', '2' };
+//---------------------------------------------------
+void kitEngines_setStock(uint8_t* engines)
+{
+	for(uint8_t slot=0;slot<NUM_VOICE_SLOTS;slot++)
+	{
+		engines[slot] = slot_stockEngine(slot);
+	}
+}
+//---------------------------------------------------
+void kitEngines_init(void)
+{
+	kitEngines_setStock(kitEngines);
+	for(uint8_t kit=0;kit<NUM_KIT_SLOTS;kit++)
+	{
+		kitEngines_setStock(kitEngines_ram[kit]);
+	}
+}
+//---------------------------------------------------
+uint8_t kitEngines_encode(const uint8_t* engines, uint8_t* block)
+{
+	memcpy(block, kitEngines_signature, 4);
+	block[4] = NUM_VOICE_SLOTS;
+	memcpy(&block[5], engines, NUM_VOICE_SLOTS);
+	return KIT_ENGINES_BLOCK_SIZE;
+}
+//---------------------------------------------------
+void kitEngines_decode(const uint8_t* block, const uint16_t size, uint8_t* engines)
+{
+	kitEngines_setStock(engines);
+	if(size < KIT_ENGINES_BLOCK_SIZE || memcmp(block, kitEngines_signature, 4) != 0 || block[4] < NUM_VOICE_SLOTS)
+		return;
+	for(uint8_t slot=0;slot<NUM_VOICE_SLOTS;slot++)
+	{
+		if(block[5+slot] < NUM_ENGINES)
+			engines[slot] = block[5+slot];
+	}
+}
 //---------------------------------------------------
 //the slot whose stock engine this is (where its defaults are taken from)
 static uint8_t kitEngines_stockSlot(const uint8_t engine)
@@ -38,6 +80,16 @@ static uint8_t kitEngines_isRolePar(const uint8_t slot, const uint16_t par)
 			return 1;
 	}
 	return 0;
+}
+//---------------------------------------------------
+uint8_t kitEngines_rolePar2Slot(const uint16_t par)
+{
+	for(uint8_t slot=0;slot<NUM_VOICE_SLOTS;slot++)
+	{
+		if(kitEngines_isRolePar(slot, par))
+			return slot;
+	}
+	return NUM_VOICE_SLOTS;
 }
 //---------------------------------------------------
 static void kitEngines_sendPar(const uint8_t par)
@@ -136,6 +188,9 @@ void kitEngines_assign(const uint8_t slot, const uint8_t engine)
 		}
 	}
 
+	//autosave (tmp.snd) like any other kit edit
+	preset_touchTimer(PRESET_KIT_TIMER);
+
 	//the voice was re-initialized: send all its parameters
 	for(uint8_t i=0;i<NUM_SLOT_PARAMS;i++)
 	{
@@ -148,11 +203,10 @@ void kitEngines_assign(const uint8_t slot, const uint8_t engine)
 	menu_repaint();
 }
 //---------------------------------------------------
-void kitEngines_restoreStock(void)
+void kitEngines_apply(void)
 {
 	for(uint8_t slot=0;slot<NUM_VOICE_SLOTS;slot++)
 	{
-		kitEngines[slot] = slot_stockEngine(slot);
 		slot_setEngine(slot, kitEngines[slot]);
 	}
 }

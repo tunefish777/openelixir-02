@@ -16,6 +16,7 @@
 #include "main.h"
 #include "menu/menu.h"
 int CodecInit(void) { return 0; }
+void preset_touchTimer(PresetTimer type) { }
 uint8_t euklid_getLength(uint8_t trackNr) { return 0; }
 uint8_t euklid_getRotation(uint8_t trackNr) { return 0; }
 uint8_t euklid_getSteps(uint8_t trackNr) { return 0; }

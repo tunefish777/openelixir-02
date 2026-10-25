@@ -18,6 +18,7 @@
 
 
 #include "Preset/PresetManager.h"
+#include "Preset/KitEngines.h"
 #include "menu/menuPages.h"
 #include "menu/MenuText.h"
 //#include "../Hardware/timebase.h"
@@ -752,6 +753,7 @@ void menu_init()
 	memset(saveScreenPots,0,4*sizeof(uint8_t));
 
 	memset(mainParameters, 0, sizeof(uint8_t) * END_OF_SOUND_PARAMETERS * NUM_KIT_SLOTS);
+	kitEngines_init();
 
 
 	activeParameters[PAR_EUKLID_LENGTH] = 16;
