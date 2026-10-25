@@ -12,8 +12,12 @@ test/engine/compare.sh v0.1       # working tree vs. a tag/commit
 ```
 
 `render --engines` (built by `build.sh`, e.g. `build/engine-test/out-work/render --engines`)
-checks engine switching instead: every slot gets every engine, each track must sound, no
-voice state may become NaN, track 7 must use decay B and track 6 must cut track 7.
+checks engine switching instead: every slot gets every engine (switched like a received
+NRPN 98, including the UI side in `Preset/KitEngines.c`). Each track must sound, no voice
+state may become NaN, track 7 must use decay B, track 6 must cut track 7, and each of the
+slot's 7 engine specific parameters must change the sound of the engine it runs (except
+the roles that engine doesn't have). The voice level checks render a copy of the voice,
+so they don't depend on the mixer, FX or the other voices.
 
 How it works:
 - The engine is driven only through entry points that stay stable across refactorings:

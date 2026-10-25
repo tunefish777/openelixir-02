@@ -10,6 +10,10 @@ CFLAGS="-O1 -g -fno-fast-math -ffp-contract=off -fno-strict-aliasing -fcommon -w
 INC="-I$HERE/shim -I$ROOT/Core/Inc -I$ROOT/Drivers/CMSIS/Include -I$ROOT/Drivers/CMSIS/Device/ST/STM32F7xx/Include -I$ROOT/Drivers/STM32F7xx_HAL_Driver/Inc -I$ROOT/Middlewares/JS/STM32_USB_Device_Library/Core/Inc -I$ROOT/Middlewares/JS/STM32_USB_Device_Library/Class/CDC/Inc -I$ROOT/USB_DEVICE_MIDI/Target -I$ROOT/USB_DEVICE_MIDI/App -I$ROOT/FATFS/App -I$ROOT/FATFS/Target -I$ROOT/Middlewares/Third_Party/FatFs/src"
 SRCS=$(ls "$ROOT"/Core/Src/Soundengine/DSPAudio/*.c "$ROOT"/Core/Src/Soundengine/DSPAudio/FX/*.c "$ROOT"/Core/Src/Soundengine/DSPAudio/FX/VerbTools/*.c)
 SRCS="$SRCS $ROOT/Core/Src/Soundengine/FxBus.c $ROOT/Core/Src/Soundengine/MIDI/MidiParser.c $ROOT/Core/Src/Soundengine/MIDI/MidiVoiceControl.c $ROOT/Core/Src/Soundengine/MIDI/ParameterArray.c $ROOT/Core/Src/Soundengine/MIDI/MidiMessages.c $ROOT/Core/Src/Preset/initKit.c $ROOT/Core/Src/Soundengine/MIDI/CortexParser.c $ROOT/Core/Src/Soundengine/Soundengine.c"
+# UI side of engine switching (when the tree has it)
+if [ -f "$ROOT/Core/Src/Preset/KitEngines.c" ]; then
+	SRCS="$SRCS $ROOT/Core/Src/Preset/KitEngines.c $ROOT/Core/Src/menu/Cc2Text.c"
+fi
 fail=0
 for f in $SRCS; do
 	o="$OUT/obj/$(basename "$f" .c).o"

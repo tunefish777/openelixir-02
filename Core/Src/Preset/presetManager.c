@@ -14,6 +14,7 @@
 //#include "../config.h"
 #include <frontPanelParser_ui.h>
 #include "Preset/PresetManager.h"
+#include "Preset/KitEngines.h"
 //#include "../Hardware/SD/ff.h"
 #include "ff.h"
 #include <stdio.h>
@@ -1260,8 +1261,12 @@ static uint8_t interpolate(uint8_t a, uint8_t b, uint8_t x)
 }
 
 //----------------------------------------------------
-IN_ITCM_RAM void preset_sendDrumsetParametersImmediate()
+//kit load: not time critical, runs from flash (frees ITCM)
+void preset_sendDrumsetParametersImmediate()
 {
+		//kits don't store engines yet: the parameters are for the stock engines
+		kitEngines_restoreStock();
+
 		//special case mod targets
 		for(uint8_t i=0;i<6;i++)
 		{
@@ -1350,6 +1355,8 @@ IN_ITCM_RAM void preset_sendDrumsetParametersImmediate()
 void preset_sendDrumsetParameters()
 {
 	uint8_t i;
+	//kits don't store engines yet: the parameters are for the stock engines
+	kitEngines_restoreStock();
 	//special case mod targets
 	for(i=0;i<6;i++)
 	{

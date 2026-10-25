@@ -28,6 +28,7 @@ Custom firmware for the Erica Synths LXR-02 drum machine. It is based on the ope
 | next | Development build option `-DLXR_CPU_METER=ON`: CPU load per voice and FX on the display. |
 | next | About 10 % less CPU load in the worst case and 2.4 KB more free fast RAM (ITCM), with identical sound. Host test (`test/engine/`) that proves engine changes render bit-identical. |
 | next | Fix: switching the FX delay to ping-pong could write up to 32 KB past the delay buffer and corrupt other sound data (also in the stock firmware). |
+| next | Experimental: each of the 6 voice slots can run any engine (drum, snare, cymbal, hi-hat), switched with NRPN 98 (value = slot × 4 + engine, slots 0-5, engines 0 drum, 1 snare, 2 cymbal, 3 hi-hat). Not saved in kits yet; loading a kit restores the stock engines. |
 
 ## Building and installing
 

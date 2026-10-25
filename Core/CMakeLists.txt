@@ -60,6 +60,7 @@ add_library(lxr_ui OBJECT
 # Kit/pattern/project storage on the SD card.
 add_library(lxr_preset OBJECT
     Src/Preset/initKit.c
+    Src/Preset/KitEngines.c
     Src/Preset/presetManager.c
 )
 

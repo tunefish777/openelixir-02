@@ -92,12 +92,6 @@ inline uint16_t calcSlopeEgTime(uint8_t data2)
 	return data2>0?val*val*data2*128:1;
 }
 #endif
-//-----------------------------------------------------------
-static inline float calcPitchModAmount(uint8_t data2)
-{
-	const float val = data2/127.f;
-	return val*val*PITCH_AMOUNT_FACTOR;
-}
 
 //-----------------------------------------------------------
 // vars
@@ -170,6 +164,16 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 			midiParser_originalCcValues[paramNr+1] = value.itg;
 		}
 
+		//engine specific parameters: handled by the engine the slot runs
+		if(slot_setRoleParameter(paramNr, value.itg, value.flt, isFloatModulator))
+		{
+			if(!isFloatModulator)
+			{
+				modNode_originalValueChanged(paramNr);
+			}
+			return;
+		}
+
 		switch(msg.data1)
 		{
 
@@ -206,26 +210,11 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 			slopeEg2_setSlope(&voiceSlots[0].u.drum.oscVolEg,value.itg);
 
 			break;
-		case PITCH_SLOPE1:
-			DecayEg_setSlope(&voiceSlots[0].u.drum.oscPitchEg,value.itg);
-			break;
-
 		case VOL_SLOPE2:
 			slopeEg2_setSlope(&voiceSlots[1].u.drum.oscVolEg,value.itg);
 			break;
-		case PITCH_SLOPE2:
-			DecayEg_setSlope(&voiceSlots[1].u.drum.oscPitchEg,value.itg);
-			break;
-
 		case VOL_SLOPE3:
 			slopeEg2_setSlope(&voiceSlots[2].u.drum.oscVolEg,value.itg);
-			break;
-		case PITCH_SLOPE3:
-			DecayEg_setSlope(&voiceSlots[2].u.drum.oscPitchEg,value.itg);
-			break;
-
-		case PITCH_SLOPE4:
-			DecayEg_setSlope(&voiceSlots[3].u.snare.oscPitchEg,value.itg);
 			break;
 		case VOL_SLOPE6:
 			slopeEg2_setSlope(&voiceSlots[5].u.hat.oscVolEg,value.itg);
@@ -362,19 +351,6 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 			}
 			break;
 
-		case MOD_WAVE_DRUM1:
-			if(isFloatModulator)
-			{
-				uint8_t wave = NUM_OSC_WAVEFORMS * value.flt;
-				wave = wave >= NUM_OSC_WAVEFORMS ? NUM_OSC_WAVEFORMS-1 : wave;
-				voiceSlots[0].u.drum.modOsc.waveform = wave;
-			}
-			else
-			{
-				voiceSlots[0].u.drum.modOsc.waveform = value.itg;
-			}
-			break;
-
 		case OSC_WAVE_DRUM2:
 			if(isFloatModulator)
 			{
@@ -388,19 +364,6 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 			}
 			break;
 
-		case MOD_WAVE_DRUM2:
-			if(isFloatModulator)
-			{
-				uint8_t wave = NUM_OSC_WAVEFORMS * value.flt;
-				wave = wave >= NUM_OSC_WAVEFORMS ? NUM_OSC_WAVEFORMS-1 : wave;
-				voiceSlots[1].u.drum.modOsc.waveform = wave;
-			}
-			else
-			{
-				voiceSlots[1].u.drum.modOsc.waveform = value.itg;
-			}
-			break;
-
 		case OSC_WAVE_DRUM3:
 			if(isFloatModulator)
 			{
@@ -411,19 +374,6 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 			else
 			{
 				voiceSlots[2].u.drum.osc.waveform = value.itg;
-			}
-			break;
-
-		case MOD_WAVE_DRUM3:
-			if(isFloatModulator)
-			{
-				uint8_t wave = NUM_OSC_WAVEFORMS * value.flt;
-				wave = wave >= NUM_OSC_WAVEFORMS ? NUM_OSC_WAVEFORMS-1 : wave;
-				voiceSlots[2].u.drum.modOsc.waveform = wave;
-			}
-			else
-			{
-				voiceSlots[2].u.drum.modOsc.waveform = value.itg;
 			}
 			break;
 
@@ -473,28 +423,6 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 		}
 			break;
 
-		case PITCHD1:
-		{
-			DecayEg_setDecay(&voiceSlots[0].u.drum.oscPitchEg,value.itg);
-		}
-			break;
-
-		case MODAMNT1:
-			voiceSlots[0].u.drum.egPitchModAmount = calcPitchModAmount(value.itg);
-			break;
-
-		case FMAMNT1:
-			voiceSlots[0].u.drum.fmModAmount = value.flt;
-			break;
-
-		case FMDTN1:
-			//clear upper nibble
-			voiceSlots[0].u.drum.modOsc.midiFreq &= 0x00ff;
-			//set upper nibble
-			voiceSlots[0].u.drum.modOsc.midiFreq |= value.itg << 8;
-			osc_recalcFreq(&voiceSlots[0].u.drum.modOsc);
-			break;
-
 		case VOL1:
 			voiceSlots[0].u.drum.vol = value.flt;
 			break;
@@ -511,26 +439,6 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 			slopeEg2_setDecay(&voiceSlots[1].u.drum.oscVolEg,value.itg,AMP_EG_SYNC);
 			break;
 
-			case PITCHD2:
-			DecayEg_setDecay(&voiceSlots[1].u.drum.oscPitchEg,value.itg);
-			break;
-
-			case MODAMNT2:
-			voiceSlots[1].u.drum.egPitchModAmount = calcPitchModAmount(value.itg);
-			break;
-
-			case FMAMNT2:
-			voiceSlots[1].u.drum.fmModAmount = value.flt;
-				break;
-
-			case FMDTN2:
-				//clear upper nibble
-				voiceSlots[1].u.drum.modOsc.midiFreq &= 0x00ff;
-				//set upper nibble
-				voiceSlots[1].u.drum.modOsc.midiFreq |= value.itg << 8;
-				osc_recalcFreq(&voiceSlots[1].u.drum.modOsc);
-				break;
-
 			case VOL2:
 				voiceSlots[1].u.drum.vol = value.flt;
 				break;
@@ -546,26 +454,6 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 
 			case VELOD3:
 				slopeEg2_setDecay(&voiceSlots[2].u.drum.oscVolEg,value.itg,AMP_EG_SYNC);
-				break;
-
-			case PITCHD3:
-				DecayEg_setDecay(&voiceSlots[2].u.drum.oscPitchEg,value.itg);
-				break;
-
-			case MODAMNT3:
-				voiceSlots[2].u.drum.egPitchModAmount = calcPitchModAmount(value.itg);
-				break;
-
-			case FMAMNT3:
-				voiceSlots[2].u.drum.fmModAmount = value.flt;
-				break;
-
-			case FMDTN3:
-				//clear upper nibble
-				voiceSlots[2].u.drum.modOsc.midiFreq &= 0x00ff;
-				//set upper nibble
-				voiceSlots[2].u.drum.modOsc.midiFreq |= value.itg << 8;
-				osc_recalcFreq(&voiceSlots[2].u.drum.modOsc);
 				break;
 
 			case VOL3:
@@ -586,10 +474,6 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 
 				break;
 
-			case SNARE_NOISE_F:
-				voiceSlots[3].u.snare.noiseOsc.freq = value.flt*22000;
-				//TODO respond to midi note
-				break;
 			case VELOA4:
 				slopeEg2_setAttack(&voiceSlots[3].u.snare.oscVolEg,value.itg,false);
 				break;
@@ -598,13 +482,6 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				slopeEg2_setDecay(&voiceSlots[3].u.snare.oscVolEg,value.itg,false);
 				break;
 
-			case PITCHD4:
-				DecayEg_setDecay(&voiceSlots[3].u.snare.oscPitchEg,value.itg);
-				break;
-
-			case MODAMNT4:
-				voiceSlots[3].u.snare.egPitchModAmount = calcPitchModAmount(value.itg);
-				break;
 			case SNARE_FILTER_F:
 				{
 					#if USE_PEAK
@@ -623,10 +500,6 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 #else
 				SVF_setReso(&voiceSlots[3].u.snare.filter, value.flt);
 #endif
-				break;
-
-			case SNARE_MIX:
-				voiceSlots[3].u.snare.mix = value.flt;
 				break;
 
 			//snare 2
@@ -659,57 +532,6 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				}
 				break;
 
-			case CYM_WAVE2:
-				if(isFloatModulator)
-				{
-					uint8_t wave = NUM_OSC_WAVEFORMS * value.flt;
-					wave = wave >= NUM_OSC_WAVEFORMS ? NUM_OSC_WAVEFORMS-1 : wave;
-					voiceSlots[4].u.cymbal.modOsc.waveform = wave;
-				}
-				else
-				{
-					voiceSlots[4].u.cymbal.modOsc.waveform = value.itg;
-				}
-				break;
-
-			case CYM_WAVE3:
-				if(isFloatModulator)
-				{
-					uint8_t wave = NUM_OSC_WAVEFORMS * value.flt;
-					wave = wave >= NUM_OSC_WAVEFORMS ? NUM_OSC_WAVEFORMS-1 : wave;
-					voiceSlots[4].u.cymbal.modOsc2.waveform = wave;
-				}
-				else
-				{
-					voiceSlots[4].u.cymbal.modOsc2.waveform = value.itg;
-				}
-				break;
-
-			case CYM_MOD_OSC_F1:
-				//voiceSlots[4].u.cymbal.modOsc.freq = MidiNoteFrequencies[value.itg];
-				//clear upper nibble
-				voiceSlots[4].u.cymbal.modOsc.midiFreq &= 0x00ff;
-				//set upper nibble
-				voiceSlots[4].u.cymbal.modOsc.midiFreq |= value.itg << 8;
-				osc_recalcFreq(&voiceSlots[4].u.cymbal.modOsc);
-				break;
-
-			case CYM_MOD_OSC_F2:
-				//clear upper nibble
-				voiceSlots[4].u.cymbal.modOsc2.midiFreq &= 0x00ff;
-				//set upper nibble
-				voiceSlots[4].u.cymbal.modOsc2.midiFreq |= value.itg << 8;
-				osc_recalcFreq(&voiceSlots[4].u.cymbal.modOsc2);
-				break;
-
-			case CYM_MOD_OSC_GAIN1:
-				voiceSlots[4].u.cymbal.fmModAmount1 = value.flt;
-				break;
-
-			case CYM_MOD_OSC_GAIN2:
-				voiceSlots[4].u.cymbal.fmModAmount2 = value.flt;
-				break;
-
 			case CYM_FIL_FREQ:
 			{
 				const float f = value.flt;
@@ -722,9 +544,6 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				SVF_setReso(&voiceSlots[4].u.cymbal.filter, value.flt);
 				break;
 
-			case CYM_REPEAT:
-				voiceSlots[4].u.cymbal.oscVolEg.repeat = value.itg;
-				break;
 			case CYM_SLOPE:
 				slopeEg2_setSlope(&voiceSlots[4].u.cymbal.oscVolEg,value.itg);
 				break;
@@ -740,31 +559,6 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				else
 				{
 					voiceSlots[5].u.hat.osc.waveform = value.itg;
-				}
-				break;
-
-			case WAVE2_HH:
-				if(isFloatModulator)
-				{
-					uint8_t wave = NUM_OSC_WAVEFORMS * value.flt;
-					wave = wave >= NUM_OSC_WAVEFORMS ? NUM_OSC_WAVEFORMS-1 : wave;
-					voiceSlots[5].u.hat.modOsc.waveform = wave;
-				}
-				else
-				{
-					voiceSlots[5].u.hat.modOsc.waveform = value.itg;
-				}
-				break;
-			case WAVE3_HH:
-				if(isFloatModulator)
-				{
-					uint8_t wave = NUM_OSC_WAVEFORMS * value.flt;
-					wave = wave >= NUM_OSC_WAVEFORMS ? NUM_OSC_WAVEFORMS-1 : wave;
-					voiceSlots[5].u.hat.modOsc2.waveform = wave;
-				}
-				else
-				{
-					voiceSlots[5].u.hat.modOsc2.waveform = value.itg;
 				}
 				break;
 
@@ -806,36 +600,8 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				}
 				break;
 
-			case MOD_OSC_F1:
-				//clear upper nibble
-				voiceSlots[5].u.hat.modOsc.midiFreq &= 0x00ff;
-				//set upper nibble
-				voiceSlots[5].u.hat.modOsc.midiFreq |= value.itg << 8;
-				osc_recalcFreq(&voiceSlots[5].u.hat.modOsc);
-				break;
-
-			case MOD_OSC_F2:
-				//clear upper nibble
-				voiceSlots[5].u.hat.modOsc2.midiFreq &= 0x00ff;
-				//set upper nibble
-				voiceSlots[5].u.hat.modOsc2.midiFreq |= value.itg << 8;
-				osc_recalcFreq(&voiceSlots[5].u.hat.modOsc2);
-				break;
-
-			case MOD_OSC_GAIN1:
-				voiceSlots[5].u.hat.fmModAmount1 = value.flt;
-				break;
-
-			case MOD_OSC_GAIN2:
-				voiceSlots[5].u.hat.fmModAmount2 = value.flt;
-				break;
-
 			case VELOA6:
 				slopeEg2_setAttack(&voiceSlots[5].u.hat.oscVolEg,value.itg,false);
-				break;
-
-			case REPEAT1:
-				voiceSlots[3].u.snare.oscVolEg.repeat = value.itg;
 				break;
 
 
@@ -910,6 +676,16 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 
 		if(updateOriginalValue && !isFloatModulator) {
 			midiParser_originalCcValues[paramNr] = value.itg;
+		}
+
+		//engine specific parameters: handled by the engine the slot runs
+		if(slot_setRoleParameter(paramNr, value.itg, value.flt, isFloatModulator))
+		{
+			if(!isFloatModulator)
+			{
+				modNode_originalValueChanged(paramNr);
+			}
+			return;
 		}
 		switch(msg.data1)
 		{
@@ -1126,12 +902,6 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				SVF_setDrive(&voiceSlots[5].u.hat.filter, value.flt);
 #endif
 
-				break;
-
-			case CC2_MIX_MOD_1:
-			case CC2_MIX_MOD_2:
-			case CC2_MIX_MOD_3:
-				voiceSlots[msg.data1-CC2_MIX_MOD_1].u.drum.mixOscs = value.itg != 0;
 				break;
 
 			case CC2_VOLUME_MOD_ON_OFF1:
@@ -1430,6 +1200,16 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 			case CC2_FX_DELAY_TYPE:
 				fxBus.delay.delayType = value.itg;
 			break;
+			case PAR_SLOT_ENGINE-128:
+				//command, not a sound parameter: value = slot*4 + engine. Only from
+				//a received NRPN (midiParser_nrpnHandler): kit loads send this byte
+				//too, and old kits can hold any value in it (it once was a MIDI note
+				//setting); step automation uses MIDI_CC2 without updateOriginalValue
+				if(msg.status == MIDI_CC2 && updateOriginalValue && !isFloatModulator)
+				{
+					slot_setEngine(value.itg>>2, value.itg&3);
+				}
+				break;
 
 			default:
 				break;

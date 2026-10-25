@@ -23,8 +23,10 @@
 #include "Soundengine/DSPAudio/Snare.h"
 #include "Soundengine/DSPAudio/CymbalVoice.h"
 #include "Soundengine/DSPAudio/HiHat.h"
+#include "Parameters.h"
 
 #define NUM_VOICE_SLOTS	6
+#define NUM_SLOT_ROLES	7
 
 //engine numbers are stored in kits and sent via MIDI: never change them
 enum VoiceEngine
@@ -52,6 +54,16 @@ typedef struct
 
 extern VoiceSlot voiceSlots[NUM_VOICE_SLOTS];
 
+//The engine specific settings of a slot are stored in 7 parameters per slot,
+//indexed by role: analogous controls of the engines share a role, so a knob or
+//MIDI CC keeps a similar meaning when the engine changes. For the stock engine
+//of a slot these are exactly its stock parameters. This table is part of the
+//kit format: never change it.
+extern const uint8_t slot_rolePar[NUM_VOICE_SLOTS][NUM_SLOT_ROLES];
+
+//write-only command (NRPN 98, not stored in kits): value = slot*4 + engine
+#define PAR_SLOT_ENGINE	PAR_UNUSED_6
+
 //the engine every slot has in the stock firmware (and in kits without engine data)
 uint8_t slot_stockEngine(const uint8_t slot);
 
@@ -64,5 +76,9 @@ void slot_setEngine(const uint8_t slot, const uint8_t engine);
 
 //trigger track 0-6 (track 6 = 2nd trigger of slot 5)
 void slot_trigger(const uint8_t track, const uint8_t vel, const uint8_t note);
+
+//if par is one of the engine specific parameters (slot_rolePar), apply it to
+//the engine the slot runs and return 1; otherwise return 0
+uint8_t slot_setRoleParameter(const uint16_t par, const uint8_t itg, const float flt, const uint8_t isFloatModulator);
 
 #endif /* VOICESLOT_H_ */

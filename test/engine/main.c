@@ -143,7 +143,8 @@ static void loadKit(int kit)
 	for(uint16_t par = 0; par < END_OF_SOUND_PARAMETERS; par++)
 	{
 		if(skipParam(par)) continue;
-		sendParam(par, kit == 0 ? initKit[8 + par] : randomValue(par));
+		const uint8_t init = par < INIT_KIT_SIZE - 8 ? initKit[8 + par] : 0;	//the init kit lacks the last parameter
+		sendParam(par, kit == 0 ? init : randomValue(par));
 	}
 	for(uint8_t v = 0; v < 6; v++)
 	{
@@ -178,6 +179,17 @@ static uint32_t tablesHash(void)
 #if __has_include("Soundengine/DSPAudio/VoiceSlot.h")
 #include "Soundengine/DSPAudio/VoiceSlot.h"
 #define HAVE_VOICE_SLOTS 1
+#if __has_include("Preset/KitEngines.h")
+#include "Preset/KitEngines.h"
+#include "Soundengine/MIDI/MidiParser.h"
+#define HAVE_KIT_ENGINES 1
+
+//the UI sends to the sound engine like this in the firmware too
+void frontPanel_sendData(uint8_t status, uint8_t data1, uint8_t data2)
+{
+	sendFront(status, data1, data2);
+}
+#endif
 
 static int16_t engOut[OUTPUT_DMA_SIZE * 2], engOut2[OUTPUT_DMA_SIZE * 2];
 
@@ -210,15 +222,151 @@ static int renderSound(int maxBlocks, int* peak, int* nan)
 	return last + 1;
 }
 
-//every slot gets every engine (with the engine's init values; the parameter
-//routing for non-stock engines comes later): each track must sound, track 7
-//must use decay B, and track 6 must cut track 7
+static void switchEngine(uint8_t slot, uint8_t engine)
+{
+#ifdef HAVE_KIT_ENGINES
+	//like a received NRPN 98: the sound engine switches, then the UI applies the switch rules
+	MidiMsg m = { 0 };
+	m.status = MIDI_CC2;
+	m.data1 = PAR_SLOT_ENGINE - 128;
+	m.data2 = (uint8_t)(slot * 4 + engine);
+	midiParser_ccHandler(m, 1, 0, 0.f);
+	kitEngines_assign(slot, engine);
+#else
+	slot_setEngine(slot, engine);
+#endif
+}
+
+#ifdef HAVE_KIT_ENGINES
+//Voice level checks render a copy of a slot's voice directly (no mixer, FX or
+//other voices), so every run starts from the same state (oscillator phases,
+//noise sequence) and only the voice itself is measured.
+static void voiceTrigger(VoiceSlot* c, uint8_t slot, uint8_t second)
+{
+	switch(c->engine)
+	{
+	case ENGINE_SNARE:	Snare_trigger(&c->u.snare, 127, 60);			break;
+	case ENGINE_CYMBAL:	Cymbal_trigger(&c->u.cymbal, 127, 60);			break;
+	case ENGINE_HIHAT:	HiHat_trigger(&c->u.hat, 127, second, 60);		break;
+	default:			Drum_trigger(&c->u.drum, 127, 60);				break;
+	}
+	if(slot == NUM_VOICE_SLOTS - 1) c->u.c.oscVolEg.decay = c->decay[second];	//as slot_trigger()
+}
+
+//render blocks; returns a hash of the output, *len = number of blocks with sound
+static uint32_t voiceRender(VoiceSlot* c, int blocks, int* len)
+{
+	int16_t buf[OUTPUT_DMA_SIZE];
+	uint32_t h = 2166136261u;
+	int last = -1;
+	for(int b = 0; b < blocks; b++)
+	{
+		SVF_recalcFreq(&c->u.c.filter);
+		switch(c->engine)
+		{
+		case ENGINE_SNARE:	Snare_calcAsync(&c->u.snare);	Snare_calcSyncBlock(&c->u.snare, buf, OUTPUT_DMA_SIZE);		break;
+		case ENGINE_CYMBAL:	Cymbal_calcAsync(&c->u.cymbal);	Cymbal_calcSyncBlock(&c->u.cymbal, buf, OUTPUT_DMA_SIZE);	break;
+		case ENGINE_HIHAT:	HiHat_calcAsync(&c->u.hat);		HiHat_calcSyncBlock(&c->u.hat, buf, OUTPUT_DMA_SIZE);		break;
+		default:			calcDrumVoiceAsync(&c->u.drum);	calcDrumVoiceSyncBlock(&c->u.drum, buf, OUTPUT_DMA_SIZE);	break;
+		}
+		h = fnv(buf, sizeof(buf)) ^ h * 16777619u;
+		for(int i = 0; i < OUTPUT_DMA_SIZE; i++) if(abs(buf[i]) > 32) last = b;
+	}
+	if(len) *len = last + 1;
+	return h;
+}
+
+static uint32_t slotSoundHash(uint8_t slot)
+{
+	static VoiceSlot c;
+	c = voiceSlots[slot];
+	hwRngState = 0x12345678;
+	voiceTrigger(&c, slot, 0);
+	return voiceRender(&c, 200, NULL);
+}
+
+//slot 6: track 7 must use decay B (longer here) and cut a sounding track 7 the
+//other way round: track 6 after track 7 ends no later than track 6 alone
+static int decayTest(void)
+{
+	static VoiceSlot c;
+	int lenA, lenB, lenCut;
+	const uint8_t slot = NUM_VOICE_SLOTS - 1;
+	c = voiceSlots[slot]; hwRngState = 0x12345678;
+	voiceTrigger(&c, slot, 0); voiceRender(&c, 3000, &lenA);
+	c = voiceSlots[slot]; hwRngState = 0x12345678;
+	voiceTrigger(&c, slot, 1); voiceRender(&c, 3000, &lenB);
+	c = voiceSlots[slot]; hwRngState = 0x12345678;
+	voiceTrigger(&c, slot, 1); voiceRender(&c, 5, NULL);
+	voiceTrigger(&c, slot, 0); voiceRender(&c, 3000, &lenCut);
+	printf("  slot 6 decay A %d, B %d, B cut by A %d", lenA, lenB, lenCut);
+	return !(lenB > lenA && lenCut <= lenA);
+}
+
+//every engine specific parameter of a slot must change the sound of the engine
+//the slot runs, except the roles that engine doesn't have
+static int roleTest(int round)
+{
+	int fail = 0;
+	printf("  roles (x = changes the sound):");
+	for(uint8_t s = 0; s < NUM_VOICE_SLOTS; s++)
+	{
+		const uint8_t engine = voiceSlots[s].engine;
+		printf("  %d:", s + 1);
+		//an active setting first, so that turning one role to 0 must change the
+		//sound: roles 0-5 at 100 (FM amount > 0, waveform PWM, ...), role 6 at 1
+		//(mix mode on, 1 repeat; many repeats can silence a short attack), and
+		//the slot's PWM at 64 (PWM at pulse width 0 is silent) and its main
+		//oscillator a sine (a noise carrier ignores the FM modulators)
+		static const uint8_t oscWave[NUM_VOICE_SLOTS] = { PAR_OSC_WAVE_DRUM1, PAR_OSC_WAVE_DRUM2, PAR_OSC_WAVE_DRUM3, PAR_OSC_WAVE_SNARE, PAR_WAVE1_CYM, PAR_WAVE1_HH };
+		uint8_t saved[NUM_SLOT_ROLES];
+		const uint8_t savedPwm = activeParameters[PAR_PWM_1 + s];
+		const uint8_t savedWave = activeParameters[oscWave[s]];
+		sendParam(PAR_PWM_1 + s, 64);
+		sendParam(oscWave[s], SINE);
+		for(uint8_t role = 0; role < NUM_SLOT_ROLES; role++)
+		{
+			saved[role] = activeParameters[slot_rolePar[s][role]];
+			sendParam(slot_rolePar[s][role], role == 6 ? 1 : 100);
+		}
+		for(uint8_t role = 0; role < NUM_SLOT_ROLES; role++)
+		{
+			const uint8_t par = slot_rolePar[s][role];
+			const uint32_t a = slotSoundHash(s);
+			sendParam(par, 0);
+			const uint32_t b = slotSoundHash(s);
+			sendParam(par, role == 6 ? 1 : 100);
+			const int unused = (engine == ENGINE_SNARE && role == 0) || (engine == ENGINE_HIHAT && role == 6);
+			printf("%c", a != b ? 'x' : '.');
+			if((a != b) == unused)
+			{
+				fail = 1;
+			}
+		}
+		for(uint8_t role = 0; role < NUM_SLOT_ROLES; role++)
+		{
+			sendParam(slot_rolePar[s][role], saved[role]);
+		}
+		sendParam(PAR_PWM_1 + s, savedPwm);
+		sendParam(oscWave[s], savedWave);
+	}
+	printf("\n");
+	(void)round;
+	return fail;
+}
+#endif
+
+//every slot gets every engine: each track must sound, track 7 must use decay B,
+//track 6 must cut track 7, and the engine specific parameters must reach the engine
 static int engineTest(void)
 {
 	static const char* const names[NUM_ENGINES] = { "drum", "snare", "cymbal", "hihat" };
 	int fail = 0, peak, nan = 0;
 	for(int round = 0; round < NUM_ENGINES; round++)
 	{
+#ifdef HAVE_KIT_ENGINES
+		kitEngines_restoreStock();	//like a kit load
+#endif
 		loadKit(0);
 		for(uint8_t v = 0; v < 6; v++)
 		{
@@ -227,7 +375,7 @@ static int engineTest(void)
 		}
 		for(uint8_t s = 0; s < NUM_VOICE_SLOTS; s++)
 		{
-			slot_setEngine(s, (s + round) % NUM_ENGINES);
+			switchEngine(s, (s + round) % NUM_ENGINES);
 		}
 		sendParam(PAR_VELOD6_CLOSED, 40);
 		sendParam(PAR_VELOD6_OPEN, 90);
@@ -242,14 +390,11 @@ static int engineTest(void)
 			printf("  %d %s %d/%d", track + 1, names[voiceSlots[track < 6 ? track : 5].engine], len[track], peak);
 			if(len[track] == 0) fail = 1;
 		}
-		//track 6 after track 7 cuts it: decay A from the current level, so it
-		//ends no later than track 6 alone (same as the stock hi-hat)
-		voiceControl_noteOn(6, 60, 127);
-		renderSound(5, &peak, &nan);
-		voiceControl_noteOn(5, 60, 127);
-		const int cut = renderSound(1500, &peak, &nan);
-		printf("  cut %d\n", cut);
-		if(!(len[6] > len[5] && cut <= len[5])) fail = 1;
+		printf("\n");
+#ifdef HAVE_KIT_ENGINES
+		fail |= decayTest();
+		fail |= roleTest(round);
+#endif
 	}
 	if(nan) printf("NaN in a voice\n");
 	printf(fail || nan ? "ENGINE TEST FAILED\n" : "engine test passed\n");

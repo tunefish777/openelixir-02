@@ -24,6 +24,7 @@
 #include "lcd.h"
 //#include <util/atomic.h>
 #include "Preset/PresetManager.h"
+#include "Preset/KitEngines.h"
 //--
 
 static uint8_t frontParser_rxCnt=0;
@@ -46,6 +47,13 @@ uint8_t frontParser_nameIndex = 0;
 void frontParser_parseNrpn(uint8_t value)
 {
 	uint16_t paramNr=frontParser_nrpnNr+128;
+
+	if(paramNr == PAR_SLOT_ENGINE)
+	{
+		//engine command (the sound engine has already switched): not stored in the kit
+		kitEngines_assign((uint8_t)(value>>2), (uint8_t)(value&3));
+		return;
+	}
 
 	if(paramNr < NUM_PARAMS) {
 			activeParameters[paramNr] = value;
