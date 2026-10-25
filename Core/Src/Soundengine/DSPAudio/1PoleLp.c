@@ -24,14 +24,6 @@ void initOnePole(OnePoleFilter* filter)
 	filter->r = 0.01f;
 }
 //-------------------------------------------------------------
-IN_ITCM_RAM float calcOnePole(OnePoleFilter* filter, double input)
-{
-	//result = a × b + c
-	filter->b = fmaf(filter->r, input - filter->b, filter->b);
-	//filter->b += filter->r * (input - filter->b);
-	return filter->b;
-}
-//-------------------------------------------------------------
 float calcOnePoleAdaptiveVolume(OnePoleFilter* filter, double input)
 {
 

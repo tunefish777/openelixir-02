@@ -79,12 +79,10 @@ void modNode_originalValueChanged(uint16_t idx)
 		modNode_setOriginalValueChanged(&velocityModulators[i],idx);
 	}
 
-	modNode_setOriginalValueChanged(&voiceArray[0].lfo.modTarget,idx);
-	modNode_setOriginalValueChanged(&voiceArray[1].lfo.modTarget,idx);
-	modNode_setOriginalValueChanged(&voiceArray[2].lfo.modTarget,idx);
-	modNode_setOriginalValueChanged(&snareVoice.lfo.modTarget,idx);
-	modNode_setOriginalValueChanged(&cymbalVoice.lfo.modTarget,idx);
-	modNode_setOriginalValueChanged(&hatVoice.lfo.modTarget,idx);
+	for(i=0;i<6;i++)
+	{
+		modNode_setOriginalValueChanged(&voiceCommon[i]->lfo.modTarget,idx);
+	}
 }
 //-----------------------------------------------------------------------
 IN_ITCM_RAM void modNode_resetTargets()
@@ -95,12 +93,11 @@ IN_ITCM_RAM void modNode_resetTargets()
 		paramArray_setParameter(velocityModulators[i].destination,velocityModulators[i].originalValue);
 	}
 
-	paramArray_setParameter(voiceArray[0].lfo.modTarget.destination,voiceArray[0].lfo.modTarget.originalValue);
-	paramArray_setParameter(voiceArray[1].lfo.modTarget.destination,voiceArray[1].lfo.modTarget.originalValue);
-	paramArray_setParameter(voiceArray[2].lfo.modTarget.destination,voiceArray[2].lfo.modTarget.originalValue);
-	paramArray_setParameter(snareVoice.lfo.modTarget.destination,snareVoice.lfo.modTarget.originalValue);
-	paramArray_setParameter(cymbalVoice.lfo.modTarget.destination,cymbalVoice.lfo.modTarget.originalValue);
-	paramArray_setParameter(hatVoice.lfo.modTarget.destination,hatVoice.lfo.modTarget.originalValue);
+	for(i=0;i<6;i++)
+	{
+		const ModulationNode* target = &voiceCommon[i]->lfo.modTarget;
+		paramArray_setParameter(target->destination,target->originalValue);
+	}
 
 
 }

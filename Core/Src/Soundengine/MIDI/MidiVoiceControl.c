@@ -32,13 +32,13 @@ void voiceControl_noteOn(uint8_t voice, uint8_t note, uint8_t vel)
 	active_voices |= (1<<voice);
 
 	if(voice < 3)
-		Drum_trigger(voice, vel, note);
+		Drum_trigger(&voiceArray[voice], vel, note);
 	else if(voice < 4)
-		Snare_trigger(vel, note);
+		Snare_trigger(&snareVoice, vel, note);
 	else if(voice < 5)
-		Cymbal_trigger(vel, note);
+		Cymbal_trigger(&cymbalVoice, vel, note);
 	else
-		HiHat_trigger(vel,voice-5,note);
+		HiHat_trigger(&hatVoice, vel,voice-5,note);
 	
 	//Send trigger out signal
 	/*

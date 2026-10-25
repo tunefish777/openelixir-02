@@ -16,6 +16,7 @@
 #define HIHAT_H_
 
 #include "stm32f7xx_hal.h"
+#include "Soundengine/DSPAudio/VoiceCommon.h"
 #include "Soundengine/DSPAudio/Oscillator.h"
 #include "Soundengine/config.h"
 #include "Soundengine/DSPAudio/ResonantFilter.h"
@@ -32,62 +33,40 @@
 
 typedef struct HiHatStruct
 {
+	VOICE_COMMON_FIELDS
 
-	OscInfo 	osc;		// the tonal oscillator
+	// engine specific
+
 	OscInfo 	modOsc;		// the mod osc1
 	OscInfo 	modOsc2;	// the mod osc2
 	float		fmModAmount1;
 	float		fmModAmount2;
 
-	float	 	vol;		// volume of the voice
 	//float		panL;		// [0:1]
 	//float		panR;		// [0:1]
-	uint8_t pan;
-	float 	triggeredPanL; //only updated with the latest pan value when triggered
-	float 	triggeredPanR;
 	//float 		panModifier;
 
-	float 		velo;
-
 	int32_t		noiseSample;
-
-	ResonantFilter filter;
-	uint8_t		filterType;
-
-	TransientGenerator transGen;
 
 	float		decayClosed;
 	float		decayOpen;
 
-	Distortion distortion;
-
-	SlopeEg2		oscVolEg;
-	float 		egValueOscVol;
-	Lfo 		lfo;
-	SnapEg snapEg;
-	uint8_t volumeMod;	//modulate volume by midi velocity if 1
 	uint8_t isOpen;		//is 1 if urrent playing voice is open hihat, 0 for closed
-
-	float combinedVolume;
-	OnePoleFilter FaderVolumeFilter;
-
-	float pwm;
-
 } HiHatVoice;
 
 extern HiHatVoice hatVoice;
 
 //initialize all the parameters to sane values
-void HiHat_init();
+void HiHat_init(HiHatVoice* v, uint8_t slot);
 
-void HiHat_trigger(uint8_t vel, uint8_t isOpen, const uint8_t note);
-void HiHat_updatePan();
-void HiHat_calcSyncBlock(int16_t* buf, const uint8_t size);
+void HiHat_trigger(HiHatVoice* v, uint8_t vel, uint8_t isOpen, const uint8_t note);
+void HiHat_updatePan(HiHatVoice* v);
+void HiHat_calcSyncBlock(HiHatVoice* v, int16_t* buf, const uint8_t size);
 
 /** calculate envelopes etc (all 16 samples */
-void HiHat_calcAsync();
+void HiHat_calcAsync(HiHatVoice* v);
 
 //-0.5 = left 0=both max 0.5=right*/
-void HiHat_setPan(const uint8_t pan);
+void HiHat_setPan(HiHatVoice* v, const uint8_t pan);
 
 #endif /* HIHAT_H_ */

@@ -26,6 +26,7 @@ Custom firmware for the Erica Synths LXR-02 drum machine. It is based on the ope
 | 0.1 | Memory usage report after every build, compared with the stock firmware. |
 | 0.1 | Renamed to OpenElixir-02: shown on the start-up screen and as the USB-MIDI device name. |
 | next | Development build option `-DLXR_CPU_METER=ON`: CPU load per voice and FX on the display. |
+| next | About 10 % less CPU load in the worst case and 2.4 KB more free fast RAM (ITCM), with identical sound. Host test (`test/engine/`) that proves engine changes render bit-identical. |
 
 ## Building and installing
 

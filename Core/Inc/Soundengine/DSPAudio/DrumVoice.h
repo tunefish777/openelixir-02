@@ -16,6 +16,7 @@
 #define DRUMVOICE_H_
 
 #include "Soundengine/DSPAudio/Oscillator.h"
+#include "Soundengine/DSPAudio/VoiceCommon.h"
 #include "Soundengine/config.h"
 #include "Soundengine/DSPAudio/ResonantFilter.h"
 #include "Soundengine/DSPAudio/distortion.h"
@@ -35,16 +36,13 @@ enum
 //------------------------------------------------------------------------
 typedef struct VoiceStruct
 {
-	OscInfo 	osc;		// the main fm oscillator
+	VOICE_COMMON_FIELDS
+
+	// engine specific
 	OscInfo 	modOsc;		// the mod osc
 
 	float		fmModAmount;
 
-	float	 	vol;		// volume of the voice
-	float 		velo;
-	uint8_t 	pan;
-	float 	triggeredPanL; //only updated with the latest pan value when triggered
-	float 	triggeredPanR;
 	//float 		panModifier;
 
 	int16_t 	oscSample;
@@ -53,17 +51,7 @@ typedef struct VoiceStruct
 	float		egPitchModAmount;
 	float 		offset;				//the start offset for the waveform - used to generate clicks
 
-	TransientGenerator transGen;
-	Lfo 		lfo;
-	SlopeEg2	oscVolEg;
-	float 		egValueOscVol;
 	float 		volEgValueBlock[OUTPUT_DMA_SIZE];
-	Distortion distortion;
-
-#if ENABLE_DRUM_SVF
-	ResonantFilter filter;
-	uint8_t		filterType; // bit 0 = lp, bit 1 = hp, bit 3 = bp on/off
-#endif
 
 #ifdef USE_AMP_FILTER
 	OnePoleFilter ampFilter;
@@ -80,19 +68,12 @@ typedef struct VoiceStruct
 
 	float decimationCnt;
 	float decimationRate;
-	SnapEg snapEg;
-
-	uint8_t volumeMod;	//modulate volume by midi velocity if 1
 
 	Dither dither;
-	float combinedVolume;
-	OnePoleFilter FaderVolumeFilter;
 
 #if SMOOTH_MIXER_VOL_PAN_DRIVE
 	OnePoleFilter MixerPageFilter[2];
 #endif
-
-	float pwm;
 } DrumVoice;
 //------------------------------------------------------------------------
 
@@ -101,22 +82,25 @@ typedef struct VoiceStruct
 extern DrumVoice voiceArray[NUM_DRUM_VOICES];
 
 //initialize all the parameters to sane values
+/** initialize one drum voice instance for the given voice slot */
+void Drum_init(DrumVoice* v, uint8_t slot);
+//initialize all the parameters to sane values
 void initDrumVoice();
 
-void Drum_trigger(const uint8_t voiceNr, const uint8_t vol, const uint8_t note);
+void Drum_trigger(DrumVoice* v, const uint8_t vol, const uint8_t note);
 
-void Drum_updatePan(const uint8_t voiceNr);
+void Drum_updatePan(DrumVoice* v);
 
 /** block based calculation*/
-void calcDrumVoiceSyncBlock(const uint8_t voiceNr, int16_t* buf, const uint8_t size);
+void calcDrumVoiceSyncBlock(DrumVoice* v, int16_t* buf, const uint8_t size);
 
 /** calculate envelopes etc (all 16 samples */
-void calcDrumVoiceAsync(const uint8_t voiceNr);
+void calcDrumVoiceAsync(DrumVoice* v);
 
 //-0.5 = left 0=both max 0.5=right*/
-void setPan(const uint8_t voiceNr, const uint8_t pan);
+void Drum_setPan(DrumVoice* v, const uint8_t pan);
 
 /** set the oscillator start phase for all OSCs*/
-void drum_setPhase(const uint8_t phase, const uint8_t voiceNr);
+void drum_setPhase(DrumVoice* v, const uint8_t phase);
 
 #endif /* DRUMVOICE_H_ */

@@ -16,6 +16,7 @@
 #define SNARE_H_
 
 #include "stm32f7xx_hal.h"
+#include "Soundengine/DSPAudio/VoiceCommon.h"
 #include "Oscillator.h"
 #include "config.h"
 #include "ResonantFilter.h"
@@ -32,66 +33,38 @@
 //------------------------------------------------------------------------
 typedef struct SnareStruct
 {
-	OscInfo 	osc;		// the tonal oscillator
+	VOICE_COMMON_FIELDS
+
+	// engine specific
 	OscInfo 	noiseOsc;	// the noise osc
 
-
-	uint8_t		filterType; // bit 0 = lp, bit 1 = hp, bit 3 = bp on/off
-	float	 	vol;		// volume of the voice
 	//float		panL;		// [0:1]
 	//float		panR;		// [0:1]
-	uint8_t pan;
-	float 	triggeredPanL; //only updated with the latest pan value when triggered
-	float 	triggeredPanR;
 	//float 		panModifier;
 
 	float   	mix;		// defines the mix between osc and noise [0 = 100% osc: 1 = 100% noise]
-	float 		velo;
 
 	int16_t		oscSample;
 	int32_t		noiseSample;
 
-#if USE_PEAK
-	PeakFilter  filter;
-#else
-	ResonantFilter filter;
-#endif
-
 	DecayEg		oscPitchEg;
 	float		egPitchModAmount;
-
-	Lfo 		lfo;
-	TransientGenerator transGen;
-
-	SlopeEg2		oscVolEg;
-	float 		egValueOscVol;
-
-	Distortion distortion;
-	SnapEg snapEg;
-
-	uint8_t volumeMod;	//modulate volume by midi velocity if 1
-
-	float combinedVolume;
-	OnePoleFilter FaderVolumeFilter;
-
-	float pwm;
-
 } SnareVoice;
 
 //array holding all the voices
 extern SnareVoice snareVoice;
 
 //initialize all the parameters to sane values
-void Snare_init();
+void Snare_init(SnareVoice* v, uint8_t slot);
 
-void Snare_trigger(const uint8_t vel, const uint8_t note);
-void Snare_updatePan();
+void Snare_trigger(SnareVoice* v, const uint8_t vel, const uint8_t note);
+void Snare_updatePan(SnareVoice* v);
 /** claculate the oscillators and sample based stuff*/
-void Snare_calcSyncBlock(int16_t* buf, const uint8_t size);
+void Snare_calcSyncBlock(SnareVoice* v, int16_t* buf, const uint8_t size);
 
 /** calculate envelopes etc (all 16 samples */
-void Snare_calcAsync();
+void Snare_calcAsync(SnareVoice* v);
 
 //-0.5 = left 0=both max 0.5=right*/
-void Snare_setPan(const uint8_t pan);
+void Snare_setPan(SnareVoice* v, const uint8_t pan);
 #endif /* SNARE_H_ */

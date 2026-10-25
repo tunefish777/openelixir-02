@@ -499,7 +499,7 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 			break;
 
 		case PAN1:
-			setPan(0,value.itg);
+			Drum_setPan(&voiceArray[0],value.itg);
 			break;
 
 		case VELOA2:
@@ -535,7 +535,7 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				break;
 
 			case PAN2:
-				setPan(1,value.itg);
+				Drum_setPan(&voiceArray[1],value.itg);
 				break;
 
 
@@ -572,7 +572,7 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				break;
 
 			case PAN3:
-				setPan(2,value.itg);
+				Drum_setPan(&voiceArray[2],value.itg);
 				break;
 
 			//snare
@@ -581,7 +581,7 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				break;
 
 			case PAN4:
-				Snare_setPan(value.itg);
+				Snare_setPan(&snareVoice, value.itg);
 
 				break;
 
@@ -634,7 +634,7 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				break;
 
 			case PAN5:
-				Cymbal_setPan(value.itg);
+				Cymbal_setPan(&cymbalVoice, value.itg);
 				break;
 
 			case VELOA5:
@@ -792,7 +792,7 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				break;
 
 			case PAN6:
-				HiHat_setPan(value.itg);
+				HiHat_setPan(&hatVoice, value.itg);
 				break;
 
 			case F_OSC6_COARSE:

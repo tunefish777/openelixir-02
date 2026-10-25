@@ -472,17 +472,9 @@ static void frontParser_handleMidiMessage()
 
 		uint8_t lfoNr = (upper&0xfe)>>1;
 
-		switch(lfoNr)
+		if(lfoNr < 6)
 		{
-		case 0:
-		case 1:
-		case 2:	modNode_setDestination(&voiceArray[lfoNr].lfo.modTarget, value);break;
-
-		case 3:	modNode_setDestination(&snareVoice.lfo.modTarget,value);		break;
-		case 4:	modNode_setDestination(&cymbalVoice.lfo.modTarget, value);		break;
-		case 5:	modNode_setDestination(&hatVoice.lfo.modTarget, value);			break;
-		default:
-			break;
+			modNode_setDestination(&voiceCommon[lfoNr]->lfo.modTarget, value);
 		}
 
 	}

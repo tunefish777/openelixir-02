@@ -28,16 +28,80 @@ INDTCM static float ampSmoothValue = 0.1f;
 //---------------------------------------------------
 INDTCMZ DrumVoice voiceArray[NUM_DRUM_VOICES];
 //---------------------------------------------------
-IN_ITCM_RAM void setPan(const uint8_t voiceNr, const uint8_t pan)
+IN_ITCM_RAM void Drum_setPan(DrumVoice* v, const uint8_t pan)
 {
-	voiceArray[voiceNr].pan = pan;
+	v->pan = pan;
 }
 //---------------------------------------------------
-void drum_setPhase(const uint8_t phase, const uint8_t voiceNr)
+void drum_setPhase(DrumVoice* v, const uint8_t phase)
 {
 	const uint32_t startPhase = (phase/127.f)*0xffffffff;
-	voiceArray[voiceNr].osc.startPhase = startPhase;
-	voiceArray[voiceNr].modOsc.startPhase = startPhase;
+	v->osc.startPhase = startPhase;
+	v->modOsc.startPhase = startPhase;
+}
+//---------------------------------------------------
+void Drum_init(DrumVoice* v, uint8_t slot)
+{
+	v->slot = slot;
+
+	initOnePole(&v->FaderVolumeFilter);
+	setOnePoleCoef(&v->FaderVolumeFilter,0.01);
+
+#if SMOOTH_MIXER_VOL_PAN_DRIVE
+	for(uint8_t j=0;j<2;j++)
+	{
+		initOnePole(&v->MixerPageFilter[j]);
+		setOnePoleCoef(&v->MixerPageFilter[j],0.01);
+	}
+	initOnePole(&v->distortion.DriveParamFilter);
+	setOnePoleCoef(&v->distortion.DriveParamFilter,0.01);
+
+#endif
+
+	SnapEg_init(&v->snapEg);
+	Drum_setPan(v,0.f);
+	v->vol = 0.8f;
+	//v->panModifier = 1.f;
+	v->fmModAmount = 0.5f;
+	transient_init(&v->transGen);
+#if ENABLE_DRUM_SVF
+	SVF_init(&v->filter);
+	v->filterType = 0x01;
+#endif
+	lfo_init(&v->lfo);
+
+	v->modOsc.freq = 440;
+	v->modOsc.waveform = 1;
+	v->modOsc.fmMod = 0;
+	v->modOsc.midiFreq = 70<<8 | 64;
+	v->modOsc.pitchMod = 1.0f;
+	v->modOsc.modNodeValue = 1;
+
+	v->volumeMod = 1;
+
+	v->osc.freq = 440;
+	v->osc.modNodeValue = 1;
+	v->osc.waveform = TRI+slot; //for testing init to tri,saw,rec
+	v->osc.fmMod = 0;
+	v->osc.midiFreq = 70<<8 | 64;
+
+	DecayEg_init(&v->oscPitchEg);
+	v->egPitchModAmount = 0.5f;
+
+	slopeEg2_init(&v->oscVolEg);
+	setDistortionShape(&v->distortion, 0.f);
+
+#ifdef USE_AMP_FILTER
+	initOnePole(&v->ampFilter);
+	setOnePoleCoef(&v->ampFilter,ampSmoothValue);
+#endif
+
+#if ENABLE_MIX_OSC
+	v->mixOscs = true;
+#endif
+	v->decimationCnt = 0;
+	v->decimationRate = 1;
+
 }
 //---------------------------------------------------
 void initDrumVoice()
@@ -47,196 +111,138 @@ void initDrumVoice()
 
 
 
-	int i;
+	uint8_t i;
 	for(i=0;i<NUM_DRUM_VOICES;i++)
 	{
-
-		initOnePole(&voiceArray[i].FaderVolumeFilter);
-		setOnePoleCoef(&voiceArray[i].FaderVolumeFilter,0.01);
-
-#if SMOOTH_MIXER_VOL_PAN_DRIVE
-		for(uint8_t j=0;j<2;j++)
-		{
-			initOnePole(&voiceArray[i].MixerPageFilter[j]);
-			setOnePoleCoef(&voiceArray[i].MixerPageFilter[j],0.01);
-		}
-		initOnePole(&voiceArray[i].distortion.DriveParamFilter);
-		setOnePoleCoef(&voiceArray[i].distortion.DriveParamFilter,0.01);
-
-#endif
-
-		SnapEg_init(&voiceArray[i].snapEg);
-		setPan(i,0.f);
-		voiceArray[i].vol = 0.8f;
-		//voiceArray[i].panModifier = 1.f;
-		voiceArray[i].fmModAmount = 0.5f;
-		transient_init(&voiceArray[i].transGen);
-#if ENABLE_DRUM_SVF
-		SVF_init(&voiceArray[i].filter);
-		voiceArray[i].filterType = 0x01;
-#endif
-		lfo_init(&voiceArray[i].lfo);
-
-		voiceArray[i].modOsc.freq = 440;
-		voiceArray[i].modOsc.waveform = 1;
-		voiceArray[i].modOsc.fmMod = 0;
-		voiceArray[i].modOsc.midiFreq = 70<<8 | 64;
-		voiceArray[i].modOsc.pitchMod = 1.0f;
-		voiceArray[i].modOsc.modNodeValue = 1;
-
-		voiceArray[i].volumeMod = 1;
-
-		voiceArray[i].osc.freq = 440;
-		voiceArray[i].osc.modNodeValue = 1;
-		voiceArray[i].osc.waveform = TRI+i; //for testing init to tri,saw,rec
-		voiceArray[i].osc.fmMod = 0;
-		voiceArray[i].osc.midiFreq = 70<<8 | 64;
-
-		DecayEg_init(&voiceArray[i].oscPitchEg);
-		voiceArray[i].egPitchModAmount = 0.5f;
-
-		slopeEg2_init(&voiceArray[i].oscVolEg);
-		setDistortionShape(&voiceArray[i].distortion, 0.f);
-
-#ifdef USE_AMP_FILTER
-		initOnePole(&voiceArray[i].ampFilter);
-		setOnePoleCoef(&voiceArray[i].ampFilter,ampSmoothValue);
-#endif
-
-#if ENABLE_MIX_OSC
-		voiceArray[i].mixOscs = true;
-#endif
-		voiceArray[i].decimationCnt = 0;
-		voiceArray[i].decimationRate = 1;
-
+		Drum_init(&voiceArray[i], i);
 	}
 }
 //---------------------------------------------------
-void Drum_updatePan(const uint8_t voiceNr)
+void Drum_updatePan(DrumVoice* v)
 {
-	voiceArray[voiceNr].triggeredPanL = sqrtf((127-voiceArray[voiceNr].pan)/127.f);
-	voiceArray[voiceNr].triggeredPanR = sqrtf(voiceArray[voiceNr].pan/127.f);
+	v->triggeredPanL = sqrtf((127-v->pan)/127.f);
+	v->triggeredPanR = sqrtf(v->pan/127.f);
 }
 //---------------------------------------------------
-void Drum_trigger(const uint8_t voiceNr, const uint8_t vol, const uint8_t note)
+void Drum_trigger(DrumVoice* v, const uint8_t vol, const uint8_t note)
 {
 
-	lfo_retrigger(voiceNr);
+	lfo_retrigger(v->slot);
 
 	//update velocity modulation
-	modNode_updateValue(&velocityModulators[voiceNr],vol/127.f);
+	modNode_updateValue(&velocityModulators[v->slot],vol/127.f);
 
 	//only reset phase if envelope is closed
 #ifdef USE_AMP_FILTER
-	if((voiceArray[voiceNr].volEgValueBlock[15]<=0.01f) || (voiceArray[voiceNr].transGen.waveform==1))
+	if((v->volEgValueBlock[15]<=0.01f) || (v->transGen.waveform==1))
 #else
-		//if((voiceArray[voiceNr].ampFilterInput<=0.01f) || (voiceArray[voiceNr].transGen.waveform==1))
+		//if((v->ampFilterInput<=0.01f) || (v->transGen.waveform==1))
 #endif
 	{
 		float offset = 1;
-		if(voiceArray[voiceNr].transGen.waveform==1) //offset mode
+		if(v->transGen.waveform==1) //offset mode
 		{
-			offset -= voiceArray[voiceNr].transGen.volume;
+			offset -= v->transGen.volume;
 #ifdef USE_AMP_FILTER
-			setOnePoleCoef(&voiceArray[voiceNr].ampFilter,1.0f); //turn off amp filter for super snappy attack
+			setOnePoleCoef(&v->ampFilter,1.0f); //turn off amp filter for super snappy attack
 
 		} else {
-			setOnePoleCoef(&voiceArray[voiceNr].ampFilter,ampSmoothValue);
+			setOnePoleCoef(&v->ampFilter,ampSmoothValue);
 #endif
 		}
-		if(voiceArray[voiceNr].osc.waveform == SINE)
-			voiceArray[voiceNr].osc.phase = 1024 + ( (0x3ff<<20) - 1024)*offset;//voiceArray[voiceNr].osc.startPhase ;
-		else if(voiceArray[voiceNr].osc.waveform > SINE && voiceArray[voiceNr].osc.waveform <= REC)
-			voiceArray[voiceNr].osc.phase = (0xff<<22)*offset;
+		if(v->osc.waveform == SINE)
+			v->osc.phase = 1024 + ( (0x3ff<<20) - 1024)*offset;//v->osc.startPhase ;
+		else if(v->osc.waveform > SINE && v->osc.waveform <= REC)
+			v->osc.phase = (0xff<<22)*offset;
 		else
-			voiceArray[voiceNr].osc.phase = 0;
+			v->osc.phase = 0;
 
 		//reset mod osc phase
-		if(voiceArray[voiceNr].modOsc.waveform == SINE)
-			voiceArray[voiceNr].modOsc.phase = 1024 + ( (0x3ff<<20) - 1024);//voiceArray[voiceNr].osc.startPhase ;
-		else if(voiceArray[voiceNr].modOsc.waveform > SINE && voiceArray[voiceNr].modOsc.waveform <= REC)
-			voiceArray[voiceNr].modOsc.phase = (0xff<<22);
+		if(v->modOsc.waveform == SINE)
+			v->modOsc.phase = 1024 + ( (0x3ff<<20) - 1024);//v->osc.startPhase ;
+		else if(v->modOsc.waveform > SINE && v->modOsc.waveform <= REC)
+			v->modOsc.phase = (0xff<<22);
 		else
-			voiceArray[voiceNr].modOsc.phase = 0;
+			v->modOsc.phase = 0;
 
 	}
 
-	osc_setBaseNote(&voiceArray[voiceNr].osc,note);
-	osc_setBaseNote(&voiceArray[voiceNr].modOsc,note);
+	osc_setBaseNote(&v->osc,note);
+	osc_setBaseNote(&v->modOsc,note);
 
 
-	DecayEg_trigger(&voiceArray[voiceNr].oscPitchEg);
-	slopeEg2_trigger(&voiceArray[voiceNr].oscVolEg);
-	voiceArray[voiceNr].velo = vol/127.f;
+	DecayEg_trigger(&v->oscPitchEg);
+	slopeEg2_trigger(&v->oscVolEg);
+	v->velo = vol/127.f;
 
-	transient_trigger(&voiceArray[voiceNr].transGen);
+	transient_trigger(&v->transGen);
 
-	SnapEg_trigger(&voiceArray[voiceNr].snapEg);
+	SnapEg_trigger(&v->snapEg);
 
 	//reset filter coeffs to prevent wrong transient
-	SVF_reset(&voiceArray[voiceNr].filter);
+	SVF_reset(&v->filter);
 
 	//update pan value
-	Drum_updatePan(voiceNr);
+	Drum_updatePan(v);
 }
 //---------------------------------------------------
-IN_ITCM_RAM void calcDrumVoiceAsync(const uint8_t voiceNr)
+IN_ITCM_RAM void calcDrumVoiceAsync(DrumVoice* v)
 {
 
 
 	//add modulation eg to osc freq (1 = no change. a+eg = original freq + modulation
-	const float egPitchVal = DecayEg_calc(&voiceArray[voiceNr].oscPitchEg);
-	const float pitchEgValue = egPitchVal*voiceArray[voiceNr].egPitchModAmount;
-	voiceArray[voiceNr].osc.pitchMod = 1+pitchEgValue;
+	const float egPitchVal = DecayEg_calc(&v->oscPitchEg);
+	const float pitchEgValue = egPitchVal*v->egPitchModAmount;
+	v->osc.pitchMod = 1+pitchEgValue;
 
 	//calc snap EG if transient sample 0 is activated
-	if(voiceArray[voiceNr].transGen.waveform == 0)
+	if(v->transGen.waveform == 0)
 	{
-		const float snapVal = SnapEg_calc(&voiceArray[voiceNr].snapEg, voiceArray[voiceNr].transGen.pitch);
-		voiceArray[voiceNr].osc.pitchMod += snapVal*voiceArray[voiceNr].transGen.volume;
+		const float snapVal = SnapEg_calc(&v->snapEg, v->transGen.pitch);
+		v->osc.pitchMod += snapVal*v->transGen.volume;
 	}
 
 	// fm amount with pitch eg
-	voiceArray[voiceNr].osc.fmMod = voiceArray[voiceNr].fmModAmount * egPitchVal;
+	v->osc.fmMod = v->fmModAmount * egPitchVal;
 
 	//calc the osc + noise vol eg
 #if (AMP_EG_SYNC==0)
 
 	//check if in attack phase
-	if( (voiceArray[voiceNr].oscVolEg.attack == 1 ) && ((voiceArray[voiceNr].oscVolEg.state == EG_A) || (voiceArray[voiceNr].oscVolEg.state == EG_REPEAT)) )
+	if( (v->oscVolEg.attack == 1 ) && ((v->oscVolEg.state == EG_A) || (v->oscVolEg.state == EG_REPEAT)) )
 	{
 			//if attack is set to 0 -> no interpolation
-		voiceArray[voiceNr].ampFilterInput = slopeEg2_calc(&voiceArray[voiceNr].oscVolEg);
-		voiceArray[voiceNr].lastGain = voiceArray[voiceNr].ampFilterInput;
+		v->ampFilterInput = slopeEg2_calc(&v->oscVolEg);
+		v->lastGain = v->ampFilterInput;
 	}
 	else
 	{
-		voiceArray[voiceNr].lastGain = voiceArray[voiceNr].ampFilterInput;
-		voiceArray[voiceNr].ampFilterInput = slopeEg2_calc(&voiceArray[voiceNr].oscVolEg);
+		v->lastGain = v->ampFilterInput;
+		v->ampFilterInput = slopeEg2_calc(&v->oscVolEg);
 	}
 
 	//turn off trigger signal if trigger gate mode is on and volume == 0
 	/*
 	if(trigger_isGateModeOn())
 	{
-		if(!voiceArray[voiceNr].ampFilterInput) {
-			//trigger_triggerVoice(TRIGGER_1 + voiceNr, TRIGGER_OFF);
-			voiceControl_noteOff(TRIGGER_1 + voiceNr);
+		if(!v->ampFilterInput) {
+			//trigger_triggerVoice(TRIGGER_1 + v->slot, TRIGGER_OFF);
+			voiceControl_noteOff(TRIGGER_1 + v->slot);
 		}
 	}
 	*/
 #endif
 
 	//update osc phaseInc
-	osc_setFreq(&voiceArray[voiceNr].osc);
-	osc_setFreq(&voiceArray[voiceNr].modOsc);
+	osc_setFreq(&v->osc);
+	osc_setFreq(&v->modOsc);
 
 
 
 }
 
 //---------------------------------------------------
-IN_ITCM_RAM void calcDrumVoiceSyncBlock(const uint8_t voiceNr, int16_t* buf, const uint8_t size)
+IN_ITCM_RAM void calcDrumVoiceSyncBlock(DrumVoice* v, int16_t* buf, const uint8_t size)
 {
 
 
@@ -244,70 +250,72 @@ IN_ITCM_RAM void calcDrumVoiceSyncBlock(const uint8_t voiceNr, int16_t* buf, con
 
 	//calc vol EG
 #ifdef USE_AMP_FILTER
-	calcOnePoleBlockFixedInput(&voiceArray[voiceNr].ampFilter, voiceArray[voiceNr].ampFilterInput,voiceArray[voiceNr].volEgValueBlock, size);
+	calcOnePoleBlockFixedInput(&v->ampFilter, v->ampFilterInput,v->volEgValueBlock, size);
 #endif
 
 	//calc next mod osc sampleBlock - int16_t processing
-	calcNextOscSampleBlock(&voiceArray[voiceNr].modOsc,modBuf,size,voiceArray[voiceNr].fmModAmount, voiceArray[voiceNr].pwm);
+	calcNextOscSampleBlock(&v->modOsc,modBuf,size,v->fmModAmount, v->pwm);
 
-	if(voiceArray[voiceNr].mixOscs)
+	if(v->mixOscs)
 	{
 		//calc main osc buffer - int16_t processing
-		calcNextOscSampleBlock(&voiceArray[voiceNr].osc,buf,size, (1.f-voiceArray[voiceNr].fmModAmount), voiceArray[voiceNr].pwm);
+		calcNextOscSampleBlock(&v->osc,buf,size, (1.f-v->fmModAmount), v->pwm);
 		//add mod buffer to main osc buffer - int16_t processing
 		bufferTool_addBuffersSaturating(buf,modBuf,size);
 	}
 	else
 	{
-		calcNextOscSampleFmBlock(&voiceArray[voiceNr].osc,modBuf,buf,size,1.0f, voiceArray[voiceNr].pwm);
+		calcNextOscSampleFmBlock(&v->osc,modBuf,buf,size,1.0f, v->pwm);
 	}
 
 	//calc transient sample - int16_t processing
-	transient_calcBlock(&voiceArray[voiceNr].transGen,modBuf,size);
+	transient_calcBlock(&v->transGen,modBuf,size);
 
 	//Mix with transient buffer - int16_t processing
 	bufferTool_addBuffersSaturating(buf,modBuf,size);
 
 	//calc filter block - float processing
-	SVF_calcBlockZDF(&voiceArray[voiceNr].filter,voiceArray[voiceNr].filterType,buf,size);
+	SVF_calcBlockZDF(&v->filter,v->filterType,buf,size);
 
 	//attentuate main OSCs by amp EG
 #ifdef USE_AMP_FILTER
-	bufferTool_multiplyWithFloatBufferDithered(&voiceArray[voiceNr].dither, buf,voiceArray[voiceNr].volEgValueBlock,size);
+	bufferTool_multiplyWithFloatBufferDithered(&v->dither, buf,v->volEgValueBlock,size);
 #else
-	//bufferTool_addGainInterpolatedDoubleDithered(&voiceArray[voiceNr].dither, buf,voiceArray[voiceNr].ampFilterInput, voiceArray[voiceNr].lastGain, size);
+	//bufferTool_addGainInterpolatedDoubleDithered(&v->dither, buf,v->ampFilterInput, v->lastGain, size);
 	//float
-	bufferTool_addGainInterpolated(buf,voiceArray[voiceNr].ampFilterInput, voiceArray[voiceNr].lastGain, size);
+	bufferTool_addGainInterpolated(buf,v->ampFilterInput, v->lastGain, size);
 
-	//buf[i] = dither_process(voiceArray[voiceNr].dither, buf[i]
+	//buf[i] = dither_process(v->dither, buf[i]
 #endif
 
 	//MIDI velocity - float processing
-	if(voiceArray[voiceNr].volumeMod)
+	if(v->volumeMod)
 	{
-		bufferTool_addGain(buf,voiceArray[voiceNr].velo,size);
+		bufferTool_addGain(buf,v->velo,size);
 	}
 	//distortion - float processing
 #if (USE_FILTER_DRIVE == 0)
 #if SMOOTH_MIXER_VOL_PAN_DRIVE
-	calcDistBlockFiltered(&voiceArray[voiceNr].distortion,buf,size);
+	calcDistBlockFiltered(&v->distortion,buf,size);
 #else
-	calcDistBlock(&voiceArray[voiceNr].distortion,buf,size);
+	calcDistBlock(&v->distortion,buf,size);
 #endif
 #endif
 	//channel volume
-	//bufferTool_addGain(buf,voiceArray[voiceNr].combinedVolume  ,size);
+	//bufferTool_addGain(buf,v->combinedVolume  ,size);
 
+	//the fader can't change while a block is calculated: read it once, not per sample
+	const float faderVolume = adc_getFaderVolume(v->slot);
 	for(int i=0; i< size; i++)
 	{
 #if SMOOTH_MIXER_VOL_PAN_DRIVE
 
-		float mixVol 	= calcOnePole( &voiceArray[voiceNr].MixerPageFilter[0], voiceArray[voiceNr].vol);
-		voiceArray[voiceNr].combinedVolume = mixVol * calcOnePole( &voiceArray[voiceNr].FaderVolumeFilter, adc_getFaderVolume(voiceNr));
+		float mixVol 	= calcOnePole( &v->MixerPageFilter[0], v->vol);
+		v->combinedVolume = mixVol * calcOnePole( &v->FaderVolumeFilter, faderVolume);
 #else
-		voiceArray[voiceNr].combinedVolume = voiceArray[voiceNr].vol * calcOnePole( &voiceArray[voiceNr].FaderVolumeFilter, adc_getFaderVolume(voiceNr));
+		v->combinedVolume = v->vol * calcOnePole( &v->FaderVolumeFilter, faderVolume);
 #endif
-		buf[i] *= voiceArray[voiceNr].combinedVolume;
+		buf[i] *= v->combinedVolume;
 	}
 }
 //---------------------------------------------------

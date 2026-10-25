@@ -23,116 +23,117 @@
 
 INDTCMZ CymbalVoice cymbalVoice;
 //---------------------------------------------------
-void Cymbal_setPan(const uint8_t pan)
+void Cymbal_setPan(CymbalVoice* v, const uint8_t pan)
 {
-	//cymbalVoice.panL = squareRootLut[127-pan];
-	//cymbalVoice.panR = squareRootLut[pan];
-	cymbalVoice.pan = pan;
+	//v->panL = squareRootLut[127-pan];
+	//v->panR = squareRootLut[pan];
+	v->pan = pan;
 }
 //---------------------------------------------------
 
-void Cymbal_init()
+void Cymbal_init(CymbalVoice* v, uint8_t slot)
 {
+	v->slot = slot;
 
-	initOnePole(&cymbalVoice.FaderVolumeFilter);
-	setOnePoleCoef(&cymbalVoice.FaderVolumeFilter,0.1);
+	initOnePole(&v->FaderVolumeFilter);
+	setOnePoleCoef(&v->FaderVolumeFilter,0.1);
 
-	SnapEg_init(&cymbalVoice.snapEg);
-	Cymbal_setPan(0);
-	cymbalVoice.vol = 0.8f;
+	SnapEg_init(&v->snapEg);
+	Cymbal_setPan(v, 0);
+	v->vol = 0.8f;
 
-	//cymbalVoice.panModifier = 1.f;
+	//v->panModifier = 1.f;
 
-	transient_init(&cymbalVoice.transGen);
+	transient_init(&v->transGen);
 
-	cymbalVoice.fmModAmount1 = 0.5f;
-	cymbalVoice.fmModAmount2 = 0.5f;
+	v->fmModAmount1 = 0.5f;
+	v->fmModAmount2 = 0.5f;
 
-	setDistortionShape(&cymbalVoice.distortion, 0.f);
+	setDistortionShape(&v->distortion, 0.f);
 
-	cymbalVoice.modOsc.freq = 440;
-	cymbalVoice.modOsc.waveform = SINE;
-	cymbalVoice.modOsc.fmMod = 0;
-	cymbalVoice.modOsc.midiFreq = 70<<8 | 64;
-	cymbalVoice.modOsc.pitchMod = 1.0f;
-	cymbalVoice.modOsc.modNodeValue = 1;
+	v->modOsc.freq = 440;
+	v->modOsc.waveform = SINE;
+	v->modOsc.fmMod = 0;
+	v->modOsc.midiFreq = 70<<8 | 64;
+	v->modOsc.pitchMod = 1.0f;
+	v->modOsc.modNodeValue = 1;
 
-	cymbalVoice.modOsc2.freq = 440;
-	cymbalVoice.modOsc2.waveform = NOISE;//SINE;
-	cymbalVoice.modOsc2.fmMod = 0;
-	cymbalVoice.modOsc2.midiFreq = 70<<8| 64;
-	cymbalVoice.modOsc2.pitchMod = 1.0f;
-	cymbalVoice.modOsc2.modNodeValue = 1;
+	v->modOsc2.freq = 440;
+	v->modOsc2.waveform = NOISE;//SINE;
+	v->modOsc2.fmMod = 0;
+	v->modOsc2.midiFreq = 70<<8| 64;
+	v->modOsc2.pitchMod = 1.0f;
+	v->modOsc2.modNodeValue = 1;
 
-	cymbalVoice.osc.freq = 440;
-	cymbalVoice.osc.waveform = 1;
-	cymbalVoice.osc.fmMod = 1;
-	cymbalVoice.osc.midiFreq = 70<<8 | 64;
-	cymbalVoice.osc.pitchMod = 1.0f;
-	cymbalVoice.osc.modNodeValue = 1;
+	v->osc.freq = 440;
+	v->osc.waveform = 1;
+	v->osc.fmMod = 1;
+	v->osc.midiFreq = 70<<8 | 64;
+	v->osc.pitchMod = 1.0f;
+	v->osc.modNodeValue = 1;
 
-	cymbalVoice.volumeMod = 1;
+	v->volumeMod = 1;
 
-	slopeEg2_init(&cymbalVoice.oscVolEg);
+	slopeEg2_init(&v->oscVolEg);
 
-	SVF_init(&cymbalVoice.filter);
+	SVF_init(&v->filter);
 
-	lfo_init(&cymbalVoice.lfo);
+	lfo_init(&v->lfo);
 
 }
 
 //---------------------------------------------------
-void Cymbal_updatePan()
+void Cymbal_updatePan(CymbalVoice* v)
 {
-	cymbalVoice.triggeredPanL = sqrtf((127-cymbalVoice.pan)/127.f);
-	cymbalVoice.triggeredPanR = sqrtf(cymbalVoice.pan/127.f);
+	v->triggeredPanL = sqrtf((127-v->pan)/127.f);
+	v->triggeredPanR = sqrtf(v->pan/127.f);
 }
 //---------------------------------------------------
-void Cymbal_trigger( const uint8_t vel, const uint8_t note)
+void Cymbal_trigger(CymbalVoice* v, const uint8_t vel, const uint8_t note)
 {
-	lfo_retrigger(4);
+	lfo_retrigger(v->slot);
 	//update velocity modulation
-	modNode_updateValue(&velocityModulators[4],vel/127.f);
+	modNode_updateValue(&velocityModulators[v->slot],vel/127.f);
 
 	float offset = 1;
-	if(cymbalVoice.transGen.waveform==1) //offset mode
+	if(v->transGen.waveform==1) //offset mode
 	{
-		offset -= cymbalVoice.transGen.volume;
+		offset -= v->transGen.volume;
 	}
-	if(cymbalVoice.osc.waveform == SINE)
-		cymbalVoice.osc.phase = (0x3ff<<20)*offset;//voiceArray[voiceNr].osc.startPhase ;
-	else if(cymbalVoice.osc.waveform > SINE && cymbalVoice.osc.waveform <= REC)
-		cymbalVoice.osc.phase = (0xff<<22)*offset;
+	if(v->osc.waveform == SINE)
+		v->osc.phase = (0x3ff<<20)*offset;//voiceArray[voiceNr].osc.startPhase ;
+	else if(v->osc.waveform > SINE && v->osc.waveform <= REC)
+		v->osc.phase = (0xff<<22)*offset;
 	else
-		cymbalVoice.osc.phase = 0;
+		v->osc.phase = 0;
 
-	cymbalVoice.modOsc.phase = 0;
-	cymbalVoice.modOsc2.phase = 0;
+	v->modOsc.phase = 0;
+	v->modOsc2.phase = 0;
 
-	osc_setBaseNote(&cymbalVoice.osc,note);
-	osc_setBaseNote(&cymbalVoice.modOsc,note);
-	osc_setBaseNote(&cymbalVoice.modOsc2,note);
+	osc_setBaseNote(&v->osc,note);
+	osc_setBaseNote(&v->modOsc,note);
+	osc_setBaseNote(&v->modOsc2,note);
 
-	slopeEg2_trigger(&cymbalVoice.oscVolEg);
-	cymbalVoice.velo = vel/127.f;
+	slopeEg2_trigger(&v->oscVolEg);
+	v->velo = vel/127.f;
 
-	transient_trigger(&cymbalVoice.transGen);
+	transient_trigger(&v->transGen);
 
-	SnapEg_trigger(&cymbalVoice.snapEg);
+	SnapEg_trigger(&v->snapEg);
 
-	Cymbal_updatePan();
+	Cymbal_updatePan(v);
 }
 //---------------------------------------------------
-IN_ITCM_RAM void Cymbal_calcAsync()
+IN_ITCM_RAM void Cymbal_calcAsync(CymbalVoice* v)
 {
 	//calc the osc  vol eg
-	cymbalVoice.egValueOscVol = slopeEg2_calc(&cymbalVoice.oscVolEg);
+	v->egValueOscVol = slopeEg2_calc(&v->oscVolEg);
 
 	//turn off trigger signal if trigger gate mode is on and volume == 0
 	/*
 	if(trigger_isGateModeOn())
 	{
-		if(!cymbalVoice.egValueOscVol) {
+		if(!v->egValueOscVol) {
 			trigger_triggerVoice(TRIGGER_5, TRIGGER_OFF);
 			voiceControl_noteOff(TRIGGER_5);
 		}
@@ -140,53 +141,55 @@ IN_ITCM_RAM void Cymbal_calcAsync()
 	*/
 
 	//calc snap EG if transient sample 0 is activated
-	if(cymbalVoice.transGen.waveform == 0)
+	if(v->transGen.waveform == 0)
 	{
-		const float snapVal = SnapEg_calc(&cymbalVoice.snapEg,cymbalVoice.transGen.pitch);
-		cymbalVoice.osc.pitchMod = 1 + snapVal*cymbalVoice.transGen.volume;
+		const float snapVal = SnapEg_calc(&v->snapEg,v->transGen.pitch);
+		v->osc.pitchMod = 1 + snapVal*v->transGen.volume;
 	}
 
 	//update osc phaseInc
-	osc_setFreq(&cymbalVoice.osc);
-	osc_setFreq(&cymbalVoice.modOsc);
-	osc_setFreq(&cymbalVoice.modOsc2);
+	osc_setFreq(&v->osc);
+	osc_setFreq(&v->modOsc);
+	osc_setFreq(&v->modOsc2);
 
 
 }
 //---------------------------------------------------
-void Cymbal_calcSyncBlock(int16_t* buf, const uint8_t size)
+void Cymbal_calcSyncBlock(CymbalVoice* v, int16_t* buf, const uint8_t size)
 {
+	//the fader can't change while a block is calculated: read it once, not per sample
+	const float faderVolume = adc_getFaderVolume(v->slot);
 		int16_t mod[size];
 		int16_t mod2[size];
 		//calc next mod osc sample
-		calcNextOscSampleBlock(&cymbalVoice.modOsc,mod,size,cymbalVoice.fmModAmount1, cymbalVoice.pwm);
-		calcNextOscSampleBlock(&cymbalVoice.modOsc2,mod2,size,cymbalVoice.fmModAmount2, cymbalVoice.pwm);
+		calcNextOscSampleBlock(&v->modOsc,mod,size,v->fmModAmount1, v->pwm);
+		calcNextOscSampleBlock(&v->modOsc2,mod2,size,v->fmModAmount2, v->pwm);
 
 		//combine both mod oscs to 1 modulation signal
 		bufferTool_addBuffersSaturating(mod,mod2,size);
 
-		calcNextOscSampleFmBlock(&cymbalVoice.osc,mod,buf,size,1.f, cymbalVoice.pwm) ;
+		calcNextOscSampleFmBlock(&v->osc,mod,buf,size,1.f, v->pwm) ;
 #if USE_REVERB
 		if(fxBus.fxType != FX_REVERB)
 		{
 #endif
-			SVF_calcBlockZDF(&cymbalVoice.filter,cymbalVoice.filterType,buf,size);
+			SVF_calcBlockZDF(&v->filter,v->filterType,buf,size);
 
 #if USE_REVERB
 		}
 		else
 		{
-			SVF_calcBlockCheapZDF(&cymbalVoice.filter,cymbalVoice.filterType,buf,size);
+			SVF_calcBlockCheapZDF(&v->filter,v->filterType,buf,size);
 		}
 #endif
 
 		//calc transient sample
-		transient_calcBlock(&cymbalVoice.transGen,mod,size);
+		transient_calcBlock(&v->transGen,mod,size);
 
 		uint8_t j;
-		if(cymbalVoice.volumeMod)
+		if(v->volumeMod)
 		{
-			cymbalVoice.combinedVolume = cymbalVoice.vol *cymbalVoice.velo *  cymbalVoice.egValueOscVol ;
+			v->combinedVolume = v->vol *v->velo *  v->egValueOscVol ;
 			//const float vol = ;
 
 #if 1
@@ -202,7 +205,7 @@ void Cymbal_calcSyncBlock(int16_t* buf, const uint8_t size)
 			for(j=0;j<size;j++)
 			{
 				//add volume
-				buf[j] *=  cymbalVoice.combinedVolume * calcOnePole( &cymbalVoice.FaderVolumeFilter, adc_getFaderVolume(4));
+				buf[j] *=  v->combinedVolume * calcOnePole( &v->FaderVolumeFilter, faderVolume);
 			}
 #else
 			for(j=0;j<size;j++)
@@ -215,8 +218,8 @@ void Cymbal_calcSyncBlock(int16_t* buf, const uint8_t size)
 		}
 		else
 		{
-			cymbalVoice.combinedVolume = cymbalVoice.vol * cymbalVoice.egValueOscVol;
-			//const float vol = cymbalVoice.combinedVolume ;
+			v->combinedVolume = v->vol * v->egValueOscVol;
+			//const float vol = v->combinedVolume ;
 
 #if 1
 			int32_t* x = (int32_t*)buf;
@@ -231,7 +234,7 @@ void Cymbal_calcSyncBlock(int16_t* buf, const uint8_t size)
 			for(j=0;j<size;j++)
 			{
 				//add volume
-				buf[j] *=  cymbalVoice.combinedVolume * calcOnePole( &cymbalVoice.FaderVolumeFilter, adc_getFaderVolume(4));
+				buf[j] *=  v->combinedVolume * calcOnePole( &v->FaderVolumeFilter, faderVolume);
 			}
 #else
 			for(j=0;j<size;j++)
@@ -242,7 +245,7 @@ void Cymbal_calcSyncBlock(int16_t* buf, const uint8_t size)
 			}
 #endif
 		}
-		calcDistBlock(&cymbalVoice.distortion,buf,size);
+		calcDistBlock(&v->distortion,buf,size);
 }
 //---------------------------------------------------
 

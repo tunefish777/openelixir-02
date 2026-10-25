@@ -71,9 +71,9 @@ void soundengine_init()
 //	memset(midi_NoteOverride,0,7);
 
 	initDrumVoice();
-	Snare_init();
-	HiHat_init();
-	Cymbal_init();
+	Snare_init(&snareVoice, 3);
+	HiHat_init(&hatVoice, 5);
+	Cymbal_init(&cymbalVoice, 4);
 
 	//precalc the first dma buffer block
 	soundengine_calcNextSampleBlock();

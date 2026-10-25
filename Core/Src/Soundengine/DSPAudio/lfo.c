@@ -200,50 +200,23 @@ IN_ITCM_RAM void lfo_setSync(Lfo* lfo, uint8_t sync)
 //-------------------------------------------------------------
 void lfo_recalcSync()
 {
-	Lfo* lfo = &voiceArray[0].lfo;
-	lfo->phaseInc = lfo_calcPhaseInc(lfo->freq,lfo->sync);
-
-	lfo = &voiceArray[1].lfo;
-	lfo->phaseInc = lfo_calcPhaseInc(lfo->freq,lfo->sync);
-
-	lfo = &voiceArray[2].lfo;
-	lfo->phaseInc = lfo_calcPhaseInc(lfo->freq,lfo->sync);
-
-	lfo = &snareVoice.lfo;
-	lfo->phaseInc = lfo_calcPhaseInc(lfo->freq,lfo->sync);
-
-	lfo = &cymbalVoice.lfo;
-	lfo->phaseInc = lfo_calcPhaseInc(lfo->freq,lfo->sync);
-
-	lfo = &hatVoice.lfo;
-	lfo->phaseInc = lfo_calcPhaseInc(lfo->freq,lfo->sync);
+	for(uint8_t i=0;i<6;i++)
+	{
+		Lfo* lfo = &voiceCommon[i]->lfo;
+		lfo->phaseInc = lfo_calcPhaseInc(lfo->freq,lfo->sync);
+	}
 }
 //-------------------------------------------------------------
 void lfo_retrigger(uint8_t voice)
 {
-	if(voiceArray[0].lfo.retrigger == voice+1)
+	//restart the LFOs that are retriggered by this voice
+	for(uint8_t i=0;i<6;i++)
 	{
-		voiceArray[0].lfo.phase = voiceArray[0].lfo.phaseOffset;
-	}
-	if(voiceArray[1].lfo.retrigger == voice+1)
-	{
-		voiceArray[1].lfo.phase = voiceArray[1].lfo.phaseOffset;
-	}
-	if(voiceArray[2].lfo.retrigger == voice+1)
-	{
-		voiceArray[2].lfo.phase = voiceArray[2].lfo.phaseOffset;
-	}
-	if(snareVoice.lfo.retrigger == voice+1)
-	{
-		snareVoice.lfo.phase = snareVoice.lfo.phaseOffset;
-	}
-	if(cymbalVoice.lfo.retrigger == voice+1)
-	{
-		cymbalVoice.lfo.phase = cymbalVoice.lfo.phaseOffset;
-	}
-	if(hatVoice.lfo.retrigger == voice+1)
-	{
-		hatVoice.lfo.phase = hatVoice.lfo.phaseOffset;
+		Lfo* lfo = &voiceCommon[i]->lfo;
+		if(lfo->retrigger == voice+1)
+		{
+			lfo->phase = lfo->phaseOffset;
+		}
 	}
 }
 //-------------------------------------------------------------

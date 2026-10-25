@@ -24,108 +24,109 @@
 INDTCMZ SnareVoice snareVoice;
 
 //---------------------------------------------------
-void Snare_setPan(const uint8_t pan)
+void Snare_setPan(SnareVoice* v, const uint8_t pan)
 {
-	//snareVoice.panL = squareRootLut[127-pan];
-	//snareVoice.panR = squareRootLut[pan];
-	snareVoice.pan = pan;
+	//v->panL = squareRootLut[127-pan];
+	//v->panR = squareRootLut[pan];
+	v->pan = pan;
 }
 //---------------------------------------------------
-void Snare_init()
+void Snare_init(SnareVoice* v, uint8_t slot)
 {
-	initOnePole(&snareVoice.FaderVolumeFilter);
-	setOnePoleCoef(&snareVoice.FaderVolumeFilter,0.1);
+	v->slot = slot;
+	initOnePole(&v->FaderVolumeFilter);
+	setOnePoleCoef(&v->FaderVolumeFilter,0.1);
 
-	SnapEg_init(&snareVoice.snapEg);
-	Snare_setPan(0);
-	snareVoice.vol = 0.8f;
+	SnapEg_init(&v->snapEg);
+	Snare_setPan(v, 0);
+	v->vol = 0.8f;
 
-	//snareVoice.panModifier = 1.f;
+	//v->panModifier = 1.f;
 
-	snareVoice.noiseOsc.freq = 440;
-	snareVoice.noiseOsc.waveform = 1;
-	snareVoice.noiseOsc.fmMod = 0;
-	snareVoice.noiseOsc.midiFreq = 70<<8 | 64;
-	snareVoice.noiseOsc.pitchMod = 1.0f;
-	snareVoice.noiseOsc.modNodeValue = 1;
+	v->noiseOsc.freq = 440;
+	v->noiseOsc.waveform = 1;
+	v->noiseOsc.fmMod = 0;
+	v->noiseOsc.midiFreq = 70<<8 | 64;
+	v->noiseOsc.pitchMod = 1.0f;
+	v->noiseOsc.modNodeValue = 1;
 
-	snareVoice.osc.freq = 440;
-	snareVoice.osc.waveform = 1;
-	snareVoice.osc.fmMod = 0;
-	snareVoice.osc.midiFreq = 70<<8 | 64;
-	snareVoice.osc.modNodeValue = 1;
+	v->osc.freq = 440;
+	v->osc.waveform = 1;
+	v->osc.fmMod = 0;
+	v->osc.midiFreq = 70<<8 | 64;
+	v->osc.modNodeValue = 1;
 
-	setDistortionShape(&snareVoice.distortion, 0.f);
+	setDistortionShape(&v->distortion, 0.f);
 
-	snareVoice.volumeMod = 1;
+	v->volumeMod = 1;
 
-	transient_init(&snareVoice.transGen);
+	transient_init(&v->transGen);
 
-	DecayEg_init(&snareVoice.oscPitchEg);
-	snareVoice.egPitchModAmount = 0.5f;
+	DecayEg_init(&v->oscPitchEg);
+	v->egPitchModAmount = 0.5f;
 
-	slopeEg2_init(&snareVoice.oscVolEg);
+	slopeEg2_init(&v->oscVolEg);
 
 
 
-	SVF_init(&snareVoice.filter);
+	SVF_init(&v->filter);
 
-	lfo_init(&snareVoice.lfo);
+	lfo_init(&v->lfo);
 }
 //---------------------------------------------------
-void Snare_updatePan()
+void Snare_updatePan(SnareVoice* v)
 {
-	snareVoice.triggeredPanL = sqrtf((127-snareVoice.pan)/127.f);
-	snareVoice.triggeredPanR = sqrtf(snareVoice.pan/127.f);
+	v->triggeredPanL = sqrtf((127-v->pan)/127.f);
+	v->triggeredPanR = sqrtf(v->pan/127.f);
 }
 //---------------------------------------------------
-void Snare_trigger(const uint8_t vel, const uint8_t note)
+void Snare_trigger(SnareVoice* v, const uint8_t vel, const uint8_t note)
 {
-	lfo_retrigger(3);
+	lfo_retrigger(v->slot);
 	//update velocity modulation
-	modNode_updateValue(&velocityModulators[3],vel/127.f);
+	modNode_updateValue(&velocityModulators[v->slot],vel/127.f);
 
 	float offset = 1;
-	if(snareVoice.transGen.waveform==1) //offset mode
+	if(v->transGen.waveform==1) //offset mode
 	{
-		offset -= snareVoice.transGen.volume;
+		offset -= v->transGen.volume;
 	}
-	if(snareVoice.osc.waveform == SINE)
-		snareVoice.osc.phase = (0x3ff<<20)*offset;//voiceArray[voiceNr].osc.startPhase ;
-	else if(snareVoice.osc.waveform > SINE && snareVoice.osc.waveform <= REC)
-		snareVoice.osc.phase = (0xff<<22)*offset;
+	if(v->osc.waveform == SINE)
+		v->osc.phase = (0x3ff<<20)*offset;//voiceArray[voiceNr].osc.startPhase ;
+	else if(v->osc.waveform > SINE && v->osc.waveform <= REC)
+		v->osc.phase = (0xff<<22)*offset;
 	else
-		snareVoice.osc.phase = 0;
+		v->osc.phase = 0;
 
-	DecayEg_trigger(&snareVoice.oscPitchEg);
-	slopeEg2_trigger(&snareVoice.oscVolEg);
-	snareVoice.velo = vel/127.f;
+	DecayEg_trigger(&v->oscPitchEg);
+	slopeEg2_trigger(&v->oscVolEg);
+	v->velo = vel/127.f;
 
-	osc_setBaseNote(&snareVoice.osc,note);
+	osc_setBaseNote(&v->osc,note);
 	//TODO noise muss mit transponiert werden
 
-	transient_trigger(&snareVoice.transGen);
+	transient_trigger(&v->transGen);
 
-	SnapEg_trigger(&snareVoice.snapEg);
+	SnapEg_trigger(&v->snapEg);
 
-	Snare_updatePan();
+	Snare_updatePan(v);
 }
 //---------------------------------------------------
-IN_ITCM_RAM void Snare_calcAsync()
+IN_ITCM_RAM void Snare_calcAsync(SnareVoice* v)
 {
 	//add modulation eg to osc freq (1 = no change. a+eg = original freq + modulation
-	const float egPitchVal = DecayEg_calc(&snareVoice.oscPitchEg);
-	const float pitchEgValue = egPitchVal*snareVoice.egPitchModAmount;
-	snareVoice.osc.pitchMod = 1+pitchEgValue;
+	const float egPitchVal = DecayEg_calc(&v->oscPitchEg);
+	const float pitchEgValue = egPitchVal*v->egPitchModAmount;
+	v->osc.pitchMod = 1+pitchEgValue;
 
 	//calc the osc  vol eg
-	snareVoice.egValueOscVol = slopeEg2_calc(&snareVoice.oscVolEg);
+	v->egValueOscVol = slopeEg2_calc(&v->oscVolEg);
 
 	//turn off trigger signal if trigger gate mode is on and volume == 0
 	/*
 	if(trigger_isGateModeOn())
 	{
-		if(!snareVoice.egValueOscVol) {
+		if(!v->egValueOscVol) {
 			//trigger_triggerVoice(TRIGGER_4, TRIGGER_OFF);
 			//voiceControl_noteOff(TRIGGER_4);
 		}
@@ -133,34 +134,36 @@ IN_ITCM_RAM void Snare_calcAsync()
 	*/
 
 	//calc snap EG if transient sample 0 is activated
-	if(snareVoice.transGen.waveform == 0)
+	if(v->transGen.waveform == 0)
 	{
-		const float snapVal = SnapEg_calc(&snareVoice.snapEg, snareVoice.transGen.pitch);
-		snareVoice.osc.pitchMod += snapVal*snareVoice.transGen.volume;;
+		const float snapVal = SnapEg_calc(&v->snapEg, v->transGen.pitch);
+		v->osc.pitchMod += snapVal*v->transGen.volume;;
 	}
 
-	osc_setFreq(&snareVoice.osc);
-	osc_setFreq(&snareVoice.noiseOsc);
+	osc_setFreq(&v->osc);
+	osc_setFreq(&v->noiseOsc);
 
 
 }
 //---------------------------------------------------
-void Snare_calcSyncBlock(int16_t* buf, const uint8_t size)
+void Snare_calcSyncBlock(SnareVoice* v, int16_t* buf, const uint8_t size)
 {
+	//the fader can't change while a block is calculated: read it once, not per sample
+	const float faderVolume = adc_getFaderVolume(v->slot);
 	int16_t transBuf[size];
 	int16_t oscBuf[size];
 
-	calcNoiseBlock(&snareVoice.noiseOsc,buf,size,0.9f);
+	calcNoiseBlock(&v->noiseOsc,buf,size,0.9f);
 #if USE_REVERB
 	if(fxBus.fxType != FX_REVERB)
 	{
 #endif
-		SVF_calcBlockZDF(&snareVoice.filter,snareVoice.filterType,buf,size);
+		SVF_calcBlockZDF(&v->filter,v->filterType,buf,size);
 #if USE_REVERB
 	}
 	else
 	{
-		SVF_calcBlockCheapZDF(&snareVoice.filter,snareVoice.filterType,buf,size);
+		SVF_calcBlockCheapZDF(&v->filter,v->filterType,buf,size);
 	}
 #endif
 
@@ -168,19 +171,19 @@ void Snare_calcSyncBlock(int16_t* buf, const uint8_t size)
 
 
 	//calc next osc sample
-	calcNextOscSampleBlock(&snareVoice.osc,oscBuf,size,(1.f-snareVoice.mix), snareVoice.pwm);
+	calcNextOscSampleBlock(&v->osc,oscBuf,size,(1.f-v->mix), v->pwm);
 	// apply filter to synthesized sound as well here if desired, or combine code for more efficiency
-	//SVF_calcBlockZDF(&snareVoice.filter,snareVoice.filterType,transBuf,size);
+	//SVF_calcBlockZDF(&v->filter,v->filterType,transBuf,size);
 
 
 	//calc transient sample
-	transient_calcBlock(&snareVoice.transGen,transBuf,size);
+	transient_calcBlock(&v->transGen,transBuf,size);
 
 
 	uint8_t j;
-	if(snareVoice.volumeMod)
+	if(v->volumeMod)
 	{
-		snareVoice.combinedVolume = snareVoice.vol * snareVoice.velo * snareVoice.egValueOscVol ;
+		v->combinedVolume = v->vol * v->velo * v->egValueOscVol ;
 		//const float vol = ;
 
 		for(j=0;j<size;j++)
@@ -189,16 +192,16 @@ void Snare_calcSyncBlock(int16_t* buf, const uint8_t size)
 #if 1
 			//float fmaf(float a, float b, float c);
 			//result = a × b + c
-			float tmp = fmaf(buf[j], snareVoice.mix, oscBuf[j]);
+			float tmp = fmaf(buf[j], v->mix, oscBuf[j]);
 			//add transient sample
 			//tmp	= __QADD16(transBuf[j],(int16_t)tmp);
 			tmp	+= transBuf[j];
-			buf[j] =   snareVoice.combinedVolume  * tmp * calcOnePole( &snareVoice.FaderVolumeFilter, adc_getFaderVolume(3));
+			buf[j] =   v->combinedVolume  * tmp * calcOnePole( &v->FaderVolumeFilter, faderVolume);
 
 #else
 
 			//add filter to buffer
-			buf[j] *= snareVoice.mix;
+			buf[j] *= v->mix;
 			buf[j] = (__QADD16(buf[j],transBuf[j])); //transBuf here is mod osc
 
 			buf[j] *=  vol;
@@ -207,27 +210,27 @@ void Snare_calcSyncBlock(int16_t* buf, const uint8_t size)
 	}
 	else
 	{
-		snareVoice.combinedVolume = snareVoice.vol * snareVoice.egValueOscVol;
-		//const float vol = snareVoice.combinedVolume * ;
+		v->combinedVolume = v->vol * v->egValueOscVol;
+		//const float vol = v->combinedVolume * ;
 
 		for(j=0;j<size;j++)
 		{
 
 #if 1
-			float tmp = fmaf(buf[j], snareVoice.mix, oscBuf[j]);
+			float tmp = fmaf(buf[j], v->mix, oscBuf[j]);
 			//add transient sample
 			//tmp	= __QADD16(transBuf[j],(int16_t)tmp);
 			tmp	+= transBuf[j];
-			buf[j] =  snareVoice.combinedVolume * tmp * calcOnePole( &snareVoice.FaderVolumeFilter, adc_getFaderVolume(3));
+			buf[j] =  v->combinedVolume * tmp * calcOnePole( &v->FaderVolumeFilter, faderVolume);
 #else
 			//add filter to buffer
-			buf[j] *= snareVoice.mix;
+			buf[j] *= v->mix;
 			buf[j] = (__QADD16(buf[j],transBuf[j]));
 			buf[j] *=  vol;
 #endif
 		}
 	}
 
-	calcDistBlock(&snareVoice.distortion,buf,size);
+	calcDistBlock(&v->distortion,buf,size);
 }
 //------------------------------------------------------------------------

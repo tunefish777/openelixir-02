@@ -24,119 +24,120 @@
 INDTCMZ HiHatVoice hatVoice;
 
 //---------------------------------------------------
-void HiHat_setPan(const uint8_t pan)
+void HiHat_setPan(HiHatVoice* v, const uint8_t pan)
 {
-	//hatVoice.panL = squareRootLut[127-pan];
-	//hatVoice.panR = squareRootLut[pan];
-	hatVoice.pan = pan;
+	//v->panL = squareRootLut[127-pan];
+	//v->panR = squareRootLut[pan];
+	v->pan = pan;
 }
 //---------------------------------------------------
 
-void HiHat_init()
+void HiHat_init(HiHatVoice* v, uint8_t slot)
 {
-	initOnePole(&hatVoice.FaderVolumeFilter);
-	setOnePoleCoef(&hatVoice.FaderVolumeFilter,0.1);
+	v->slot = slot;
+	initOnePole(&v->FaderVolumeFilter);
+	setOnePoleCoef(&v->FaderVolumeFilter,0.1);
 
-	SnapEg_init(&hatVoice.snapEg);
-	HiHat_setPan(0);
-	hatVoice.vol = 0.8f;
+	SnapEg_init(&v->snapEg);
+	HiHat_setPan(v, 0);
+	v->vol = 0.8f;
 
-	//hatVoice.panModifier = 1.f;
+	//v->panModifier = 1.f;
 
-	transient_init(&hatVoice.transGen);
+	transient_init(&v->transGen);
 
-	hatVoice.fmModAmount1 = 0.5f;
-	hatVoice.fmModAmount2 = 0.5f;
+	v->fmModAmount1 = 0.5f;
+	v->fmModAmount2 = 0.5f;
 
-	setDistortionShape(&hatVoice.distortion, 0.f);
+	setDistortionShape(&v->distortion, 0.f);
 
-	hatVoice.modOsc.freq = 440;
-	hatVoice.modOsc.waveform = SINE;
-	hatVoice.modOsc.fmMod = 0;
-	hatVoice.modOsc.midiFreq = 70<<8 | 64 ;
-	hatVoice.modOsc.pitchMod = 1.0f;
-	hatVoice.modOsc.modNodeValue = 1;
+	v->modOsc.freq = 440;
+	v->modOsc.waveform = SINE;
+	v->modOsc.fmMod = 0;
+	v->modOsc.midiFreq = 70<<8 | 64 ;
+	v->modOsc.pitchMod = 1.0f;
+	v->modOsc.modNodeValue = 1;
 
-	hatVoice.modOsc2.freq = 440;
-	hatVoice.modOsc2.waveform = NOISE;//SINE;
-	hatVoice.modOsc2.fmMod = 0;
-	hatVoice.modOsc2.midiFreq = 70<<8 | 64;
-	hatVoice.modOsc2.pitchMod = 1.0f;
-	hatVoice.modOsc2.modNodeValue = 1;
+	v->modOsc2.freq = 440;
+	v->modOsc2.waveform = NOISE;//SINE;
+	v->modOsc2.fmMod = 0;
+	v->modOsc2.midiFreq = 70<<8 | 64;
+	v->modOsc2.pitchMod = 1.0f;
+	v->modOsc2.modNodeValue = 1;
 
-	hatVoice.osc.freq = 440;
-	hatVoice.osc.waveform = 1;
-	hatVoice.osc.fmMod = 1;
-	hatVoice.osc.midiFreq = 70<<8 | 64;
-	hatVoice.osc.pitchMod = 1.0f;
-	hatVoice.osc.modNodeValue = 1;
+	v->osc.freq = 440;
+	v->osc.waveform = 1;
+	v->osc.fmMod = 1;
+	v->osc.midiFreq = 70<<8 | 64;
+	v->osc.pitchMod = 1.0f;
+	v->osc.modNodeValue = 1;
 
-	hatVoice.volumeMod = 1;
+	v->volumeMod = 1;
 
-	slopeEg2_init(&hatVoice.oscVolEg);
+	slopeEg2_init(&v->oscVolEg);
 
-	SVF_init(&hatVoice.filter);
+	SVF_init(&v->filter);
 
-	lfo_init(&hatVoice.lfo);
+	lfo_init(&v->lfo);
 }
 
 //---------------------------------------------------
-void HiHat_updatePan()
+void HiHat_updatePan(HiHatVoice* v)
 {
-	hatVoice.triggeredPanL = sqrtf((127-hatVoice.pan)/127.f);
-	hatVoice.triggeredPanR = sqrtf(hatVoice.pan/127.f);
+	v->triggeredPanL = sqrtf((127-v->pan)/127.f);
+	v->triggeredPanR = sqrtf(v->pan/127.f);
 }
 //---------------------------------------------------
-void HiHat_trigger( uint8_t vel, uint8_t isOpen, const uint8_t note)
+void HiHat_trigger(HiHatVoice* v, uint8_t vel, uint8_t isOpen, const uint8_t note)
 {
-	lfo_retrigger(5);
+	lfo_retrigger(v->slot);
 
 	//update velocity modulation
-	modNode_updateValue(&velocityModulators[5],vel/127.f);
+	modNode_updateValue(&velocityModulators[v->slot],vel/127.f);
 
 	float offset = 1;
-	if(hatVoice.transGen.waveform==1) //offset mode
+	if(v->transGen.waveform==1) //offset mode
 	{
-		offset -= hatVoice.transGen.volume;
+		offset -= v->transGen.volume;
 	}
-	if(hatVoice.osc.waveform == SINE)
-		hatVoice.osc.phase = (0x3ff<<20)*offset;//voiceArray[voiceNr].osc.startPhase ;
-	else if(hatVoice.osc.waveform > SINE && hatVoice.osc.waveform <= REC)
-		hatVoice.osc.phase = (0xff<<22)*offset;
+	if(v->osc.waveform == SINE)
+		v->osc.phase = (0x3ff<<20)*offset;//voiceArray[voiceNr].osc.startPhase ;
+	else if(v->osc.waveform > SINE && v->osc.waveform <= REC)
+		v->osc.phase = (0xff<<22)*offset;
 	else
-		hatVoice.osc.phase = 0;
+		v->osc.phase = 0;
 
-	hatVoice.modOsc.phase = 0;
-	hatVoice.modOsc2.phase = 0;
+	v->modOsc.phase = 0;
+	v->modOsc2.phase = 0;
 
-	osc_setBaseNote(&hatVoice.osc,note);
-	osc_setBaseNote(&hatVoice.modOsc,note);
-	osc_setBaseNote(&hatVoice.modOsc2,note);
+	osc_setBaseNote(&v->osc,note);
+	osc_setBaseNote(&v->modOsc,note);
+	osc_setBaseNote(&v->modOsc2,note);
 
-	hatVoice.isOpen = isOpen;
-	hatVoice.oscVolEg.decay = isOpen?hatVoice.decayOpen:hatVoice.decayClosed;
+	v->isOpen = isOpen;
+	v->oscVolEg.decay = isOpen?v->decayOpen:v->decayClosed;
 
-	slopeEg2_trigger(&hatVoice.oscVolEg);
-	hatVoice.velo = vel/127.f;
-	transient_trigger(&hatVoice.transGen);
+	slopeEg2_trigger(&v->oscVolEg);
+	v->velo = vel/127.f;
+	transient_trigger(&v->transGen);
 
-	SnapEg_trigger(&hatVoice.snapEg);
+	SnapEg_trigger(&v->snapEg);
 
-	HiHat_updatePan();
+	HiHat_updatePan(v);
 }
 //---------------------------------------------------
-IN_ITCM_RAM void HiHat_calcAsync( )
+IN_ITCM_RAM void HiHat_calcAsync(HiHatVoice* v)
 {
 	//calc the osc  vol eg
-	hatVoice.egValueOscVol = slopeEg2_calc(&hatVoice.oscVolEg);
+	v->egValueOscVol = slopeEg2_calc(&v->oscVolEg);
 
 	//turn off trigger signal if trigger gate mode is on and volume == 0
 	/*
 	if(trigger_isGateModeOn())
 	{
-		if(!hatVoice.egValueOscVol)
+		if(!v->egValueOscVol)
 		{
-			if(hatVoice.isOpen)
+			if(v->isOpen)
 			{
 				//trigger_triggerVoice(TRIGGER_7, TRIGGER_OFF);
 				voiceControl_noteOff(TRIGGER_7);
@@ -149,52 +150,54 @@ IN_ITCM_RAM void HiHat_calcAsync( )
 	*/
 
 	//calc snap EG if transient sample 0 is activated
-	if(hatVoice.transGen.waveform == 0)
+	if(v->transGen.waveform == 0)
 	{
-		const float snapVal = SnapEg_calc(&hatVoice.snapEg, hatVoice.transGen.pitch);
-		hatVoice.osc.pitchMod = 1 + snapVal*hatVoice.transGen.volume;
+		const float snapVal = SnapEg_calc(&v->snapEg, v->transGen.pitch);
+		v->osc.pitchMod = 1 + snapVal*v->transGen.volume;
 	}
 
-	osc_setFreq(&hatVoice.osc);
-	osc_setFreq(&hatVoice.modOsc);
-	osc_setFreq(&hatVoice.modOsc2);
+	osc_setFreq(&v->osc);
+	osc_setFreq(&v->modOsc);
+	osc_setFreq(&v->modOsc2);
 
 
 }
 //---------------------------------------------------
-void HiHat_calcSyncBlock(int16_t* buf, const uint8_t size)
+void HiHat_calcSyncBlock(HiHatVoice* v, int16_t* buf, const uint8_t size)
 {
+	//the fader can't change while a block is calculated: read it once, not per sample
+	const float faderVolume = adc_getFaderVolume(v->slot);
 	//2 buffers for the mod oscs
 	int16_t mod1[size],mod2[size];
 	//calc next mod osc samples, scaled with mod amount
-	calcNextOscSampleBlock(&hatVoice.modOsc,mod1,size, hatVoice.fmModAmount1, hatVoice.pwm);
-	calcNextOscSampleBlock(&hatVoice.modOsc2,mod2,size,  hatVoice.fmModAmount2, hatVoice.pwm);
+	calcNextOscSampleBlock(&v->modOsc,mod1,size, v->fmModAmount1, v->pwm);
+	calcNextOscSampleBlock(&v->modOsc2,mod2,size,  v->fmModAmount2, v->pwm);
 
 	//combine both mod oscs to 1 modulation signal
 	bufferTool_addBuffersSaturating(mod1,mod2,size);
 
-	calcNextOscSampleFmBlock(&hatVoice.osc,mod1,buf,size,0.5f, hatVoice.pwm) ;
+	calcNextOscSampleFmBlock(&v->osc,mod1,buf,size,0.5f, v->pwm) ;
 
 #if USE_REVERB
 	if(fxBus.fxType != FX_REVERB)
 	{
 #endif
-		SVF_calcBlockZDF(&hatVoice.filter,hatVoice.filterType,buf,size);
+		SVF_calcBlockZDF(&v->filter,v->filterType,buf,size);
 
 #if USE_REVERB
 	}
 	else
 	{
-		SVF_calcBlockCheapZDF(&hatVoice.filter,hatVoice.filterType,buf,size);
+		SVF_calcBlockCheapZDF(&v->filter,v->filterType,buf,size);
 	}
 #endif
 	//calc transient sample
-	transient_calcBlock(&hatVoice.transGen,mod1,size);
+	transient_calcBlock(&v->transGen,mod1,size);
 
 	uint8_t j;
-	if(hatVoice.volumeMod)
+	if(v->volumeMod)
 	{
-		hatVoice.combinedVolume = hatVoice.vol * hatVoice.velo * hatVoice.egValueOscVol; ;
+		v->combinedVolume = v->vol * v->velo * v->egValueOscVol; ;
 		//const float vol =
 
 #if 1
@@ -210,7 +213,7 @@ void HiHat_calcSyncBlock(int16_t* buf, const uint8_t size)
 			for(j=0;j<size;j++)
 			{
 				//add volume
-				buf[j] *=  hatVoice.combinedVolume * calcOnePole( &hatVoice.FaderVolumeFilter, adc_getFaderVolume(5));
+				buf[j] *=  v->combinedVolume * calcOnePole( &v->FaderVolumeFilter, faderVolume);
 			}
 #else
 		for(j=0;j<size;j++)
@@ -223,8 +226,8 @@ void HiHat_calcSyncBlock(int16_t* buf, const uint8_t size)
 	}
 	else
 	{
-		hatVoice.combinedVolume = hatVoice.vol * hatVoice.egValueOscVol;
-		//const float vol = hatVoice.combinedVolume ;
+		v->combinedVolume = v->vol * v->egValueOscVol;
+		//const float vol = v->combinedVolume ;
 #if 1
 			int32_t* x = (int32_t*)buf;
 			int32_t* y = (int32_t*)mod1;
@@ -238,7 +241,7 @@ void HiHat_calcSyncBlock(int16_t* buf, const uint8_t size)
 			for(j=0;j<size;j++)
 			{
 				//add volume
-				buf[j] *=  hatVoice.combinedVolume * calcOnePole( &hatVoice.FaderVolumeFilter, adc_getFaderVolume(5));
+				buf[j] *=  v->combinedVolume * calcOnePole( &v->FaderVolumeFilter, faderVolume);
 			}
 #else
 		for(j=0;j<size;j++)
@@ -251,7 +254,7 @@ void HiHat_calcSyncBlock(int16_t* buf, const uint8_t size)
 #endif
 	}
 
-	calcDistBlock(&hatVoice.distortion,buf,size);
+	calcDistBlock(&v->distortion,buf,size);
 }
 //---------------------------------------------------
 
