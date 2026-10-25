@@ -93,6 +93,12 @@ void Delay_calcBuffer(Delay* d, uint8_t bufferIdx)
 
 void Delay_processPingPong(Delay *d, int16_t *fxBuffer,int32_t* outL, int32_t* outR, uint16_t size,  uint8_t channels, float dryWet)
 {
+	//each ping-pong line uses half of the buffer. After switching from the normal
+	//delay the pointers can still be in the upper half, and the right line
+	//would read and write up to 32 KB past FX_BUFFER: keep them inside.
+	d->oldRead	&= FX_BUFFER_SIZE>>1;
+	d->newRead	&= FX_BUFFER_SIZE>>1;
+	d->write	&= FX_BUFFER_SIZE>>1;
 
 	int32_t x;
 	int32_t* stereoOut = outL;
