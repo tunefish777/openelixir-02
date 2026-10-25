@@ -694,8 +694,12 @@ void preset_processTimer()
 
 
 
+//size of the working buffer for empty_directory(): it appends "/" + an 8.3
+//name (12 characters, no long file names) per directory level
+#define EMPTY_DIR_PATH_LEN	64
+
 FRESULT empty_directory (
-    char* path      /* Working buffer filled with start directory */
+    char* path      /* Working buffer (EMPTY_DIR_PATH_LEN) filled with start directory */
 )
 {
 	FILINFO fno;
@@ -711,6 +715,7 @@ FRESULT empty_directory (
             fr = f_readdir(&dir, &fno);
             if (fr != FR_OK || !fno.fname[0]) break;
             if (_FS_RPATH && fno.fname[0] == '.') continue;
+            if (i + sizeof(fno.fname) > EMPTY_DIR_PATH_LEN) { fr = FR_INVALID_NAME; break; }
             j = 0;
             do
                 path[i+j] = fno.fname[j];
@@ -2357,7 +2362,11 @@ FRESULT preset_saveProject(uint8_t presetNr)
 	}
 	else
 	{
-		res = empty_directory(currentFolder);
+		//empty_directory() builds the paths of the files in its buffer: not in
+		//currentFolder (13 bytes), that overwrote the name of kit 1 behind it
+		char path[EMPTY_DIR_PATH_LEN];
+		strcpy(path, currentFolder);
+		res = empty_directory(path);
 		if(res != FR_OK)
 		{
 			lcd_process_display_interrupt = 1;
