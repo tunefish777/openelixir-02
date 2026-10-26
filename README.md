@@ -10,32 +10,36 @@ Custom firmware for the Erica Synths LXR-02 drum machine. It is based on the ope
 
 ## Goals
 
-- **Better sound.** Fix the audible problems of the stock firmware, such as digital clipping in
-  the mix, without changing the sound of existing kits.
-- **Stay compatible.** Same hardware, same bootloader and SD-card update procedure. Keep existing
-  kits, patterns and the MIDI implementation working wherever possible.
-- **Know the limits.** Every build reports how much memory each region uses (ITCM, DTCM, RAM,
-  flash) and how that compares with the stock firmware, so changes stay within the MCU's budget.
-- **Room for new features.** Assignable voice engines and loading single voices are done; sample
-  playback is possible future work.
+- **More functionality, fully backwards compatible.** OpenElixir-02 extends what is already there.
+  Kits, patterns and projects from the stock firmware load and play as before, the MIDI
+  implementation is unchanged, and the update works with the stock bootloader.
+- **The stock sound stays available.** Every change to the core sound of the unit comes with a
+  switch in the config menu, so the stock sound is always one setting away.
 
-## Changes from the stock firmware
+## Features
 
-| Version | Change |
-|---|---|
-| 0.1 | Voices and FX are summed in 32 bit, followed by a limiter on each output: loud kits no longer hard-clip. Levels that didn't clip before are unchanged. |
-| 0.1 | Memory usage report after every build, compared with the stock firmware. |
-| 0.1 | Renamed to OpenElixir-02: shown on the start-up screen and as the USB-MIDI device name. |
-| 0.2 | Each of the 6 voice slots can run any engine (drum, snare, cymbal, hi-hat): select a voice, SHIFT + KIT, or NRPN 98. Saved in kits; kits from the stock firmware load with the stock engines and sound as before. See [docs/ENGINES.md](docs/ENGINES.md). |
-| 0.2 | About 10 % less CPU load in the worst case and 2.6 KB more free fast RAM (ITCM), with identical sound. |
-| 0.2 | Fix: switching the FX delay to ping-pong could write up to 32 KB past the delay buffer and corrupt other sound data (also in the stock firmware). |
-| 0.2 | Fix: saving a project into an existing project slot renamed kit 1 to ".SNG" (also in the stock firmware). |
-| 0.2 | Development: build option `-DLXR_CPU_METER=ON` (CPU load per voice and FX on the display); host test (`test/engine/`) that proves engine changes render bit-identical. |
-| 1.0 | Load a single voice from another kit, also from other projects: LOAD + step button 1-7 (Drum 1 ... OP HH). See [docs/ENGINES.md](docs/ENGINES.md#loading-a-voice-from-another-kit). |
-| 1.0 | Load and save kits from and into other projects: "Change Project" below kit 0 in the load and save kit menus. See [docs/ENGINES.md](docs/ENGINES.md#kits-from-other-projects). |
-| 1.0 | The limiter (0.1) can be switched off in the config menu ("lim", 2nd page): off gives exactly the stock mix, which clips. |
-| 1.0 | Fixes of stock firmware bugs found in the firmware review by jhw in [erica-synths/lxr-desktop-app#3](https://github.com/erica-synths/lxr-desktop-app/issues/3): every sequencer note was sent twice on MIDI (stuck notes); per-voice MIDI CC channel filter checked the wrong voice; MIDI clock in the middle of a message corrupted it (and MIDI thru); bank select (CC 0) could load past the kits and didn't update the kit; a song starting with LOOP played a nonexistent pattern, a song end didn't send MIDI stop and left START out of sync; SHIFT + CONFIG made the next step press set the length of all tracks; holding a step previewed voice 1's automation, and parameter locks on later held steps wiped the automation lane of voice 1 or 2; bank select and NRPN control CCs were recorded as automation; pitch EG slope 127 silenced the oscillator; internal tempo ran up to 0.2 % fast; snare and mono compressor wrapped instead of clipping; project save, reload and clear kit used the last scrolled-to kit slot instead of the current kit; failed or incomplete SD writes (full card) reported success, and one error path blocked the card until a reboot. Memory corruption: NRPNs 128-255 (e.g. the mutes) wrote past a value table; recording, rolls and flams used step -1 while stopped; SHIFT + held select button armed steps far past the 64 (v1 sub step formula); front panel messages used unchecked step/track/pattern numbers; out-of-range menu values read past the name tables (and the waveform name wrote past its buffer); an FX type above 4 made the FX page read past its pages; unchecked track lengths and kit/project numbers from files; USB-MIDI sent bytes from past its buffer and wrote into ITCM before USB was connected; the RAT distortion read past its table (a NaN there stayed until reboot). Files: the init kit (new or cleared kit) was shifted by 8 parameters and left the last 8 (FX settings, morph) from the previous kit; a damaged settings file (glo.cfg) left the settings half overwritten, and at boot the defaults were written into the project folder without being applied; saving a kit, pattern or song under a new name left the file with the old name behind, which loading could find first; a damaged pattern file (or tmp.pat) left the pattern half loaded, and patterns from older firmware kept the flams/shifts of the pattern loaded before. |
-| 1.0 | A project save writes into a new folder and replaces the saved project only when everything was written: a failed save (e.g. a full card) or switching off during the save no longer loses the saved project. Needs free space for a second copy of the project (a few hundred KB). The end of a project save no longer interrupts the audio (stock firmware: dropouts while the sequencer runs). Safe save idea also from [erica-synths/lxr-desktop-app#3](https://github.com/erica-synths/lxr-desktop-app/issues/3). |
+**Kit management.** Load full kits and single voices from any project:
+- Hold LOAD and press step button 1-7 (Drum 1 ... OP HH) to load just that voice from any kit of
+  any project into the current kit.
+- "Change Project" below kit 0 in the load and save kit menus loads kits from other projects and
+  saves kits into them.
+
+**Freely assignable voice engines.** Each of the 6 voice slots can run any engine: drum, snare,
+cymbal or hi-hat. Select a voice and press SHIFT + KIT (or send NRPN 98). The engines are saved in
+the kit; kits from the stock firmware load with the stock engines.
+
+Details for both: [docs/ENGINES.md](docs/ENGINES.md).
+
+**Limiter.** Voices and FX are summed in 32 bit, followed by a limiter on each output, so loud kits
+no longer hard-clip. Levels that didn't clip before are unchanged. Config menu "lim" (2nd page)
+switches it off for exactly the stock mix.
+
+**Under the hood.** About 10 % less CPU load, many stock firmware bugs fixed (MIDI, sequencer, SD
+card, memory corruption; most found in the firmware review by jhw in
+[erica-synths/lxr-desktop-app#3](https://github.com/erica-synths/lxr-desktop-app/issues/3)), and a
+project save that can't lose the saved project. Stock issues that are kept on purpose:
+[docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md). The changes of each version are in the
+[release notes](https://github.com/tunefish777/openelixir-02/releases).
 
 ## Building and installing
 
@@ -51,10 +55,6 @@ name is required by the updater.
 Every push is also built on GitHub Actions: the firmware files are attached to each run in the
 [Actions tab](https://github.com/tunefish777/openelixir-02/actions/workflows/build.yml), and the run
 summary shows the memory usage compared with the stock firmware.
-
-Most of the stock firmware fixes in the 1.0 rows above come from the firmware review by jhw in
-[erica-synths/lxr-desktop-app#3](https://github.com/erica-synths/lxr-desktop-app/issues/3). Issues from that list that are kept on
-purpose or not fixed: [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
 
 Requirements, build options, the memory map, troubleshooting and development details are in the
 original firmware's README: **[README_LXR.md](README_LXR.md)**.
