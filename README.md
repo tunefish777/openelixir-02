@@ -32,6 +32,7 @@ Custom firmware for the Erica Synths LXR-02 drum machine. It is based on the ope
 | 0.2 | Development: build option `-DLXR_CPU_METER=ON` (CPU load per voice and FX on the display); host test (`test/engine/`) that proves engine changes render bit-identical. |
 | next | Load a single voice from another kit, also from other projects: LOAD + step button 1-7 (Drum 1 ... OP HH). See [docs/ENGINES.md](docs/ENGINES.md#loading-a-voice-from-another-kit). |
 | next | Load and save kits from and into other projects: "Change Project" below kit 0 in the load and save kit menus. See [docs/ENGINES.md](docs/ENGINES.md#kits-from-other-projects). |
+| next | The 0.1 limiter can be switched off in the config menu ("lim", 2nd page): off gives exactly the stock mix, which clips. |
 
 ## Building and installing
 

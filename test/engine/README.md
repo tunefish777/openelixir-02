@@ -11,6 +11,9 @@ test/engine/compare.sh            # working tree vs. HEAD
 test/engine/compare.sh v0.1       # working tree vs. a tag/commit
 ```
 
+`render --no-limiter <file>` renders with the stock mix (config "lim" off); compared with a tree
+from before the 32-bit mix bus (bf9efc7 plus the ping-pong delay fix) it is bit-identical.
+
 `render --engines` (built by `build.sh`, e.g. `build/engine-test/out-work/render --engines`)
 checks engine switching instead: every slot gets every engine (switched like a received
 NRPN 98, including the UI side in `Preset/KitEngines.c`). Each track must sound, no voice

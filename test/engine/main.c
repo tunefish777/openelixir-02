@@ -522,9 +522,20 @@ static int engineTest(void)
 }
 #endif
 
+//1 = limiter, 0 = stock mix (OpenElixir-02 config "lim"); weak: older trees don't have it
+extern uint8_t mixer_limiterOn __attribute__((weak));
+
 //---------------------------------------------------------------- main
 int main(int argc, char** argv)
 {
+	//--no-limiter: render with the stock mix (compare with trees before the 32-bit mix)
+	if(argc == 3 && strcmp(argv[1], "--no-limiter") == 0)
+	{
+		if(&mixer_limiterOn)
+			mixer_limiterOn = 0;
+		argv++;
+		argc--;
+	}
 #ifdef HAVE_VOICE_SLOTS
 	if(argc == 2 && strcmp(argv[1], "--engines") == 0)
 	{
@@ -537,7 +548,7 @@ int main(int argc, char** argv)
 #endif
 	if(argc != 2)
 	{
-		fprintf(stderr, "usage: %s <output file> | --engines\n", argv[0]);
+		fprintf(stderr, "usage: %s [--no-limiter] <output file> | --engines\n", argv[0]);
 		return 2;
 	}
 	mapPeripherals();

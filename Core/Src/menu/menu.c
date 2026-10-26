@@ -29,6 +29,7 @@
 #include "menu/engineMenu.h"
 #include "menu/voiceLoad.h"
 #include "menu/projectBrowse.h"
+#include "Soundengine/DSPAudio/mixer.h"
 #include "buttonHandler.h"
 #include <ctype.h>
 #include <frontPanelParser_ui.h>
@@ -259,6 +260,7 @@ const Name valueNames[NUM_NAMES] =
 		{SHORT_P3, CAT_FX, LONG_P3},/*TEXT_FX_P3*/
 		{SHORT_P4, CAT_FX, LONG_P4},/*TEXT_FX_P4*/
 		{SHORT_KCM, CAT_GLOBAL, LONG_PATTERN_MODE},/*TEXT_AUTO_SWITCH_KIT*/
+		{SHORT_LIMITER, CAT_GLOBAL, LONG_LIMITER},/*TEXT_MIXER_LIMITER*/
 
 
 };
@@ -575,6 +577,7 @@ const enum Datatypes PROGMEM parameter_dtypes[NUM_PARAMS] = {
 	    /*PAR_MIDI_NOTE6*/		DTYPE_NOTE_NAME,
 	    /*PAR_MIDI_NOTE7*/		DTYPE_NOTE_NAME,
 		/*PAR_PATTERN_MODE*/ DTYPE_MENU | (MENU_PAT_MODE<<8),
+		/*PAR_MIXER_LIMITER*/	DTYPE_ON_OFF,
 };
 //---------------------------------------------------------------
 //Voice pages of slots that run a non-stock engine: built from the engine's stock
@@ -3790,6 +3793,10 @@ void menu_parseGlobalParam(uint16_t paramNr, uint8_t value)
 
 	case PAR_SCREENSAVER_ON_OFF:
 
+		break;
+
+	case PAR_MIXER_LIMITER:
+		mixer_limiterOn = value != 0;
 		break;
 
 	case PAR_BPM:

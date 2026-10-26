@@ -46,6 +46,9 @@ void  mixer_calcNextSampleBlock(int16_t* output,int16_t* output2);
  * without wrapping or clipping. A limiter per DAC then brings it back into
  * range before it is written to the DMA buffers. */
 
+/** 1 = 32-bit mix with an output limiter per DAC, 0 = the stock 16-bit saturating mix */
+extern uint8_t mixer_limiterOn;
+
 /** Adds a packed stereo sample (as built with __PKHBT(left, right, 16)) to a 32-bit mix buffer. */
 static inline void mixer_addStereo(int32_t* out, int32_t x)
 {

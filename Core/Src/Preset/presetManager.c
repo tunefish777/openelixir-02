@@ -1038,9 +1038,16 @@ static uint8_t preset_readGlobalData()
 	return 1;
 #else
 	const uint8_t numGlobals = NUM_PARAMS - PAR_BEGINNING_OF_GLOBALS;
+	//settings files from the stock firmware end before the OpenElixir-02 settings:
+	//those keep their defaults
+	const uint8_t numStockGlobals = PAR_MIXER_LIMITER - PAR_BEGINNING_OF_GLOBALS;
 	f_read((FIL*)&SDFile,&activeParameters[PAR_BEGINNING_OF_GLOBALS],numGlobals,&bytesRead);
-	if(bytesRead != numGlobals)	return 0;
-	else return 1;
+	if(bytesRead < numStockGlobals)	return 0;
+	if(bytesRead < numGlobals)
+	{
+		activeParameters[PAR_MIXER_LIMITER] = 1;
+	}
+	return 1;
 
 #endif
 #endif
@@ -1124,6 +1131,8 @@ void preset_loadDefaultGlobals()
 	activeParameters[PAR_MIDI_CHAN_GLOBAL] = 0; //all
 
 	activeParameters[PAR_PATTERN_MODE] = 1; //auto
+
+	activeParameters[PAR_MIXER_LIMITER] = 1; //on
 
 }
 //----------------------------------------------------

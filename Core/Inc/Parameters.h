@@ -426,6 +426,8 @@ enum ParamEnums
 
 		PAR_PATTERN_MODE,
 
+	PAR_MIXER_LIMITER,					// OpenElixir-02: 1 = 32-bit mix with output limiter, 0 = stock mix (clipping)
+
 	NUM_PARAMS	
 };
 

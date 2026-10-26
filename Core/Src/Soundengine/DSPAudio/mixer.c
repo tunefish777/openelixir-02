@@ -505,6 +505,19 @@ IN_ITCM_RAM static inline void mixer_addDataToOutput(uint8_t dest, const float p
 
 INDTCM float mixer_limiterGain[2] = {1.f, 1.f};
 
+//1 = the limiter above, 0 = the stock mix (config menu "lim")
+INDTCM uint8_t mixer_limiterOn = 1;
+
+//the stock mix added every voice and the FX return with 16-bit saturation;
+//saturating the 32-bit sums after each of them gives exactly the same result
+IN_ITCM_RAM static void mixer_saturateMix(int32_t* mix)
+{
+	for(uint32_t i=0;i<OUTPUT_DMA_SIZE*2;i++)
+	{
+		mix[i] = __SSAT(mix[i], 16);
+	}
+}
+
 IN_ITCM_RAM static void mixer_limitBlock(float* gainState, const int32_t* in, int16_t* out)
 {
 	float gain = *gainState;
@@ -642,6 +655,11 @@ IN_ITCM_RAM void mixer_calcNextSampleBlock(int16_t* output,int16_t* output2)
 		const float panR = sqrtf(voice->pan/127.f);
 #endif
 		mixer_addDataToOutput(mixer_audioRouting[v], panL, panR, sampleData,&mix[pos],&mix[pos+1],&mix2[pos],&mix2[pos+1], fxBusData);
+		if(!mixer_limiterOn)
+		{
+			mixer_saturateMix(mix);
+			mixer_saturateMix(mix2);
+		}
 	}
 
 #if CPU_METER
@@ -656,6 +674,13 @@ IN_ITCM_RAM void mixer_calcNextSampleBlock(int16_t* output,int16_t* output2)
 	meterStart = DWT->CYCCNT;
 #endif
 	FxBus_process(fxBusData,  &mix[pos],&mix[pos+1],&mix2[pos],&mix2[pos+1], OUTPUT_DMA_SIZE);
+	if(!mixer_limiterOn)
+	{
+		mixer_saturateMix(mix);
+		mixer_saturateMix(mix2);
+		//the sums are within 16 bit now: the limiter passes them unchanged
+		mixer_limiterGain[0] = mixer_limiterGain[1] = 1.f;
+	}
 #if CPU_METER
 	cpuMeter_section(CPU_SECTION_FX, meterStart);
 #endif

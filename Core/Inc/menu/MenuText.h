@@ -480,6 +480,7 @@ const char shortNames[][4]  =
 	{"kcm"},
 	{"flm"},
 	{"shf"},
+	{"lim"},
 
 };
 //-----------------------------------------------------------------
@@ -610,6 +611,7 @@ const char longNames[][16] =
 	{"KitChMde"},
 	{"Flam"},
 	{"Shift"},
+	{"Limiter"},
 };
 
 
