@@ -128,6 +128,10 @@ float midiParser_calcDetune(uint8_t value)
 //-----------------------------------------------------------
 static void midiParser_nrpnHandler(uint16_t value)
 {
+	//the sound engine handles NRPNs 0-255 (as CC2 messages, data1 is 8 bit);
+	//higher ones (e.g. the mutes 1000-1006) are for the front panel only
+	if(midiParser_activeNrpnNumber > 0xff)
+		return;
 	MidiMsg msg2;
 	msg2.status = MIDI_CC2;
 	msg2.data1 = midiParser_activeNrpnNumber;
@@ -674,7 +678,8 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 	{
 		const uint16_t paramNr = msg.data1 + 1 + 127;
 
-		if(updateOriginalValue && !isFloatModulator) {
+		//(paramNr goes up to 383: NRPNs 128-255, e.g. the mutes 200-206)
+		if(updateOriginalValue && !isFloatModulator && paramNr < sizeof(midiParser_originalCcValues)) {
 			midiParser_originalCcValues[paramNr] = value.itg;
 		}
 
@@ -1139,6 +1144,12 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				break;
 
 			case CC2_FX_TYPE:
+				//out of range (NRPN/modulation 0-127): the FX page would read past its sub pages
+#if USE_REVERB
+				if(value.itg > FX_REVERB) break;
+#else
+				if(value.itg > FX_DELAY) break;
+#endif
 #if 1
 #if USE_REVERB
 				if((value.itg == FX_REVERB) && (fxBus.fxType != value.itg)) FxBus_prepareFxChange();

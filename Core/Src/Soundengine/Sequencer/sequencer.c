@@ -496,11 +496,14 @@ void seq_triggerVoice(uint8_t voiceNr, uint8_t vol, uint8_t note)
 
 	if(voiceNr > 6) return;
 
+	//the step index is -1 while stopped (e.g. rolls): no step to take automation and velocity from
+	const int8_t step = seq_stepIndex[voiceNr];
 
 #if USE_PATTERN_EDIT_BUFFER
 	seq_parseAutomationNodes(voiceNr, &patternBackupBuffer.seq_subStepPattern[voiceNr][seq_stepIndex[voiceNr]]);
 #else
-	seq_parseAutomationNodes(voiceNr, &seq_patternSet.seq_subStepPattern[seq_activePattern][voiceNr][seq_stepIndex[voiceNr]]);
+	if(step >= 0)
+		seq_parseAutomationNodes(voiceNr, &seq_patternSet.seq_subStepPattern[seq_activePattern][voiceNr][step]);
 #endif
 
 	//turn the trigger off before sending the next one
@@ -536,7 +539,7 @@ void seq_triggerVoice(uint8_t voiceNr, uint8_t vol, uint8_t note)
 #if USE_PATTERN_EDIT_BUFFER
 	seq_sendMidiNoteOn(midiChan, midiNote, patternBackupBuffer.seq_subStepPattern[voiceNr][seq_stepIndex[voiceNr]].volume&STEP_VOLUME_MASK);
 #else
-	seq_sendMidiNoteOn(midiChan, midiNote, seq_patternSet.seq_subStepPattern[seq_activePattern][voiceNr][seq_stepIndex[voiceNr]].volume&STEP_VOLUME_MASK);
+	seq_sendMidiNoteOn(midiChan, midiNote, step >= 0 ? seq_patternSet.seq_subStepPattern[seq_activePattern][voiceNr][step].volume&STEP_VOLUME_MASK : vol);
 #endif
 }
 //------------------------------------------------------------------------------
@@ -1101,6 +1104,9 @@ void seq_processFlam(uint8_t idx)
 
 	for(uint8_t track=0;track<NUM_TRACKS;track++)
 	{
+		//the step index is -1 until the first step (e.g. with external clock)
+		if(seq_stepIndex[track] < 0)
+			continue;
 		//if track is not muted
 		if(!(seq_mutedTracks & (1<<track) ) )
 		{
@@ -2312,7 +2318,8 @@ uint8_t seq_isAutomationStepArmed()
 //------------------------------------------------------------------------
 void seq_recordAutomation(uint8_t voice, uint8_t dest, uint8_t value)
 {
-	if(seq_recordActive)
+	//(the step index is -1 while stopped)
+	if(seq_recordActive && seq_stepIndex[voice] >= 0)
 	{
 		//uint8_t quantizedStep = seq_quantize(seq_stepIndex[voice]);
 		const uint8_t step = seq_stepIndex[voice];

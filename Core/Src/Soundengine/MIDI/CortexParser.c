@@ -531,6 +531,7 @@ static void frontParser_handleMidiMessage()
 	case FRONT_SET_P1_VAL: { // cortex_midiMsg.status
 			uint8_t stepNr = cortex_midiMsg.data1;
 			uint8_t value = cortex_midiMsg.data2;
+			if(stepNr >= NUM_STEPS) break;	//7-bit data used as index: ignore out of range
 
 #if USE_PATTERN_EDIT_BUFFER
 			if( (currentPattern == seq_activePattern) )
@@ -550,6 +551,7 @@ static void frontParser_handleMidiMessage()
 	case FRONT_SET_P2_VAL: { // cortex_midiMsg.status
 			uint8_t stepNr = cortex_midiMsg.data1;
 			uint8_t value = cortex_midiMsg.data2;
+			if(stepNr >= NUM_STEPS) break;
 
 #if USE_PATTERN_EDIT_BUFFER
 			if( (currentPattern == seq_activePattern) )
@@ -574,7 +576,8 @@ static void frontParser_handleMidiMessage()
 			const uint8_t onOff 	= cortex_midiMsg.data2 & 0x40;
 			const uint8_t trackNr 	=  cortex_midiMsg.data2 & 0x3f;
 
-			seq_armAutomationStep(stepNr,trackNr,onOff);
+			//out of range: disarm (recording would write past the steps/tracks)
+			seq_armAutomationStep(stepNr,trackNr,onOff && stepNr < NUM_STEPS && trackNr < NUM_TRACKS);
 
 		}
 		break;
@@ -863,7 +866,8 @@ static void frontParser_handleSeqCC()
 		break;
 
 	case FRONT_SEQ_SELECT_ACTIVE_STEP:
-		seq_selectedStep = cortex_midiMsg.data2;
+		if(cortex_midiMsg.data2 < NUM_STEPS)
+			seq_selectedStep = cortex_midiMsg.data2;
 		break;
 
 	case FRONT_SEQ_SET_AUTOM_TRACK:
@@ -906,15 +910,18 @@ static void frontParser_handleSeqCC()
 		break;
 
 	case FRONT_SEQ_SET_SHOWN_PATTERN:
-		frontParser_shownPattern = cortex_midiMsg.data2;
+		if(cortex_midiMsg.data2 < NUM_PATTERN)
+			frontParser_shownPattern = cortex_midiMsg.data2;
 		break;
 	case FRONT_SEQ_SET_ACTIVE_TRACK:
-		frontParser_activeTrack = cortex_midiMsg.data2;
+		if(cortex_midiMsg.data2 < NUM_TRACKS)
+			frontParser_activeTrack = cortex_midiMsg.data2;
 		break;
 
 	case FRONT_SEQ_REQUEST_STEP_PARAMS:{
 
 		const uint8_t data2 = cortex_midiMsg.data2;
+		if(data2 >= NUM_STEPS) break;
 
 		/* send back probability, volume and note nr*/
 		uart_sendFrontpanelByte(FRONT_SEQ_CC);

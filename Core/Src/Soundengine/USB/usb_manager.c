@@ -111,25 +111,18 @@ void usb_sendByte(uint8_t byte)
 void usb_flushMidi()
 {
 
-	//TODO: is this right???
-	const uint8_t len = usb_MidiInWrPtr - usb_MidiInRdPtr;
-	if(len!=0)
-	//if((len != 0) && (USB_OTG_dev.dev.device_status != USB_OTG_SUSPENDED))
-	{
+	//(was (uint8_t)(Wr - Rd): after the write pointer wrapped this sent up to 255
+	//bytes from past the buffer end, and data was dropped when the USB was busy)
+	uint8_t* const end = usb_MidiInBuff + (TOTAL_MIDI_BUF_SIZE * NUM_SUB_BUFFERS);
+	if(usb_MidiInWrPtr == usb_MidiInRdPtr)
+		return;
 
-	    /* Flush a Tx FIFO */
-	//    USB_FlushTxFifo (USB_OTG_FS, 15 ); //TODO is this needed? guess not
-	    // transmit next package
-	    // TODO clean up the USB-MIDI transmit buffer handling
-	    CDC_Transmit_FS(usb_MidiInRdPtr, len);
+	//up to the write pointer, or up to the buffer end if it wrapped (the rest is sent next time)
+	uint8_t* const stop = usb_MidiInWrPtr > usb_MidiInRdPtr ? usb_MidiInWrPtr : end;
+	if(CDC_Transmit_FS(usb_MidiInRdPtr, (uint16_t)(stop - usb_MidiInRdPtr)) != USBD_OK)
+		return;	//busy or not connected: try again next time
 
-		usb_MidiInRdPtr += len;
-		if(usb_MidiInRdPtr >= (usb_MidiInBuff+(TOTAL_MIDI_BUF_SIZE * NUM_SUB_BUFFERS)))
-		{
-			usb_MidiInRdPtr = usb_MidiInBuff;
-		}
-		//usb_MidiInWrPtr=usb_MidiInRdPtr;
-	}
+	usb_MidiInRdPtr = stop >= end ? usb_MidiInBuff : stop;
 
 }
 //------------------------------------------------------------------------------

@@ -140,6 +140,10 @@ float diode(float in)
 	//float index = (in+4.2f) * 30.47f; // [0:256]
 
 	uint16_t itg = (int16_t) index;
+	//in = 1: the last entry (interpolating read table_1n914[257], past the table:
+	//a NaN there stayed in the feedback until a reboot)
+	if(itg >= 256)
+		return table_1n914[256];
 	float frac = index - itg;
 	return lerp(table_1n914[itg], table_1n914[itg+1], frac);
 

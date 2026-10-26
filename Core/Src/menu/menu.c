@@ -820,6 +820,12 @@ static void menu_copyStringToEditBuffer(const char* name)
 //-----------------------------------------------------------------
 void copyNameToEditBuffer(uint8_t presetNr, uint8_t nameType)
 {
+	//UNUSED_NAMES (settings) has no names: it is past the name types of savefileNames
+	if(nameType >= NUM_SAVEFILE_NAMES || presetNr >= NUM_KIT_SLOTS)
+	{
+		memset(nameEditBuffer, 0, sizeof(nameEditBuffer));
+		return;
+	}
 	menu_copyStringToEditBuffer(savefileNames[presetNr][nameType]);
 }
 //-----------------------------------------------------------------
@@ -2855,104 +2861,106 @@ static uint8_t getMaxEntriesForMenu(uint8_t menuId)
 // given a menu id, and a value returns the name from PROGMEM
 static void getMenuItemNameForValue(const uint8_t menuId, const uint8_t curParmVal, char *buf)
 {
+	//values from MIDI or old kits can be beyond a table's entries (count in its first entry)
+#define MENU_ITEM(table) (curParmVal < (uint8_t)(table)[0][0] ? (const void*)(table)[curParmVal + 1] : (const void*)menuText_dash)
 	const void *p=0;
 	switch(menuId)
 	{
 	case MENU_TRANS:
-		p = transientNames[curParmVal + 1];
+		p = MENU_ITEM(transientNames);
 		break;
 	case MENU_AUDIO_OUT:
-		p = outputNames[curParmVal + 1];
+		p = MENU_ITEM(outputNames);
 		break;
 
 	case MENU_AUDIO_OUT_FX:
-		p = outputNamesFx[curParmVal + 1];
+		p = MENU_ITEM(outputNamesFx);
 		break;
 	case MENU_FILTER:
-		p = filterTypes[curParmVal + 1];
+		p = MENU_ITEM(filterTypes);
 		break;
 	case MENU_WAVEFORM:
 		if(curParmVal < waveformNames[0][0])
 			p=waveformNames[curParmVal + 1];
 		else
 		{
+			//sample number: 2 digits (3 wrote one byte past the 3-character buffer)
 			buf[0]='s';
-			buf[2]=' ';
-			numtostru(&buf[1],(uint8_t)(curParmVal - waveformNames[0][0]));
+			numtostrpu_2Bytes(&buf[1],(uint8_t)(curParmVal - waveformNames[0][0]),' ');
 			return;
 		}
 		break;
 
 	case MENU_SYNC_RATES:
-		p=syncRateNames[curParmVal + 1];
+		p = MENU_ITEM(syncRateNames);
 		break;
 	case MENU_LFO_WAVES:
-		p=lfoWaveNames[curParmVal+1];
+		p = MENU_ITEM(lfoWaveNames);
 		break;
 	case MENU_RETRIGGER:
-		p=retriggerNames[curParmVal+1];
+		p = MENU_ITEM(retriggerNames);
 		break;
 	case MENU_FOLLOW:
-		p=followNames[curParmVal+1];
+		p = MENU_ITEM(followNames);
 		break;
 	case MENU_SEQ_QUANT:
-		p=quantisationNames[curParmVal+1];
+		p = MENU_ITEM(quantisationNames);
 		break;
 	case MENU_MIDI:
-		p=midiModes[curParmVal+1];
+		p = MENU_ITEM(midiModes);
 		break;
 	case MENU_NEXT_PATTERN:
-		p=nextPatternNames[curParmVal+1];
+		p = MENU_ITEM(nextPatternNames);
 		break;
 	case MENU_ROLL_RATES:
-		p=rollRateNames[curParmVal+1];
+		p = MENU_ITEM(rollRateNames);
 		break;
 	case MENU_MIDI_ROUTING:
-		p=midiRoutingNames[curParmVal+1];
+		p = MENU_ITEM(midiRoutingNames);
 		break;
 	case MENU_MIDI_FILTERING:
-		p=midiFilterNames[curParmVal+1];
+		p = MENU_ITEM(midiFilterNames);
 		break;
 	case MENU_PPQ_IN:
-		p=ppqInNames[curParmVal+1];
+		p = MENU_ITEM(ppqInNames);
 		break;
 	case MENU_PPQ_OUT:
-		p=ppqOutNames[curParmVal+1];
+		p = MENU_ITEM(ppqOutNames);
 		break;
 	case MENU_MIX_FM:
-		p=mixFmNames[curParmVal+1];
+		p = MENU_ITEM(mixFmNames);
 		break;
 
 	case MENU_FX:
-		p=fxNames[curParmVal+1];
+		p = MENU_ITEM(fxNames);
 		break;
 
 	case MENU_DIST:
-		p=distNames[curParmVal+1];
+		p = MENU_ITEM(distNames);
 		break;
 
 	case MENU_RATIO:
-		p=ratioNames[curParmVal+1];
+		p = MENU_ITEM(ratioNames);
 		break;
 
 	case MENU_DELAY:
-		p=delayNames[curParmVal+1];
+		p = MENU_ITEM(delayNames);
 		break;
 
 	case MENU_REVERB:
-		p=reverbNames[curParmVal+1];
+		p = MENU_ITEM(reverbNames);
 		break;
 
 	case MENU_PAT_MODE:
-		p=patModeNames[curParmVal+1];
+		p = MENU_ITEM(patModeNames);
 		break;
 
 	case MENU_STEP_FLAM:
-		p=stepFlamNames[curParmVal+1];
+		p = MENU_ITEM(stepFlamNames);
 		break;
 
 	case MENU_STEP_SHIFT:
-		p=stepShiftNames[curParmVal+1];
+		p = MENU_ITEM(stepShiftNames);
 		break;
 
 
@@ -2961,6 +2969,7 @@ static void getMenuItemNameForValue(const uint8_t menuId, const uint8_t curParmV
 		break;
 	}
 	memcpy(buf,p,3);
+#undef MENU_ITEM
 
 }
 

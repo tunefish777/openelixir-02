@@ -1439,12 +1439,9 @@ static void buttonHandler_selectButtonPressed(uint8_t partNr)
 		// if shift is held and a part button is held down, we will enter automation record mode
 		// for that sub-step on the currently selected step.
 		// if shift is not held, we just do normal handling
-		if ( buttonHandler_stateMemory.selectButtonMode == SELECT_MODE_VOICE && buttonHandler_getShift()) {
-			//TODO hier muss selektiert werden!
-			buttonHandler_setTimeraction((uint8_t)(buttonHandler_selectedStep * 8 + partNr));
-		} else {
-			buttonHandler_handleSelectButton(partNr);
-		}
+		//(SHIFT + held select button armed step selectedStep*8+partNr for automation:
+		//the v1 sub step formula, up to 511 -> recorded far past the 64 steps of a track)
+		buttonHandler_handleSelectButton(partNr);
 
 	}
 
