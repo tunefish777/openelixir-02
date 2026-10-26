@@ -403,7 +403,7 @@ void led_clearActive_step()
 void led_updateSeqLeds()
 {
 	//prevent steps showing up in manual trigger edit mode  (perf) and in the engine menu
-	if(buttonHandler_getMode() != SELECT_MODE_PERF && buttonHandler_getMode() != SELECT_MODE_ENGINE)
+	if(buttonHandler_getMode() != SELECT_MODE_PERF && buttonHandler_getMode() != SELECT_MODE_ENGINE && menu_getActivePage() != VOICE_LOAD_PAGE)
 	{
 		uint8_t trackNr = menu_getActiveVoice();
 		uint8_t patternNr = menu_shownPattern;

@@ -112,6 +112,7 @@ enum PageNames
 	SONG_MODE_PAGE,
 
 	ENGINE_PAGE,	//engine menu (OpenElixir-02), drawn by engineMenu.c
+	VOICE_LOAD_PAGE,	//load a voice from another kit (OpenElixir-02), drawn by voiceLoad.c
 
 	//must be last... special case
 	//CLEAR_PAGE,

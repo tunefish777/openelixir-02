@@ -21,6 +21,7 @@
 #include "menu/screensaver.h"
 #include "menu/copyClearTools.h"
 #include "menu/engineMenu.h"
+#include "menu/voiceLoad.h"
 #include "config.h"
 #include "front.h"
 #include "Soundengine/globals.h"
@@ -968,7 +969,8 @@ static void buttonHandler_seqButtonPressed(uint8_t seqButtonPressed)
 			case SEQ_CLP:
 			case SEQ_CL_HH:
 			case SEQ_OP_HH:
-				//single instrument buttons
+				//single instrument buttons: load the voice from another kit
+				voiceLoad_open(seqButtonPressed);
 				break;
 
 			case SEQ_KIT: //kit
@@ -1577,6 +1579,10 @@ static void buttonHandler_voiceButtonPressed(uint8_t voiceNr)
 				else if (buttonHandler_stateMemory.selectButtonMode == SELECT_MODE_ENGINE) {
 					//engine menu of the new voice
 					engineMenu_open();
+				}
+				else if (menu_activePage == VOICE_LOAD_PAGE) {
+					//load menu of the new voice
+					voiceLoad_open(voiceNr);
 				}
 
 

@@ -85,6 +85,11 @@ uint32_t preset_patTimer = 0;
 uint8_t preset_kitDirty = 0;
 uint8_t preset_patDirty = 0;
 
+//name of a kit loaded from another project (it has no slot in the active project)
+static char preset_otherKitName[8];
+static uint8_t preset_otherKitLoaded = 0;
+
+
 //the engines of the RAM kit morphParameters points to (the active kit's if it
 //doesn't point to one yet: it is NULL during the first kit loads at boot)
 static uint8_t* preset_morphEngines()
@@ -889,6 +894,7 @@ void preset_loadDrumsetRam(uint8_t presetNr, uint8_t isMorph, uint8_t sendImmedi
 		//copy parameters to edit buffer
 		memcpy(activeParameters, mainParameters[presetNr], sizeof(uint8_t) * END_OF_SOUND_PARAMETERS);
 		memcpy(kitEngines, kitEngines_ram[presetNr], NUM_VOICE_SLOTS);
+		preset_otherKitLoaded = 0;
 		//if(activeParameters[PAR_PATTERN_MODE] = 1)
 		//load asociated morph kit as well
 
@@ -939,6 +945,8 @@ void preset_saveDrumsetRam(uint8_t presetNr, uint8_t isMorph)
 	{
 		//copy edit buffer to parameter array
 		memcpy(mainParameters[presetNr], activeParameters, sizeof(uint8_t) * END_OF_SOUND_PARAMETERS);
+		//the active kit now is this slot (also if it came from another project)
+		preset_otherKitLoaded = 0;
 	}
 	//a morphed kit keeps the engines of the source kit
 	memcpy(kitEngines_ram[presetNr], kitEngines, NUM_VOICE_SLOTS);
@@ -2696,6 +2704,185 @@ FRESULT preset_saveSongSD(uint8_t songNr)
 }
 
 
+//----------------------------------------------------
+//----------------------------------------------------
+//index of a kit file in a project folder: NN-NAME.SND (0-63) or the older
+//PNNN.SND (isOld = 1); -1 for any other file
+static int8_t preset_kitFileIndex(const char* fname, uint8_t* isOld)
+{
+	const char* dot = strchr(fname, '.');
+	if(!dot || strcasecmp(dot, ".snd") != 0)
+		return -1;
+	if(fname[0] >= '0' && fname[0] <= '9' && fname[1] >= '0' && fname[1] <= '9' && fname[2] == '-')
+	{
+		*isOld = 0;
+		const int8_t nr = (int8_t)((fname[0]-'0')*10 + (fname[1]-'0'));
+		return nr < NUM_KIT_SLOTS ? nr : -1;
+	}
+	if((fname[0] == 'p' || fname[0] == 'P') && dot - fname == 4)
+	{
+		*isOld = 1;
+		const int nr = atoi(&fname[1]);
+		return nr < NUM_KIT_SLOTS ? (int8_t)nr : -1;
+	}
+	return -1;
+}
+//----------------------------------------------------
+//find the file of a kit in a project folder (the NN- name wins over the old one)
+static FRESULT preset_findProjectKit(const char* folder, uint8_t kitNr, char* path)
+{
+	DIR dir;
+	FILINFO fno;
+	uint8_t found = 0;
+	FRESULT res = f_opendir(&dir, folder);
+	if(res != FR_OK)
+		return res;
+	while(f_readdir(&dir, &fno) == FR_OK && fno.fname[0])
+	{
+		uint8_t isOld;
+		if(preset_kitFileIndex(fno.fname, &isOld) == kitNr && (!found || !isOld))
+		{
+			sprintf(path, "%s/%s", folder, fno.fname);
+			found = isOld ? 1 : 2;
+			if(found == 2)
+				break;
+		}
+	}
+	f_closedir(&dir);
+	return found ? FR_OK : FR_NO_FILE;
+}
+//----------------------------------------------------
+FRESULT preset_scanProjectKits(uint8_t projectNr, char names[][8], uint8_t engines[][6], uint8_t* exists)
+{
+	//FatFs allows one open file or folder at a time (_FS_LOCK 1): first collect
+	//the kit files, then read them
+	static char kitFiles[NUM_KIT_SLOTS][13];
+	uint8_t isOldFile[NUM_KIT_SLOTS];
+	char folder[12];
+	char path[32];
+	DIR dir;
+	FILINFO fno;
+
+	memset(exists, 0, NUM_KIT_SLOTS);
+	sprintf(folder, "/proj%02d", projectNr);
+	FRESULT res = f_opendir(&dir, folder);
+	if(res != FR_OK)
+		return res;
+	while(f_readdir(&dir, &fno) == FR_OK && fno.fname[0])
+	{
+		uint8_t isOld;
+		const int8_t kit = preset_kitFileIndex(fno.fname, &isOld);
+		//the NN- name wins over the old one
+		if(kit < 0 || (exists[kit] && (isOld || !isOldFile[kit])))
+			continue;
+		strcpy(kitFiles[kit], fno.fname);
+		exists[kit] = 1;
+		isOldFile[kit] = isOld;
+	}
+	f_closedir(&dir);
+
+	for(uint8_t kit=0;kit<NUM_KIT_SLOTS;kit++)
+	{
+		if(!exists[kit])
+			continue;
+		exists[kit] = 0;
+		snprintf(path, sizeof(path), "%s/%.12s", folder, kitFiles[kit]);
+		if(f_open((FIL*)&SDFile, path, FA_OPEN_EXISTING | FA_READ) != FR_OK)
+			continue;
+		UINT bytesRead;
+		if(f_read((FIL*)&SDFile, names[kit], 8, &bytesRead) == FR_OK && bytesRead == 8
+				&& f_lseek((FIL*)&SDFile, 8 + END_OF_SOUND_PARAMETERS) == FR_OK)
+		{
+			preset_readEngines(engines[kit]);
+			exists[kit] = 1;
+		}
+		f_close((FIL*)&SDFile);
+	}
+	return FR_OK;
+}
+//----------------------------------------------------
+FRESULT preset_readProjectKit(uint8_t projectNr, uint8_t kitNr, uint8_t* params, uint8_t* engines)
+{
+	char folder[12];
+	char path[32];
+	sprintf(folder, "/proj%02d", projectNr);
+	FRESULT res = preset_findProjectKit(folder, kitNr, path);
+	if(res != FR_OK)
+		return res;
+	res = f_open((FIL*)&SDFile, path, FA_OPEN_EXISTING | FA_READ);
+	if(res != FR_OK)
+		return res;
+
+	UINT bytesRead = 0;
+	res = f_lseek((FIL*)&SDFile, 8);	//skip the name
+	if(res == FR_OK)
+		res = f_read((FIL*)&SDFile, params, END_OF_SOUND_PARAMETERS, &bytesRead);
+	if(res == FR_OK)
+	{
+		//like loading a kit: missing parameters 0, mod targets normalized
+		memset(params + bytesRead, 0, END_OF_SOUND_PARAMETERS - bytesRead);
+		const uint8_t nmt = getNumModTargets();
+		for(uint8_t i=0;i<6;i++)
+		{
+			if(params[PAR_VEL_DEST_1+i] >= nmt)
+				params[PAR_VEL_DEST_1+i] = 0;
+			if(params[PAR_TARGET_LFO1+i] >= nmt)
+				params[PAR_TARGET_LFO1+i] = 0;
+		}
+		preset_readEngines(engines);
+	}
+	f_close((FIL*)&SDFile);
+	return res;
+}
+//----------------------------------------------------
+FRESULT preset_saveProjectKit(uint8_t projectNr, uint8_t kitNr, char* name, const uint8_t* params, const uint8_t* engines)
+{
+	char folder[12];
+	char path[32];
+	char fileName[13];
+	FILINFO fno;
+	UINT bytesWritten;
+
+	sprintf(folder, "/proj%02d", projectNr);
+	FRESULT res = f_stat(folder, &fno);
+	if(res != FR_OK)
+		return res;
+
+	//the file name contains the kit name: remove the kit's old file first
+	while(preset_findProjectKit(folder, kitNr, path) == FR_OK)
+	{
+		res = f_unlink(path);
+		if(res != FR_OK)
+			return res;
+	}
+
+	preset_makeFileNameSave(fileName, kitNr, FEXT_SOUND, name);
+	snprintf(path, sizeof(path), "%s/%s", folder, fileName);
+	res = f_open((FIL*)&SDFile, path, FA_CREATE_ALWAYS | FA_WRITE);
+	if(res != FR_OK)
+		return res;
+	res = f_write((FIL*)&SDFile, name, 8, &bytesWritten);
+	if(res == FR_OK)
+		res = f_write((FIL*)&SDFile, params, END_OF_SOUND_PARAMETERS, &bytesWritten);
+	if(res == FR_OK)
+		res = preset_writeEngines(engines);
+	f_close((FIL*)&SDFile);
+	return res;
+}
+//----------------------------------------------------
+void preset_loadKitData(const uint8_t* params, const uint8_t* engines, const char* name)
+{
+	memcpy(activeParameters, params, END_OF_SOUND_PARAMETERS);
+	memcpy(kitEngines, engines, NUM_VOICE_SLOTS);
+	memcpy(preset_otherKitName, name, 8);
+	preset_otherKitLoaded = 1;
+	preset_sendDrumsetParameters();
+}
+//----------------------------------------------------
+const char* preset_activeKitName(void)
+{
+	return preset_otherKitLoaded ? preset_otherKitName : savefileNames[menu_loadedPresetNr[CURRENT_KIT]][KIT_NAMES];
+}
 //----------------------------------------------------
 void preset_loadProjectNames(uint8_t projectNr)
 {

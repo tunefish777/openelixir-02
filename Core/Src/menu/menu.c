@@ -27,6 +27,8 @@
 #include "menu/CcNr2Text.h"
 #include "menu/copyClearTools.h"
 #include "menu/engineMenu.h"
+#include "menu/voiceLoad.h"
+#include "menu/projectBrowse.h"
 #include "buttonHandler.h"
 #include <ctype.h>
 #include <frontPanelParser_ui.h>
@@ -797,21 +799,34 @@ uint8_t activeParameters[NUM_PARAMS];
 //uint8_t morphParameters[END_OF_SOUND_PARAMETERS];/**< a second array for sound x-fade to another preset*/
 uint8_t *morphParameters;
 //-----------------------------------------------------------------
-void copyNameToEditBuffer(uint8_t presetNr, uint8_t nameType)
+static void menu_copyStringToEditBuffer(const char* name)
 {
 	for(int i=0;i<8;i++)
 	{
 		nameEditBuffer[i] = 0; //Make sure to use blank space if character is not found
 		for(int j=0;j<NUM_CHARS;j++)
 		{
-			if(characterOrder[j] == savefileNames[presetNr][nameType][i])
+			if(characterOrder[j] == name[i])
 			{
 				nameEditBuffer[i] = j;
 				break;
 			}
 		}
 	}
-
+}
+//-----------------------------------------------------------------
+void copyNameToEditBuffer(uint8_t presetNr, uint8_t nameType)
+{
+	menu_copyStringToEditBuffer(savefileNames[presetNr][nameType]);
+}
+//-----------------------------------------------------------------
+//the name of the selected slot; for kits from the listed project (maybe another one)
+static void menu_copySelectedNameToEditBuffer()
+{
+	if(menu_saveOptions.category == SAVE_TYPE_KIT)
+		menu_copyStringToEditBuffer(projectBrowse_kitName(menu_selectedPresetNr[SAVE_TYPE_KIT]));
+	else
+		copyNameToEditBuffer(menu_selectedPresetNr[menu_saveOptions.category], menu_saveOptions.nameBuffer);
 }
 //-----------------------------------------------------------------
 void copyEditBufferToName(uint8_t presetNr, uint8_t nameType)
@@ -1191,6 +1206,10 @@ static void menu_repaintSimplePage()
 	{
 		engineMenu_repaint(editDisplayBuffer);
 	}
+	else if(menu_activePage == VOICE_LOAD_PAGE)
+	{
+		voiceLoad_repaint(editDisplayBuffer);
+	}
 	else if(copyClear_showClearMenu == 1)
 	{
 		strcpy(&editDisplayBuffer[0][0], "clear [");
@@ -1406,6 +1425,8 @@ static void menu_repaintLoadSavePage()
 	}
 
 	strcpy(&editDisplayBuffer[0][6],toptxt);
+	if(menu_saveOptions.category == SAVE_TYPE_KIT)
+		projectBrowse_repaintProjectNr(editDisplayBuffer[0]);
 	/*
 	if(menu_saveOptions.state == SAVE_STATE_EDIT_TYPE) {
 		if(editModeActive) {
@@ -1536,6 +1557,14 @@ static void menu_repaintLoadSavePage()
 				editDisplayBuffer[1][15] = 0;
 			//}
 		}
+	}
+
+	//kit list: "Change Project" and the project list instead of a kit
+	if(menu_saveOptions.category == SAVE_TYPE_KIT && menu_saveOptions.state == SAVE_STATE_EDIT_PRESET_NR
+			&& (projectBrowse.selecting || projectBrowse.changeRow))
+	{
+		memset(editDisplayBuffer[1], ' ', 16);
+		projectBrowse_repaint(editDisplayBuffer);
 	}
 }
 //-----------------------------------------------------------------
@@ -1975,7 +2004,7 @@ void menu_repaint()
 		menu_repaintLoadSavePage();
 
 	}
-	else if((menu_activePage >= PATTERN_LOAD_PAGE  && menu_activePage <= SONG_MODE_PAGE) || (copyClear_showClearMenu == 1) || engineMenu_shown)
+	else if((menu_activePage >= PATTERN_LOAD_PAGE  && menu_activePage <= SONG_MODE_PAGE) || (copyClear_showClearMenu == 1) || engineMenu_shown || menu_activePage == VOICE_LOAD_PAGE)
 	{
 		menu_repaintSimplePage();
 	}
@@ -2144,6 +2173,14 @@ void menu_handleLoadSaveMenu(int8_t inc, uint8_t btnClicked)
 	// when this is called, edit mode will have already been set or cleared. this is only
 	// called when something has changed
 
+	//kit list: "Change Project" (below kit 0) and the project list
+	if(btnClicked && menu_saveOptions.category == SAVE_TYPE_KIT && menu_saveOptions.state == SAVE_STATE_EDIT_PRESET_NR
+			&& projectBrowse_click(menu_activePage == SAVE_PAGE))
+	{
+		menu_copySelectedNameToEditBuffer();
+		btnClicked = 0;
+	}
+
 	//---- handle the button ----
 	if(btnClicked) {
 		//if the ok button is active or we are in global save and ok is active, save/load the preset on click
@@ -2170,7 +2207,26 @@ void menu_handleLoadSaveMenu(int8_t inc, uint8_t btnClicked)
 				{
 				case SAVE_STATE_EDIT_PRESET_NR:
 					//click -> change name [y/N]
-					if(preset_isNameEmpty(savefileNames[menu_selectedPresetNr[menu_saveOptions.category]][menu_saveOptions.nameBuffer]))
+					if(menu_saveOptions.category == SAVE_TYPE_KIT && projectBrowse_isOther())
+					{
+						//into another project: the active kit with all its settings and
+						//its name, without a name dialog (renaming: save into a slot of
+						//the active project)
+						char name[8];
+						memcpy(name, preset_activeKitName(), 8);
+						const FRESULT res = projectBrowse_saveKit(menu_selectedPresetNr[SAVE_TYPE_KIT], name);
+						if(res != FR_OK)
+						{
+							menu_showSdError(res);
+						}
+						else
+						{
+							menu_activePage = KIT_SAVE_PAGE_OK;
+							sucessTimer = systick_ticks;
+							menu_repaint();
+						}
+					}
+					else if(preset_isNameEmpty(savefileNames[menu_selectedPresetNr[menu_saveOptions.category]][menu_saveOptions.nameBuffer]))
 					{
 						menu_saveOptions.state = SAVE_STATE_EDIT_NAME1;
 						sprintf(savefileNames[menu_selectedPresetNr[menu_saveOptions.category]][menu_saveOptions.nameBuffer], "Unnamed");
@@ -2212,8 +2268,6 @@ void menu_handleLoadSaveMenu(int8_t inc, uint8_t btnClicked)
 							break;
 
 						case SAVE_TYPE_KIT:
-
-
 							preset_saveDrumsetRam(menu_selectedPresetNr[SAVE_TYPE_KIT],0);
 
 							//save to tmp folder
@@ -2320,7 +2374,11 @@ void menu_handleLoadSaveMenu(int8_t inc, uint8_t btnClicked)
 						if(type != NUM_CURRENT)
 						{
 							//TODO: check naming here!
-							copyNameToEditBuffer(menu_loadedPresetNr[type],menu_saveOptions.nameBuffer );
+							//(a kit: the name of the kit the active kit was loaded from, also from another project)
+							if(type == CURRENT_KIT)
+								menu_copyStringToEditBuffer(preset_activeKitName());
+							else
+								copyNameToEditBuffer(menu_loadedPresetNr[type],menu_saveOptions.nameBuffer );
 							//memcpy((void*)savefileNames[menu_selectedPresetNr[menu_saveOptions.category]][menu_saveOptions.nameBuffer], (const void*)savefileNames[menu_loadedPresetNr[type]][menu_saveOptions.nameBuffer],8);
 						}
 					}
@@ -2345,6 +2403,26 @@ void menu_handleLoadSaveMenu(int8_t inc, uint8_t btnClicked)
 				switch(menu_saveOptions.category) {
 
 				case SAVE_TYPE_KIT:
+					if(projectBrowse_isOther())
+					{
+						//a kit of another project replaces the active kit, with all its settings
+						if(projectBrowse_kitExists(menu_selectedPresetNr[SAVE_TYPE_KIT]))
+						{
+							static uint8_t params[END_OF_SOUND_PARAMETERS];
+							uint8_t engines[NUM_VOICE_SLOTS];
+							const FRESULT res = projectBrowse_readKit(menu_selectedPresetNr[SAVE_TYPE_KIT], params, engines);
+							if(res == FR_OK)
+							{
+								preset_loadKitData(params, engines, projectBrowse_kitName(menu_selectedPresetNr[SAVE_TYPE_KIT]));
+								menu_TargetVoiceGapIndex = getModTargetGapIndex(activeParameters[PAR_TARGET_LFO1 + menu_activeVoice]);
+							}
+							else
+							{
+								menu_showSdError(res);
+							}
+						}
+						break;
+					}
 #if 1
 
 					preset_loadDrumsetRam(menu_selectedPresetNr[menu_saveOptions.category],0, 0);
@@ -2519,6 +2597,11 @@ void menu_handleLoadSaveMenu(int8_t inc, uint8_t btnClicked)
 			*/
 
 		case SAVE_STATE_EDIT_PRESET_NR: //switch(menu_saveOptions.state) - edit preset nr
+			if(menu_saveOptions.category == SAVE_TYPE_KIT && projectBrowse_encoder(inc, &menu_selectedPresetNr[SAVE_TYPE_KIT]))
+			{
+				menu_copySelectedNameToEditBuffer();
+				break;
+			}
 			if(inc<0) {
 				if(menu_selectedPresetNr[menu_saveOptions.category]+inc>=0)	{
 					DISABLE_CONV_WARNING
@@ -2551,7 +2634,7 @@ void menu_handleLoadSaveMenu(int8_t inc, uint8_t btnClicked)
 					}
 				}
 			}
-			copyNameToEditBuffer(menu_selectedPresetNr[menu_saveOptions.category],menu_saveOptions.nameBuffer );
+			menu_copySelectedNameToEditBuffer();
 			break; //switch(menu_saveOptions.state) - edit preset nr
 		case SAVE_STATE_CHANGE_NAME_DIALOG_N:
 		case SAVE_STATE_CHANGE_NAME_DIALOG_Y:
@@ -2894,6 +2977,10 @@ void menu_parseEncoder(int8_t inc, uint8_t button)
 			{
 				engineMenu_apply();
 			}
+			else if(menu_activePage == VOICE_LOAD_PAGE)
+			{
+				voiceLoad_click();
+			}
 			else if (copyClear_Mode == MODE_CLEAR)
 			{
 				//execute
@@ -2958,6 +3045,9 @@ void menu_parseEncoder(int8_t inc, uint8_t button)
 		//============================= handle encoder change ==============================
 		if(engineMenu_shown) {
 			engineMenu_encoder(inc);
+			return;
+		} else if(menu_activePage == VOICE_LOAD_PAGE) {
+			voiceLoad_encoder(inc);
 			return;
 		} else if(copyClear_isClearModeActive()) {
 			//encoder selects clear target
@@ -3287,6 +3377,7 @@ checkvalid:
 void menu_setLoadSaveCategory(uint8_t cat)
 {
 	menu_saveOptions.category = cat;
+	projectBrowse_reset();
 
 	switch(menu_saveOptions.category) {
 		default:
@@ -3408,6 +3499,8 @@ void menu_switchPage(uint8_t pageNr)
 	//leaving the engine menu: stop the KIT button blinking
 	if(menu_activePage == ENGINE_PAGE && pageNr != ENGINE_PAGE)
 		led_setBlinkLed(LED_STEP8, 0);
+	if(menu_activePage == VOICE_LOAD_PAGE && pageNr != VOICE_LOAD_PAGE)
+		voiceLoad_leave();
 
 	//autosave config page settings
 	/*

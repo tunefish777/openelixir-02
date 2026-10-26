@@ -414,12 +414,67 @@ static int mapTest(void)
 #endif
 #endif
 
+#if KIT_ENGINES_API >= 3
+//loading a voice from another kit (LOAD + voice): the slot gets the other kit's
+//values and engine, the other voices stay as they are, the LFO target only
+//comes along if that LFO modulated the voice itself
+static int loadVoiceTest(void)
+{
+	static uint8_t kit[END_OF_SOUND_PARAMETERS], before[END_OF_SOUND_PARAMETERS];
+	int fail = 0, peak, nan = 0;
+	for(uint8_t slot = 0; slot < NUM_VOICE_SLOTS; slot++)
+	{
+		for(uint8_t engine = 0; engine < NUM_ENGINES; engine++)
+		{
+			loadKit(0);
+			kitEngines_setStock(kitEngines);
+			kitEngines_apply();
+			for(uint16_t par = 1; par < END_OF_SOUND_PARAMETERS; par++)
+				kit[par] = skipParam(par) ? 0 : randomValue(par);
+			const uint8_t lfoOnItself = (slot + engine) % 2;
+			kit[PAR_VOICE_LFO1 + slot] = lfoOnItself ? slot + 1 : (slot + 1) % NUM_VOICE_SLOTS + 1;
+			kit[PAR_TARGET_LFO1 + slot] = pgm_read_byte(&modTargetVoiceOffsets[kit[PAR_VOICE_LFO1 + slot] - 1].start) + 2;
+			kit[PAR_VEL_DEST_1 + slot] = pgm_read_byte(&modTargetVoiceOffsets[slot].start) + 1;
+			memcpy(before, activeParameters, sizeof(before));
+
+			kitEngines_loadVoice(slot, engine, kit);
+
+			int bad = voiceSlots[slot].engine != engine || kitEngines[slot] != engine;
+			for(uint16_t par = 1; par < END_OF_SOUND_PARAMETERS; par++)
+			{
+				const uint8_t owner = kitEngines_slotOfParam(par);
+				if(par == PAR_TARGET_LFO1 + slot)
+					bad |= activeParameters[par] != (lfoOnItself ? kit[par] : 0);
+				else if(par == PAR_VOICE_LFO1 + slot)
+					bad |= activeParameters[par] != slot + 1;
+				else if(owner == slot)
+					bad |= activeParameters[par] != kit[par];
+				else if(!(par >= PAR_TARGET_LFO1 && par <= PAR_TARGET_LFO6) && !(par >= PAR_VEL_DEST_1 && par <= PAR_VEL_DEST_6))
+					bad |= activeParameters[par] != before[par];	//other voices (their targets may be turned off)
+			}
+			voiceControl_noteOn(slot, 60, 127);
+			bad |= renderSound(800, &peak, &nan) == 0 && kit[PAR_VOL1 + slot] > 10;
+			if(bad)
+			{
+				printf("  load voice: slot %u engine %u FAILED\n", slot + 1, engine);
+				fail = 1;
+			}
+		}
+	}
+	printf("load voice from another kit: %s\n", fail || nan ? "FAILED" : "ok");
+	return fail || nan;
+}
+#endif
+
 //every slot gets every engine: each track must sound, track 7 must use decay B,
 //track 6 must cut track 7, and the engine specific parameters must reach the engine
 static int engineTest(void)
 {
 	static const char* const names[NUM_ENGINES] = { "drum", "snare", "cymbal", "hihat" };
 	int fail = 0, peak, nan = 0;
+#if KIT_ENGINES_API >= 3
+	fail |= loadVoiceTest();
+#endif
 #ifdef HAVE_KIT_ENGINES
 	fail |= blockTest();
 #if KIT_ENGINES_API >= 2

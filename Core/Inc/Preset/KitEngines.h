@@ -32,7 +32,7 @@
 #define KIT_ENGINES_BLOCK_SIZE	(5 + NUM_VOICE_SLOTS)
 
 //version of this interface (for the host tests, which also build older trees)
-#define KIT_ENGINES_API		2
+#define KIT_ENGINES_API		3
 
 extern uint8_t kitEngines[NUM_VOICE_SLOTS];							//the active kit
 extern uint8_t kitEngines_ram[NUM_KIT_SLOTS][NUM_VOICE_SLOTS];		//the kits in RAM (mainParameters)
@@ -43,6 +43,10 @@ void kitEngines_setStock(uint8_t* engines);
 
 //change the engine of a slot in the active kit
 void kitEngines_assign(const uint8_t slot, const uint8_t engine);
+
+//load a voice from another kit (its parameters kit[], END_OF_SOUND_PARAMETERS)
+//into the same slot of the active kit, with its engine
+void kitEngines_loadVoice(const uint8_t slot, const uint8_t engine, const uint8_t* kit);
 
 //set the sound engine's slots to the active kit's engines (before the kit's
 //parameters are sent)

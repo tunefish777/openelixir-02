@@ -21,6 +21,34 @@ off, and modulation and step automation of its engine specific settings are turn
 
 The menu pages, value ranges and modulation target names of a slot follow its engine.
 
+## Loading a voice from another kit
+
+Hold LOAD and press one of the step buttons 1-7 (Drum 1 ... OP HH) to load that voice from another
+kit, also from other projects, into the active kit. The top line shows "Load: Drum 1", the bottom
+line a kit with its number, name and the engine the voice has there. Turn the encoder to choose the
+kit and press the encoder button to load the voice; the menu stays open, so several kits can be
+tried one after the other, and the voice buttons switch to another voice.
+
+"Change Project" (below kit 0) lists the projects ("Select Project:"); confirming one lists its kits
+(its number is shown at the end of the top line). The active project's kits come from memory,
+including unsaved changes, like in the load kit menu; other projects' from the SD card. Kits that
+were never saved show "Empty".
+
+The voice is loaded completely: its engine and all its sound parameters, volume, pan, output and LFO.
+Its LFO target comes along only if that LFO modulated the voice itself. CL HH and OP HH both load
+slot 6 (both decays). If the engine changes, the same rules apply as in the engine menu.
+
+## Kits from other projects
+
+The load kit and save kit menus (LOAD/SAVE + KIT) have "Change Project" below kit 0 as well:
+
+- **Load** a kit of another project: it replaces all parameters of the active kit (all voices,
+  engines, LFOs incl. targets in other voices, FX, ...). Nothing is written, neither a kit slot nor
+  the autosave; save it yourself afterwards (into any slot of any project, renaming it if you like).
+- **Save** the active kit into another project: the encoder button on a slot saves it there right
+  away with the kit's name (the name of the kit it was loaded from), without the name dialog. To
+  rename it, save it into a slot of the active project. Only existing projects can be chosen.
+
 ## Kits
 
 The engines are saved in kits, projects and the autosave (a block after the 247 parameter bytes of

@@ -95,6 +95,20 @@ FRESULT preset_loadProject(uint8_t presetNr, uint8_t clearTmp);
 FRESULT preset_createProject(uint8_t presetNr);
 void preset_loadProjectNames(uint8_t projectNr);
 
+//Kits of a project folder on the SD card, without changing the current folder
+//or anything loaded. Kit files are NN-NAME.snd (or the older pNNN.snd).
+//names/engines of all kits of a project (exists[kit] = 0 for kits without a file)
+FRESULT preset_scanProjectKits(uint8_t projectNr, char names[][8], uint8_t engines[][6], uint8_t* exists);
+//parameters (END_OF_SOUND_PARAMETERS) and engines of one kit
+FRESULT preset_readProjectKit(uint8_t projectNr, uint8_t kitNr, uint8_t* params, uint8_t* engines);
+//save a kit into an existing project folder (replaces the kit's old file)
+FRESULT preset_saveProjectKit(uint8_t projectNr, uint8_t kitNr, char* name, const uint8_t* params, const uint8_t* engines);
+//the active kit becomes these parameters and engines (a kit from another
+//project); nothing is written (no RAM kit, no autosave) until the user saves it
+void preset_loadKitData(const uint8_t* params, const uint8_t* engines, const char* name);
+//the name of the active kit: the kit it was loaded from (8 characters)
+const char* preset_activeKitName(void);
+
 FRESULT preset_loadSongSD(uint8_t songNr);
 FRESULT preset_saveSongSD(uint8_t songNr);
 

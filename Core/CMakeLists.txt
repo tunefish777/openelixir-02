@@ -54,6 +54,8 @@ add_library(lxr_ui OBJECT
     Src/menu/Cc2Text.c
     Src/menu/copyClearTools.c
     Src/menu/engineMenu.c
+    Src/menu/projectBrowse.c
+    Src/menu/voiceLoad.c
     Src/menu/menu.c
     Src/menu/screensaver.c
 )

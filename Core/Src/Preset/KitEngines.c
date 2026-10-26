@@ -185,10 +185,75 @@ static uint8_t kitEngines_initValue(const uint8_t par)
 	return par < INIT_KIT_SIZE - 8 ? initKit[8 + par] : 0;
 }
 //---------------------------------------------------
-static void kitEngines_turnOffTarget(const uint8_t par, const uint8_t status, const uint8_t voice)
+//send a mod target (index into modTargets) of a voice's LFO or velocity modulation
+static void kitEngines_sendTarget(const uint8_t status, const uint8_t voice, const uint8_t target)
 {
-	activeParameters[par] = 0;
-	frontPanel_sendData(status, (uint8_t)(voice<<1), 0);
+	const uint8_t par = (uint8_t)modTargets[target].param;
+	frontPanel_sendData(status, (uint8_t)(((par&0x80)>>7) | (voice<<1)), par&0x7f);
+}
+//---------------------------------------------------
+static void kitEngines_setTarget(const uint8_t par, const uint8_t status, const uint8_t voice, const uint8_t target)
+{
+	activeParameters[par] = target;
+	kitEngines_sendTarget(status, voice, target);
+}
+//---------------------------------------------------
+//after the engine of a slot changed: modulation of its engine specific
+//parameters by the other voices and step automation of them would now change
+//a different setting, turn it off
+static void kitEngines_turnOffRoleModulation(const uint8_t slot)
+{
+	for(uint8_t i=0;i<NUM_VOICE_SLOTS;i++)
+	{
+		if(i == slot)
+			continue;
+		if(kitEngines_isRolePar(slot, modTargets[activeParameters[PAR_TARGET_LFO1+i]].param))
+		{
+			kitEngines_setTarget(PAR_TARGET_LFO1+i, CC_LFO_TARGET, i, 0);
+		}
+		if(kitEngines_isRolePar(slot, modTargets[activeParameters[PAR_VEL_DEST_1+i]].param))
+		{
+			kitEngines_setTarget(PAR_VEL_DEST_1+i, CC_VELO_TARGET, i, 0);
+		}
+	}
+
+	for(uint8_t pattern=0;pattern<NUM_PATTERN;pattern++)
+	{
+		for(uint8_t track=0;track<NUM_TRACKS;track++)
+		{
+			for(uint8_t step=0;step<NUM_STEPS;step++)
+			{
+				Step* st = &seq_patternSet.seq_subStepPattern[pattern][track][step];
+				if(kitEngines_isRolePar(slot, st->param1Nr))
+				{
+					st->param1Nr = NO_AUTOMATION;
+					st->param1Val = 0;
+				}
+				if(kitEngines_isRolePar(slot, st->param2Nr))
+				{
+					st->param2Nr = NO_AUTOMATION;
+					st->param2Val = 0;
+				}
+			}
+		}
+	}
+}
+//---------------------------------------------------
+//the slot's parameters in activeParameters are set: send them to the sound engine
+static void kitEngines_sendSlot(const uint8_t slot, const uint8_t* list)
+{
+	//autosave (tmp.snd) like any other kit edit
+	preset_touchTimer(PRESET_KIT_TIMER);
+
+	for(uint8_t i=0;i<NUM_SLOT_PARAMS;i++)
+	{
+		kitEngines_sendPar(list[i]);
+	}
+	if(slot == NUM_VOICE_SLOTS-1)
+	{
+		kitEngines_sendPar(PAR_VELOD6_OPEN);
+	}
+	menu_repaint();
 }
 //---------------------------------------------------
 void kitEngines_assign(const uint8_t slot, const uint8_t engine)
@@ -219,58 +284,51 @@ void kitEngines_assign(const uint8_t slot, const uint8_t engine)
 	//the slot's own LFO and velocity modulation start off (copied targets would
 	//point at the stock slot's voice); the LFO's voice is the slot itself
 	activeParameters[PAR_VOICE_LFO1+slot] = slot+1;
-	kitEngines_turnOffTarget(PAR_TARGET_LFO1+slot, CC_LFO_TARGET, slot);
-	kitEngines_turnOffTarget(PAR_VEL_DEST_1+slot, CC_VELO_TARGET, slot);
+	kitEngines_setTarget(PAR_TARGET_LFO1+slot, CC_LFO_TARGET, slot, 0);
+	kitEngines_setTarget(PAR_VEL_DEST_1+slot, CC_VELO_TARGET, slot, 0);
 
-	//modulation of the slot's engine specific parameters by other voices would
-	//now change a different setting: turn it off
-	for(uint8_t i=0;i<NUM_VOICE_SLOTS;i++)
-	{
-		if(kitEngines_isRolePar(slot, modTargets[activeParameters[PAR_TARGET_LFO1+i]].param))
-		{
-			kitEngines_turnOffTarget(PAR_TARGET_LFO1+i, CC_LFO_TARGET, i);
-		}
-		if(kitEngines_isRolePar(slot, modTargets[activeParameters[PAR_VEL_DEST_1+i]].param))
-		{
-			kitEngines_turnOffTarget(PAR_VEL_DEST_1+i, CC_VELO_TARGET, i);
-		}
-	}
-
-	//the same for step automation in the patterns in RAM
-	for(uint8_t pattern=0;pattern<NUM_PATTERN;pattern++)
-	{
-		for(uint8_t track=0;track<NUM_TRACKS;track++)
-		{
-			for(uint8_t step=0;step<NUM_STEPS;step++)
-			{
-				Step* st = &seq_patternSet.seq_subStepPattern[pattern][track][step];
-				if(kitEngines_isRolePar(slot, st->param1Nr))
-				{
-					st->param1Nr = NO_AUTOMATION;
-					st->param1Val = 0;
-				}
-				if(kitEngines_isRolePar(slot, st->param2Nr))
-				{
-					st->param2Nr = NO_AUTOMATION;
-					st->param2Val = 0;
-				}
-			}
-		}
-	}
-
-	//autosave (tmp.snd) like any other kit edit
-	preset_touchTimer(PRESET_KIT_TIMER);
+	kitEngines_turnOffRoleModulation(slot);
 
 	//the voice was re-initialized: send all its parameters
+	kitEngines_sendSlot(slot, list);
+}
+//---------------------------------------------------
+void kitEngines_loadVoice(const uint8_t slot, const uint8_t engine, const uint8_t* kit)
+{
+	if(slot >= NUM_VOICE_SLOTS || engine >= NUM_ENGINES)
+		return;
+
+	const uint8_t engineChanged = kitEngines[slot] != engine;
+	kitEngines[slot] = engine;
+	slot_setEngine(slot, engine);
+	menu_updateVoicePages();
+
+	//the same slot of the other kit: the parameters have the same numbers
+	uint8_t list[NUM_SLOT_PARAMS];
+	kitEngines_slotParams(slot, list);
 	for(uint8_t i=0;i<NUM_SLOT_PARAMS;i++)
 	{
-		kitEngines_sendPar(list[i]);
+		activeParameters[list[i]] = kit[list[i]];
 	}
 	if(slot == NUM_VOICE_SLOTS-1)
 	{
-		kitEngines_sendPar(PAR_VELOD6_OPEN);
+		activeParameters[PAR_VELOD6_OPEN] = kit[PAR_VELOD6_OPEN];
 	}
-	menu_repaint();
+
+	//velocity modulation always targets the voice itself; the LFO only if it
+	//did so in the other kit (a target in another voice of that kit would
+	//modulate an unrelated voice here)
+	kitEngines_setTarget(PAR_VEL_DEST_1+slot, CC_VELO_TARGET, slot, kit[PAR_VEL_DEST_1+slot]);
+	const uint8_t lfoOnItself = kit[PAR_VOICE_LFO1+slot] == slot+1;
+	activeParameters[PAR_VOICE_LFO1+slot] = slot+1;
+	kitEngines_setTarget(PAR_TARGET_LFO1+slot, CC_LFO_TARGET, slot, lfoOnItself ? kit[PAR_TARGET_LFO1+slot] : 0);
+
+	if(engineChanged)
+	{
+		kitEngines_turnOffRoleModulation(slot);
+	}
+
+	kitEngines_sendSlot(slot, list);
 }
 //---------------------------------------------------
 void kitEngines_apply(void)
