@@ -482,7 +482,9 @@ if(sd_card_ok)
 			lcd_string(PSTR("glo.cfg error"));
 			lcd_setcursor(0,2);
 			lcd_string("Using defaults.");
-			preset_createGlobals();
+			//don't write: the damaged file stays until the next settings/project save
+			preset_loadDefaultGlobals();
+			menu_sendAllGlobals();
 			HAL_Delay(1000);
 
 		}
@@ -848,6 +850,7 @@ if(sd_card_ok)
 	{
 		preset_loadDrumsetRam(seq_patternSet.kitNr[seq_activePattern], 0, 1);
 		menu_selectedPresetNr[SAVE_TYPE_KIT] = seq_patternSet.kitNr[seq_activePattern];
+		menu_loadedPresetNr[CURRENT_KIT] = seq_patternSet.kitNr[seq_activePattern];
 	}
 #endif
 

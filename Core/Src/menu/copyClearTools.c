@@ -48,7 +48,7 @@ void copyClear_executeClear()
 	{
 		default:
 		case CLEAR_KIT:
-			preset_init(menu_selectedPresetNr[SAVE_TYPE_KIT]);
+			preset_init(menu_loadedPresetNr[CURRENT_KIT]);
 			break;
 		case CLEAR_TRACK:
 			copyClear_clearCurrentTrack();
