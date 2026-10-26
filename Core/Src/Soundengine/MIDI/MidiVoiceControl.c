@@ -41,11 +41,9 @@ void voiceControl_noteOn(uint8_t voice, uint8_t note, uint8_t vel)
 	}
 	*/
 
-	if (active_voices & (1<<voice))
-	{
-    uint8_t midiChan = midi_MidiChannels[voice];
-		seq_sendMidiNoteOn(midiChan, note, vel);
-	}
+	//MIDI out: the callers send the note (sequencer: seq_triggerVoice, MIDI in:
+	//midiParser_noteOn) after a note off; sending it here too doubled every note
+	//and only the second one got a note off
 
 	// Send to front panel so it can pulse the LED
 	uart_sendFrontpanelByte(NOTE_ON);

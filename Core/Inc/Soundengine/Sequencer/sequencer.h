@@ -22,6 +22,16 @@
 #include "Preset/SeqStep.h"
 #include "Parameters.h"
 
+//Step automation stores its target like a received MIDI CC: parameters 1-127 as
+//parameter+1 (the CC number), parameters >= 128 as the parameter number; 0 and
+//0xff (NO_AUTOMATION) mean no target. Returns the target parameter, PAR_NONE if none.
+static inline uint16_t seq_automationTarget(const uint8_t stored)
+{
+	if(stored == 0 || stored == 0xff)
+		return PAR_NONE;
+	return stored < 128 ? (uint16_t)(stored - 1) : stored;
+}
+
  /**<
   * we have 6 voices
   * 3 drums

@@ -106,24 +106,27 @@ static void buttonHandler_armTimerActionStep(int8_t stepNr) {
 
   /////////////////////
 
+  //the held step of the active track (was track 0, voice 1, whatever voice was selected);
+  //the target decoded like the sequencer does (was -1 for all, wrong for parameters >= 128)
   PatternSet* patSet = get_seq_patternSet_p();
-  uint8_t parNr = patSet->seq_subStepPattern[seq_activePattern][0][stepNr].param1Nr - 1;
+  const Step* step = &patSet->seq_subStepPattern[seq_activePattern][menu_getActiveVoice()][stepNr];
+  uint16_t parNr = seq_automationTarget(step->param1Nr);
 
-  if (parNr != 254)
+  if (parNr != PAR_NONE)
   {
     buttonHandler_originalValue[0] = activeParameters[parNr];
-    activeParameters[parNr] = patSet->seq_subStepPattern[seq_activePattern][0][stepNr].param1Val;
+    activeParameters[parNr] = step->param1Val;
 
     buttonHandler_originalParameter[0] = parNr;
     buttonHandler_resetLock1 = 1;
   }
 
-  parNr = patSet->seq_subStepPattern[seq_activePattern][0][stepNr].param2Nr - 1;
+  parNr = seq_automationTarget(step->param2Nr);
 
-  if (parNr != 254)
+  if (parNr != PAR_NONE)
   {
     buttonHandler_originalValue[1] = activeParameters[parNr];
-    activeParameters[parNr] = patSet->seq_subStepPattern[seq_activePattern][0][stepNr].param2Val;
+    activeParameters[parNr] = step->param2Val;
   
     buttonHandler_originalParameter[1] = parNr;
     buttonHandler_resetLock2 = 1;
@@ -257,6 +260,11 @@ static void buttonHandler_disarmTimerActionStep() {
         menu_repaintAll();
       }
 		}
+
+		//free both lock slots for the next held step (they stayed taken, so the
+		//next lock took the "both taken" path in menu.c and wiped automation)
+		buttonHandler_originalParameter[0] = 0;
+		buttonHandler_originalParameter[1] = 0;
 		return;
 	}
 
@@ -912,7 +920,9 @@ static void buttonHandler_seqButtonPressed(uint8_t seqButtonPressed)
 			break;
 
 		case SEQ_CONFIG: //config
-			buttonHandler_stateMemory.selectButtonMode = SEQ_CONFIG;
+			//(was SEQ_CONFIG, a step button number equal to SELECT_MODE_LAST_STEP_ALL:
+			//the next step press set the length of all tracks)
+			buttonHandler_stateMemory.selectButtonMode = SELECT_MODE_MENU;
 			led_clearAllBlinkLeds();
 			led_setBlinkLed(LED_STEP12,1);
 			menu_switchPage(MENU_MIDI_PAGE);

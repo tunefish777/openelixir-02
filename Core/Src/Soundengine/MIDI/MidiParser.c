@@ -1664,8 +1664,10 @@ void midiParser_parseMidiMessage(MidiMsg msg)
 			{
 				if((midiParser_txRxFilter & MIDI_FILTER_CC) && (midiParser_isValidChannel(chanonly) ))
 				{
-					//record automation if record is turned on
-					seq_recordAutomation(frontParser_activeTrack, msg.data1, msg.data2);
+					//record automation if record is turned on (not bank select and the
+					//NRPN control CCs: they are no sound parameters)
+					if(msg.data1 != CC_BANK_CHANGE && msg.data1 != NRPN_DATA_ENTRY_COARSE && msg.data1 != NRPN_FINE && msg.data1 != NRPN_COARSE)
+						seq_recordAutomation(frontParser_activeTrack, msg.data1, msg.data2);
 
 					//handle midi data
 					midiParser_ccHandler(msg,1, 0, 0.f);
@@ -1679,9 +1681,12 @@ void midiParser_parseMidiMessage(MidiMsg msg)
 			{
 
 				// respond to CC message. This responds only when global channel or voice channel matches the cc message's channel
-				if((midiParser_txRxFilter & MIDI_FILTER_CC) && ((chanonly == midi_MidiChannels[voiceNr]) || (chanonly == midi_MidiChannels[7]) )) {
-					//record automation if record is turned on
-					seq_recordAutomation(frontParser_activeTrack, msg.data1, msg.data2);
+				// (voiceNr is 1-based here, midi_MidiChannels 0-based)
+				if((midiParser_txRxFilter & MIDI_FILTER_CC) && ((chanonly == midi_MidiChannels[voiceNr-1]) || (chanonly == midi_MidiChannels[7]) )) {
+					//record automation if record is turned on (not bank select and the
+					//NRPN control CCs: they are no sound parameters)
+					if(msg.data1 != CC_BANK_CHANGE && msg.data1 != NRPN_DATA_ENTRY_COARSE && msg.data1 != NRPN_FINE && msg.data1 != NRPN_COARSE)
+						seq_recordAutomation(frontParser_activeTrack, msg.data1, msg.data2);
 
 					//handle midi data
 					midiParser_ccHandler(msg,1, 0, 0.f);
@@ -1751,6 +1756,20 @@ void midiParser_parseUartData(unsigned char data)
   // {
   //   return;
   // }
+
+	/* System realtime bytes (clock, start, stop, ...) may come between the bytes of
+	   any other message: handle them on their own, without touching the message
+	   being received (or MIDI thru would send them with its data bytes) */
+	if(data >= 0xF8)
+	{
+		MidiMsg realtime = midiMsg_tmp;
+		realtime.status = data;
+		realtime.bits.length = 0;
+		realtime.bits.sysxbyte = 0;
+		realtime.bits.source = midiSourceMIDI;
+		midiParser_parseMidiMessage(realtime);
+		return;
+	}
 
 	if(data & 0x80)
   {

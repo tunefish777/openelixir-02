@@ -224,12 +224,12 @@ static void kitEngines_turnOffRoleModulation(const uint8_t slot)
 			for(uint8_t step=0;step<NUM_STEPS;step++)
 			{
 				Step* st = &seq_patternSet.seq_subStepPattern[pattern][track][step];
-				if(kitEngines_isRolePar(slot, st->param1Nr))
+				if(kitEngines_isRolePar(slot, seq_automationTarget(st->param1Nr)))
 				{
 					st->param1Nr = NO_AUTOMATION;
 					st->param1Val = 0;
 				}
-				if(kitEngines_isRolePar(slot, st->param2Nr))
+				if(kitEngines_isRolePar(slot, seq_automationTarget(st->param2Nr)))
 				{
 					st->param2Nr = NO_AUTOMATION;
 					st->param2Val = 0;

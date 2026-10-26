@@ -115,7 +115,11 @@ void frontPanel_ccHandler()
 	DISABLE_SIGN_WARNING
 	if(parNr == 255/*PAR_BANK_CHANGE*/)
 	{
-		menu_selectedPresetNr[0] = frontParser_midiMsg.data2;
+		//there are NUM_KIT_SLOTS kits
+		if(frontParser_midiMsg.data2 >= NUM_KIT_SLOTS)
+			return;
+		menu_selectedPresetNr[SAVE_TYPE_KIT] = frontParser_midiMsg.data2;
+		menu_loadedPresetNr[CURRENT_KIT] = frontParser_midiMsg.data2;
 		//preset_loadDrumset(frontParser_midiMsg.data2, 0);
 		preset_loadDrumsetRam(frontParser_midiMsg.data2,0, 0);
 		preset_touchTimer(PRESET_KIT_TIMER);

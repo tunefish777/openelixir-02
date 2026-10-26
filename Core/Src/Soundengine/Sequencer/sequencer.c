@@ -368,7 +368,7 @@ float seq_getDeltaTShuffleDelay(uint16_t bpm)
 	//--- calc deltaT ----
 	// for 4/4tel takt -> 1 beat = 4 main steps = 4*8 = 32 sub steps
 	// 120 bpm 4/4tel = 120 * 1 beat / 60sec = 120 * 32 in 60 sec;
-	dT 	= (1000*60)/bpm; 	//bei 12 = 500ms = time for one beat
+	dT 	= (1000*60.f)/bpm; 	//bei 12 = 500ms = time for one beat (float: the integer division ran up to 0.2 % fast)
 	dT /= 96.f; //we run the internal clock at 96ppq -> seq clock 32 ppq == prescaler 3, midi clock 24 ppq == prescale 4
 	dT *= 4;
 	//32.f;					// time for one beat / number of steps per beat
@@ -398,7 +398,7 @@ static void seq_calcDeltaT(uint16_t bpm, uint8_t isShuffled)
 	//--- calc deltaT ----
 	// for 4/4tel takt -> 1 beat = 4 main steps = 4*8 = 32 sub steps
 	// 120 bpm 4/4tel = 120 * 1 beat / 60sec = 120 * 32 in 60 sec;
-	seq_deltaT 	= (1000*60)/bpm; 	//bei 12 = 500ms = time for one beat
+	seq_deltaT 	= (1000*60.f)/bpm; 	//bei 12 = 500ms = time for one beat (float: the integer division ran up to 0.2 % fast)
 	seq_deltaT /= 96.f; //we run the internal clock at 96ppq -> seq clock 32 ppq == prescaler 3, midi clock 24 ppq == prescale 4
 	seq_deltaT *= 4;
 	//32.f;					// time for one beat / number of steps per beat
@@ -1300,21 +1300,27 @@ IN_ITCM_RAM void seq_nextStep()
 				seq_pendingPattern = rnd;
 			}
 			*/
-			if(seq_pendingPattern == SONG_END)
-			{
-				//TODO: check if this is enough? does GUI needs info?
-				seq_setRunning(0);
-				//make sure pending pattern does not remain at 64 resulting in a seg fault.
-				seq_pendingPattern = seq_activeSong[0];
-				if(seq_pendingPattern >= 64) seq_pendingPattern  = 0;
-				seq_songPositionPointer = 0;
-				return;
-			}
-			else if(seq_pendingPattern == SONG_LOOP)
+			if(seq_pendingPattern == SONG_LOOP)
 			{
 				//reset to song start
 				seq_pendingPattern = seq_activeSong[0];
 				seq_songPositionPointer = 0;
+			}
+			//the end of the song, or a loop to a song that has no pattern before its
+			//end/loop mark (that played "pattern 65" and edits went past the patterns)
+			if(seq_pendingPattern >= MAX_PATTERN)
+			{
+				seq_setRunning(0);
+				//make sure pending pattern does not remain at 64 resulting in a seg fault.
+				seq_pendingPattern = seq_activeSong[0];
+				if(seq_pendingPattern >= MAX_PATTERN) seq_pendingPattern  = 0;
+				//like pressing stop: MIDI stop, notes off, position reset, and tell
+				//the front panel (it still showed running, so the next start press stopped)
+				seq_resetPosition();
+				uart_sendFrontpanelByte(FRONT_SEQ_CC);
+				uart_sendFrontpanelByte(FRONT_SEQ_RUN_STOP);
+				uart_sendFrontpanelByte(0);
+				return;
 			}
 
 		}
