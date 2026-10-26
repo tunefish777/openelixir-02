@@ -195,7 +195,8 @@ void Snare_calcSyncBlock(SnareVoice* v, int16_t* buf, const uint8_t size)
 			//add transient sample
 			//tmp	= __QADD16(transBuf[j],(int16_t)tmp);
 			tmp	+= transBuf[j];
-			buf[j] =   v->combinedVolume  * tmp * calcOnePole( &v->FaderVolumeFilter, faderVolume);
+			//osc + noise + transient can exceed full scale: saturate (it wrapped)
+			buf[j] = __SSAT((int32_t)(v->combinedVolume * tmp * calcOnePole( &v->FaderVolumeFilter, faderVolume)), 16);
 
 #else
 
@@ -220,7 +221,7 @@ void Snare_calcSyncBlock(SnareVoice* v, int16_t* buf, const uint8_t size)
 			//add transient sample
 			//tmp	= __QADD16(transBuf[j],(int16_t)tmp);
 			tmp	+= transBuf[j];
-			buf[j] =  v->combinedVolume * tmp * calcOnePole( &v->FaderVolumeFilter, faderVolume);
+			buf[j] = __SSAT((int32_t)(v->combinedVolume * tmp * calcOnePole( &v->FaderVolumeFilter, faderVolume)), 16);
 #else
 			//add filter to buffer
 			buf[j] *= v->mix;

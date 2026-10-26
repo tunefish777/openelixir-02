@@ -178,7 +178,7 @@ void Compressor_process(Compressor *c, int16_t *fxBuffer,int32_t* outL, int32_t*
 			gr = dB2lin(gr);
 			//debugWatch = gr;
 
-			left[i]  = fxBuffer[idx1] * gr * c->markupGain;//gain;
+			left[i]  = __SSAT(fxBuffer[idx1] * gr * c->markupGain, 16);//gain; (saturate like the stereo path, it wrapped)
 
 
 			//--- Output transfer ---

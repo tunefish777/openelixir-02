@@ -475,6 +475,18 @@ static int engineTest(void)
 #if KIT_ENGINES_API >= 3
 	fail |= loadVoiceTest();
 #endif
+	//pitch EG slope 127 made the EG output NaN and stopped the oscillator
+	{
+		loadKit(0);
+		sendParam(PAR_PITCH_SLOPE1, 127);
+		sendParam(PAR_MODAMNT1, 100);
+		renderSound(400, &peak, &nan);
+		voiceControl_noteOn(0, 60, 127);
+		const int len = renderSound(800, &peak, &nan);
+		const int bad = len == 0 || isnan(voiceSlots[0].u.drum.oscPitchEg.value) || isnan(voiceSlots[0].u.drum.osc.pitchMod);
+		printf("pitch EG slope 127: %s\n", bad ? "FAILED" : "ok");
+		fail |= bad;
+	}
 #ifdef HAVE_KIT_ENGINES
 	fail |= blockTest();
 #if KIT_ENGINES_API >= 2
