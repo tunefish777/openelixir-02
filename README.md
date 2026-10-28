@@ -8,6 +8,11 @@ Custom firmware for the Erica Synths LXR-02 drum machine. It is based on the ope
 > OpenElixir-02 is not official Erica Synths firmware and is not affiliated with or approved by
 > Erica Synths. You install it at your own risk.
 
+[![Watch the video](https://img.youtube.com/vi/mmoUcfnjkb8/hqdefault.jpg)](https://www.youtube.com/embed/<VIDEO_ID>)
+
+[<img src="https://img.youtube.com/vi/mmoUcfnjkb8/hqdefault.jpg" width="600" height="300"/>](https://www.youtube.com/embed/mmoUcfnjkb8)
+
+
 ## Goals
 
 - **More functionality, fully backwards compatible.** OpenElixir-02 extends what is already there.
