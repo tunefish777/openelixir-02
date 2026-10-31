@@ -928,6 +928,8 @@ lcd_process_display_interrupt = 1;
 	  //check SD card
 	  if((BSP_SD_IsDetected() == SD_PRESENT) &&  (lastSdState == SD_NOT_PRESENT))
 	  {
+			//mounting and reading 64 project names: keep the audio running meanwhile
+			const uint8_t bg = soundengine_backgroundAudioBegin();
 			MX_FATFS_ReInit();
 			f_mount(0, (TCHAR const*)SDPath, 0); //un-mount
 			memset((FATFS*)&SDFatFS,0,sizeof(FATFS)); //clear FS object to force reinit
@@ -944,7 +946,7 @@ lcd_process_display_interrupt = 1;
 					preset_loadProjectNames(i);
 				}
 			}
-
+			soundengine_backgroundAudioEnd(bg);
 	  }
 	  lastSdState = BSP_SD_IsDetected();
 
@@ -963,6 +965,10 @@ lcd_process_display_interrupt = 1;
   checkMainLoc = -11;
 	  //get the encoder values
 	  menu_parseEncoder(encode_read4(),encode_readButton());
+	  if(lcd_process_display_interrupt)
+	  {
+		  menu_uiTick();
+	  }
 	//  menu_tick();
 	  led_tickHandler();
 	//  menu_tick();
@@ -1552,10 +1558,10 @@ static void MX_DMA_Init(void)
 
   /* DMA interrupt init */
   /* DMA1_Stream4_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream4_IRQn, 5, 0);
+  HAL_NVIC_SetPriority(DMA1_Stream4_IRQn, 1, 0);	//audio DACs: before everything but the tick timers
   HAL_NVIC_EnableIRQ(DMA1_Stream4_IRQn);
   /* DMA1_Stream5_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 5, 0);
+  HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 1, 0);	//audio DACs: before everything but the tick timers
   HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
   /* DMA2_Stream0_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 3, 0);

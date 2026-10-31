@@ -670,6 +670,8 @@ void menu_repaint();
 //-----------------------------------------------------------------
 //For nonblocking display refreshs
 void menu_tick();
+//page timers and full repaints (main loop)
+void menu_uiTick();
 //-----------------------------------------------------------------
 //blocking display refresh
 //void menu_fastRefreshDisplay();

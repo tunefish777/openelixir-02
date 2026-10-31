@@ -1107,7 +1107,16 @@ uint8_t sendDisplayBuffer()
 	return display_refresh_state;
 }
 //-----------------------------------------------------------------
+//display transfer, from the TIM14 interrupt (highest priority): only the non-blocking
+//LCD state machine, everything else is in menu_uiTick()
 void menu_tick()
+{
+	sendDisplayBuffer();
+}
+//-----------------------------------------------------------------
+//page timers and full repaints, from the main loop (they used to run in the TIM14
+//interrupt and delayed the audio interrupts)
+void menu_uiTick()
 {
 #if CPU_METER
 	//refresh the CPU load page 4 times per second
@@ -1150,10 +1159,6 @@ void menu_tick()
 
 		//TODO could possibly be sped up by aborting and restarting running transfer instead of queing a new one
 	}
-
-
-
-	sendDisplayBuffer();
 }
 //-----------------------------------------------------------------
 void menu_repaintAll()
@@ -2341,25 +2346,18 @@ void menu_handleLoadSaveMenu(int8_t inc, uint8_t btnClicked)
 
 						case SAVE_TYPE_GLO:
 						{
-							FRESULT res;
-							res = preset_saveGlobals();
+							const uint8_t bg = soundengine_backgroundAudioBegin();
+							const FRESULT res = preset_saveGlobals();
+							soundengine_backgroundAudioEnd(bg);
 							if(res != FR_OK) menu_showSdError(res);
 						}
 							break;
 
 						case SAVE_TYPE_PROJECT:
 						{
-							FRESULT res;
-							if(!seq_isRunning())
-							{
-								HAL_TIM_Base_Stop(&htim2);	//calc sample interrupt - prio 1
-							}
-
-							res = preset_saveProject(menu_selectedPresetNr[SAVE_TYPE_PROJECT]);
-							if(!seq_isRunning())
-							{
-								  HAL_TIM_Base_Start_IT(&htim2);	//calc sample interrupt - prio 1
-							}
+							//(the save runs the audio interrupt itself; this used to leave it
+							//running after a save while the sequencer was stopped)
+							const FRESULT res = preset_saveProject(menu_selectedPresetNr[SAVE_TYPE_PROJECT]);
 
 							if(res != FR_OK) menu_showSdError(res);
 						}
@@ -2564,8 +2562,12 @@ void menu_handleLoadSaveMenu(int8_t inc, uint8_t btnClicked)
 					break;
 */
 				case SAVE_TYPE_GLO:
+				{
+					const uint8_t bg = soundengine_backgroundAudioBegin();
 					preset_loadGlobals();
-					menu_resetSaveParameters();						
+					soundengine_backgroundAudioEnd(bg);
+					menu_resetSaveParameters();
+				}						
 					break;
 #if USE_SAMPLES
 				case SAVE_TYPE_SAMPLES:

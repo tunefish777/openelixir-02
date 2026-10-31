@@ -16,6 +16,8 @@
 #include "main.h"
 #include "menu/menu.h"
 int CodecInit(void) { return 0; }
+HAL_StatusTypeDef HAL_TIM_Base_Start_IT(TIM_HandleTypeDef *htim) { return HAL_OK; }
+HAL_StatusTypeDef HAL_TIM_Base_Stop_IT(TIM_HandleTypeDef *htim) { return HAL_OK; }
 void preset_touchTimer(PresetTimer type) { }
 void menu_updateVoicePages(void) { }
 uint8_t euklid_getLength(uint8_t trackNr) { return 0; }

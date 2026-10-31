@@ -24,7 +24,9 @@ volatile INDTCMZ uint8_t bCurrentSampleValid = 0;
 int CodecInit()
 {
     dma_buffer[0] = 32756;
-    codec_initCsCodec((uint32_t)dma_buffer, OUTPUT_DMA_SIZE*2,(uint32_t)dma_buffer2, OUTPUT_DMA_SIZE*2);
+    //circular DMA over both blocks of each buffer. DAC 1 (SPI2, main out) plays dma_buffer2,
+    //DAC 2 (SPI3, OUT 2) dma_buffer (the old per-block restart swapped them after the first block)
+    codec_initCsCodec((uint32_t)dma_buffer2, OUTPUT_DMA_SIZE*4,(uint32_t)dma_buffer, OUTPUT_DMA_SIZE*4);
     return 0;
 }
 //------------------------------------------------------------------

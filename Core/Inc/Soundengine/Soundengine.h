@@ -33,4 +33,8 @@
 void soundengine_init();
 void soundengine_process();
 uint8_t soundengine_calcNextSampleBlock();
+/** Around work that blocks the main loop (SD card access): the audio interrupt renders
+ * the blocks meanwhile. Returns whether it was started here; pass that to ..._end(). */
+uint8_t soundengine_backgroundAudioBegin();
+void soundengine_backgroundAudioEnd(uint8_t started);
 #endif /* INC_SOUNDENGINE_SOUNDENGINE_H_ */

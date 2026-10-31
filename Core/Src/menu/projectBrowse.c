@@ -14,6 +14,7 @@
 #include "menu/menu.h"
 #include "Preset/PresetManager.h"
 #include "Preset/KitEngines.h"
+#include "Soundengine/Soundengine.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -75,9 +76,15 @@ uint8_t projectBrowse_click(const uint8_t forSave)
 		projectBrowse.project = projectBrowse.projectSel;
 		projectBrowse.selecting = 0;
 		projectBrowse.changeRow = 0;
-		if(projectBrowse_isOther() && preset_scanProjectKits(projectBrowse.project, projectBrowse_names, projectBrowse_engines, projectBrowse_exists) != FR_OK)
+		if(projectBrowse_isOther())
 		{
-			memset(projectBrowse_exists, 0, sizeof(projectBrowse_exists));
+			//reads up to 64 files: keep the audio running meanwhile
+			const uint8_t bg = soundengine_backgroundAudioBegin();
+			if(preset_scanProjectKits(projectBrowse.project, projectBrowse_names, projectBrowse_engines, projectBrowse_exists) != FR_OK)
+			{
+				memset(projectBrowse_exists, 0, sizeof(projectBrowse_exists));
+			}
+			soundengine_backgroundAudioEnd(bg);
 		}
 		return 1;
 	}
@@ -115,12 +122,17 @@ FRESULT projectBrowse_readKit(const uint8_t kit, uint8_t* params, uint8_t* engin
 		memcpy(engines, kitEngines_ram[kit], NUM_VOICE_SLOTS);
 		return FR_OK;
 	}
-	return preset_readProjectKit(projectBrowse.project, kit, params, engines);
+	const uint8_t bg = soundengine_backgroundAudioBegin();
+	const FRESULT res = preset_readProjectKit(projectBrowse.project, kit, params, engines);
+	soundengine_backgroundAudioEnd(bg);
+	return res;
 }
 //---------------------------------------------------
 FRESULT projectBrowse_saveKit(const uint8_t kit, char* name)
 {
+	const uint8_t bg = soundengine_backgroundAudioBegin();
 	const FRESULT res = preset_saveProjectKit(projectBrowse.project, kit, name, activeParameters, kitEngines);
+	soundengine_backgroundAudioEnd(bg);
 	if(res == FR_OK)
 	{
 		memcpy(projectBrowse_names[kit], name, 8);

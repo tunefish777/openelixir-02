@@ -125,3 +125,21 @@ void soundengine_process()
 	//preset_morph_tick();
 
 }
+//------------------------------------------------------------------
+uint8_t soundengine_backgroundAudioBegin()
+{
+#if USE_INTERRUPT_ONLY_DURING_SAVE_PROJ
+	//fails if it is already running (then whoever started it stops it)
+	return HAL_TIM_Base_Start_IT(&htim2) == HAL_OK;
+#else
+	return 0;
+#endif
+}
+//------------------------------------------------------------------
+void soundengine_backgroundAudioEnd(uint8_t started)
+{
+#if USE_INTERRUPT_ONLY_DURING_SAVE_PROJ
+	if(started)
+		HAL_TIM_Base_Stop_IT(&htim2);
+#endif
+}
