@@ -661,6 +661,8 @@ void menu_repaintAll();
 #if CPU_METER
 /** development builds: show/hide the CPU load page (see Soundengine/CpuMeter.h) */
 void menu_toggleCpuMeter();
+//CPU meter page shown: 0 off, 1 load, 2 sections, 3 timing, 4 stalls
+uint8_t menu_cpuMeterPage();
 #endif
 //-----------------------------------------------------------------
 //repaint the screen. show all changes*/

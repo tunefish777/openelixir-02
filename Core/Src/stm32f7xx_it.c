@@ -298,7 +298,26 @@ void TIM2_IRQHandler(void)
 /**
   * @brief This function handles TIM8 trigger and commutation interrupts and TIM14 global interrupt.
   */
+#if CPU_METER
+//development builds: the CPU meter samples the interrupted code first (stall locator,
+//CpuMeter.h), then the normal handler runs
+void tim14_handler(void);
+__attribute__((naked)) void TIM8_TRG_COM_TIM14_IRQHandler(void)
+{
+  __asm volatile(
+    "tst lr, #4\n"
+    "ite eq\n"
+    "mrseq r0, msp\n"
+    "mrsne r0, psp\n"
+    "push {r4, lr}\n"
+    "bl cpuMeter_irqSample\n"
+    "pop {r4, lr}\n"
+    "b tim14_handler\n");
+}
+void tim14_handler(void)
+#else
 void TIM8_TRG_COM_TIM14_IRQHandler(void)
+#endif
 {
   /* USER CODE BEGIN TIM8_TRG_COM_TIM14_IRQn 0 */
 
@@ -354,7 +373,13 @@ void DMA2_Stream0_IRQHandler(void)
   /* USER CODE BEGIN DMA2_Stream0_IRQn 0 */
 
   /* USER CODE END DMA2_Stream0_IRQn 0 */
+#if CPU_METER
+  cpuMeter_adcEnter();
+#endif
   HAL_DMA_IRQHandler(&hdma_adc1);
+#if CPU_METER
+  cpuMeter_adcExit();
+#endif
   /* USER CODE BEGIN DMA2_Stream0_IRQn 1 */
 
   /* USER CODE END DMA2_Stream0_IRQn 1 */

@@ -218,8 +218,9 @@ This creates `build/cpumeter/LXR_<name>_V<version>_cpumeter.img`; install it lik
 Normal builds don't contain any of it (the code is in `#if CPU_METER`, see
 `Core/Inc/Soundengine/CpuMeter.h`), and CI builds the meter variant too so that it keeps compiling.
 
-On the device, SHIFT + PROJECT steps through: off, load page, section page. All values are in percent
-of one audio block (64 samples, about 1.45 ms); "pk" values are peaks since the last reset.
+On the device, SHIFT + PROJECT steps through: off, load page, section page, timing page, stall page.
+Switching pages keeps the measurements. Load and section values are in percent of one audio block (64 samples, about 1.45 ms); "pk"
+values are peaks since the last reset.
 
 | Page | Shows |
 |---|---|
@@ -227,10 +228,14 @@ of one audio block (64 samples, about 1.45 ms); "pk" values are peaks since the 
 | Load: `all pk 82% u0 +0` | Peak of all audio work per block (sequencer, rendering, MIDI): what the UI can't use. `u` = buffer underruns (dropouts) since the reset, `+N` = simulated extra voices |
 | Sections: `D12 12 12 S10` | Peaks of drum voices 1-3 and the snare |
 | Sections: `C10 H10 fx12 o11` | Peaks of cymbal, hi-hat, FX bus and the rest of the mixer (LFOs, envelopes, sample-rate reduction, panning/summing, limiter) |
+| Timing: `dma  12us lt 30%` | `dma`: longest delay of an I2S DMA callback (interrupt latency; the DMA runs in circular mode, so only a delay of more than a block matters). `lt`: longest wait from a block request until its rendering starts, in percent of a block; `lt` plus the render time above 100 % is a dropout. It can't show more than one missed block: count those with `u` |
+| Timing: `adc12% seq 0.3ms` | `adc`: CPU share of the fader/knob ADC interrupt (current). `seq`: longest delay of an internal sequencer clock tick (96 ppq) while running; up to 0.25 ms is the clock's resolution |
+| Stalls: `stall  27.6ms` | Longest time without rendering a block (only counted above two blocks) |
+| Stalls: `pc 08012345 blk` | Code address that was running during that stall; find the function with `arm-none-eabi-addr2line -f -e build/cpumeter/OpenElixir-02.elf 0x08012345`. `blk`: the measuring interrupt itself was held off (interrupts disabled, or an interrupt of the highest priority running) |
 
 SHIFT + MORPH renders the cymbal engine 0 to 4 extra times per block (`+N`) to simulate kits with more
-FM voices, and resets the peaks. While `+N` is above 0 the cymbal sounds wrong (its envelope runs
-faster); that's expected. Measured with a worst-case kit on the stock voice layout: `dsp` peak 78 %,
+FM voices, and resets the peaks and the underrun count. On the timing and stall pages it only resets.
+The extra renders use a separate cymbal voice and don't change the sound. Measured with a worst-case kit on the stock voice layout: `dsp` peak 78 %,
 `all` peak 82 %, drum voice 12 % each, snare/cymbal/hi-hat 10 %, FX 12 %, rest 11 %.
 
 ## Source layout and CMake targets

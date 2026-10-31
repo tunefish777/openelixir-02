@@ -21,6 +21,18 @@
  * Values are shown on two pages; SHIFT + PROJECT steps through them (menu.c).
  * cpuMeter.stressFm renders the cymbal engine that many extra times per block,
  * to simulate kits with more FM voices (SHIFT + MORPH cycles 0..4).
+ *
+ * A third page shows timing (what can cause dropouts and sequencer jitter):
+ *  - dma: longest extra time between two I2S DMA callbacks. The DMA is restarted
+ *    in the callback (normal mode): a late callback leaves the DAC without data.
+ *  - lt:  longest wait from a block request (DMA callback) until its rendering
+ *    starts, in percent of a block. lt + dsp above 100 % is a dropout.
+ *  - adc: share of the CPU spent in the fader/knob ADC DMA interrupt.
+ *  - seq: longest delay of an internal sequencer clock tick (96 ppq).
+ * A fourth page locates stalls: the TIM14 interrupt (4 kHz, highest priority) checks
+ * how long no block has been rendered. For the longest stall it keeps the address of
+ * the code it interrupted, and whether TIM14 itself was held off (interrupts disabled
+ * or an interrupt of the same priority running).
  */
 
 #ifndef CPU_METER_H_
@@ -57,6 +69,24 @@ typedef struct
 	uint32_t sectionAcc;	/**< cycles of the measured sections in the current block */
 	uint32_t sectionPeak[CPU_NUM_SECTIONS];
 	uint8_t stressFm;		/**< extra cymbal engine renders per block */
+
+	//timing page
+	uint32_t dmaLast[2];	/**< cycle counter at the last DMA callback per DAC, 0 = none yet */
+	uint32_t dmaMin;		/**< shortest / longest time between two DMA callbacks of a DAC */
+	uint32_t dmaMax;
+	uint32_t requestTime;	/**< cycle counter when the next block was requested */
+	uint32_t latePeak;		/**< longest wait from block request to rendering start */
+	uint32_t adcStart;
+	uint32_t adcAcc;		/**< cycles in the ADC interrupt since adcWindowStart */
+	uint32_t adcWindowStart;
+	uint32_t seqLatePeakUs;	/**< longest delay of a sequencer clock tick */
+
+	//stall locator
+	uint32_t lastRender;	/**< cycle counter at the start of the last block rendering */
+	uint32_t lastSample;	/**< cycle counter at the last TIM14 sample */
+	uint32_t stallPeak;		/**< longest time without rendering */
+	uint32_t stallPc;		/**< interrupted code address during the longest stall */
+	uint8_t stallBlocked;	/**< TIM14 itself was held off during the longest stall */
 } CpuMeter;
 
 extern CpuMeter cpuMeter;
@@ -82,6 +112,43 @@ static inline void cpuMeter_section(uint8_t section, uint32_t start)
 		cpuMeter.sectionPeak[section] = cycles;
 	}
 }
+
+/** call in the I2S DMA callback of each DAC (0, 1) */
+static inline void cpuMeter_dmaCallback(uint8_t dac)
+{
+	const uint32_t now = DWT->CYCCNT;
+	if(cpuMeter.dmaLast[dac] != 0 && cpuMeter.blocks > CPU_METER_SETTLE_BLOCKS)
+	{
+		const uint32_t interval = now - cpuMeter.dmaLast[dac];
+		if(interval < cpuMeter.dmaMin) cpuMeter.dmaMin = interval;
+		if(interval > cpuMeter.dmaMax) cpuMeter.dmaMax = interval;
+	}
+	cpuMeter.dmaLast[dac] = now;
+}
+/** call when the next block is requested (bCurrentSampleValid set) */
+static inline void cpuMeter_blockRequested(void)
+{
+	cpuMeter.requestTime = DWT->CYCCNT;
+}
+/** call at the start / end of the ADC DMA interrupt */
+static inline void cpuMeter_adcEnter(void)
+{
+	cpuMeter.adcStart = DWT->CYCCNT;
+}
+static inline void cpuMeter_adcExit(void)
+{
+	cpuMeter.adcAcc += DWT->CYCCNT - cpuMeter.adcStart;
+}
+
+/** from the TIM14 interrupt with its stacked exception frame (stall locator) */
+void cpuMeter_irqSample(const uint32_t* frame);
+
+/** a sequencer clock tick came lateTicks (systick_ticks, 0.25 ms) late */
+void cpuMeter_seqTickLate(float lateTicks);
+/** ADC interrupt load in percent since the last call */
+uint32_t cpuMeter_adcLoad(void);
+/** longest extra time between two DMA callbacks in microseconds */
+uint32_t cpuMeter_dmaGapUs(void);
 
 /** call around mixer_calcNextSampleBlock() */
 uint32_t cpuMeter_dspStart(void);

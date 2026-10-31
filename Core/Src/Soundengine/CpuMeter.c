@@ -32,6 +32,13 @@ uint32_t cpuMeter_dspStart(void)
 	{
 		cpuMeter.busyPeak = busy;
 	}
+	cpuMeter.lastRender = now;
+	//time this block waited since it was requested
+	const uint32_t late = now - cpuMeter.requestTime;
+	if(cpuMeter.blocks > CPU_METER_SETTLE_BLOCKS && late > cpuMeter.latePeak)
+	{
+		cpuMeter.latePeak = late;
+	}
 	return now;
 }
 
@@ -66,6 +73,59 @@ void cpuMeter_resetPeaks(void)
 	{
 		cpuMeter.sectionPeak[i] = 0;
 	}
+	cpuMeter.dmaLast[0] = cpuMeter.dmaLast[1] = 0;
+	cpuMeter.dmaMin = UINT32_MAX;
+	cpuMeter.dmaMax = 0;
+	cpuMeter.latePeak = 0;
+	cpuMeter.seqLatePeakUs = 0;
+	cpuMeter.stallPeak = 0;
+	cpuMeter.stallPc = 0;
+	cpuMeter.stallBlocked = 0;
+}
+
+void cpuMeter_irqSample(const uint32_t* frame)
+{
+	const uint32_t now = DWT->CYCCNT;
+	const uint32_t block = cpuMeter_blockCycles();
+	//TIM14 runs every 0.25 ms: a much longer interval means it couldn't run
+	const uint8_t blocked = (now - cpuMeter.lastSample) > block;
+	cpuMeter.lastSample = now;
+
+	const uint32_t gap = now - cpuMeter.lastRender;
+	if(cpuMeter.blocks > CPU_METER_SETTLE_BLOCKS && gap > 2 * block && gap > cpuMeter.stallPeak)
+	{
+		cpuMeter.stallPeak = gap;
+		cpuMeter.stallPc = frame[6];	//stacked PC: r0-r3, r12, lr, pc, xpsr
+		cpuMeter.stallBlocked = blocked;
+	}
+}
+
+void cpuMeter_seqTickLate(float lateTicks)
+{
+	//systick_ticks run at 4 kHz
+	const uint32_t us = lateTicks > 0 ? (uint32_t)(lateTicks * 250.f) : 0;
+	if(us > cpuMeter.seqLatePeakUs)
+	{
+		cpuMeter.seqLatePeakUs = us;
+	}
+}
+
+uint32_t cpuMeter_adcLoad(void)
+{
+	const uint32_t now = DWT->CYCCNT;
+	const uint32_t window = now - cpuMeter.adcWindowStart;
+	const uint32_t acc = cpuMeter.adcAcc;
+	cpuMeter.adcAcc = 0;
+	cpuMeter.adcWindowStart = now;
+	return window ? (uint32_t)((uint64_t)acc * 100 / window) : 0;
+}
+
+uint32_t cpuMeter_dmaGapUs(void)
+{
+	//the shortest interval is the block period: the rest is how late a callback was
+	if(cpuMeter.dmaMax < cpuMeter.dmaMin)
+		return 0;
+	return (cpuMeter.dmaMax - cpuMeter.dmaMin) / (SystemCoreClock / 1000000);
 }
 
 uint32_t cpuMeter_underruns(void)

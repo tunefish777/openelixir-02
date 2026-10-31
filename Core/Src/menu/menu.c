@@ -41,7 +41,7 @@
 
 uint8_t display_refresh_state = 0;
 #if CPU_METER
-static uint8_t menu_cpuMeterShown = 0;		//CPU meter page: 0 off, 1 load, 2 sections (development builds)
+static uint8_t menu_cpuMeterShown = 0;		//CPU meter page: 0 off, 1 load, 2 sections, 3 timing, 4 stalls (development builds)
 static uint32_t menu_cpuMeterTimer = 0;
 #endif
 uint8_t display_needs_refresh = 0;
@@ -1174,9 +1174,13 @@ void menu_repaintAll()
 #if CPU_METER
 void menu_toggleCpuMeter()
 {
-	menu_cpuMeterShown = (menu_cpuMeterShown + 1) % 3;
-	cpuMeter_resetPeaks();
+	//(doesn't reset the peaks, so values like the dropout count can be read on another page)
+	menu_cpuMeterShown = (menu_cpuMeterShown + 1) % 5;
 	menu_repaintAll();
+}
+uint8_t menu_cpuMeterPage()
+{
+	return menu_cpuMeterShown;
 }
 
 #define CPU_METER_MIN(a,b) (((a)<(b))?(a):(b))
@@ -1185,6 +1189,26 @@ static void menu_repaintCpuMeter()
 {
 	//load in percent of one audio block, clamped so that each line fits 16 characters
 	const uint32_t block = cpuMeter_blockCycles();
+	if(menu_cpuMeterShown == 4)
+	{
+		//longest time without rendering, the code it interrupted, "blk" if TIM14 was held off
+		const unsigned stall = CPU_METER_MIN(cpuMeter.stallPeak / (SystemCoreClock / 10000), 9999u);
+		snprintf(&editDisplayBuffer[0][0], 17, "stall %3u.%ums  ", stall / 10, stall % 10);
+		snprintf(&editDisplayBuffer[1][0], 17, "pc %08lx %s", (unsigned long)cpuMeter.stallPc, cpuMeter.stallBlocked ? "blk" : "   ");
+		return;
+	}
+	if(menu_cpuMeterShown == 3)
+	{
+		//timing: DMA callback delay, wait until a requested block is rendered, ADC interrupt load,
+		//sequencer tick delay
+		const unsigned dmaGap = CPU_METER_MIN(cpuMeter_dmaGapUs(), 9999u);
+		const unsigned late = CPU_METER_MIN(cpuMeter.latePeak * 100 / block, 999u);
+		const unsigned adc = CPU_METER_MIN(cpuMeter_adcLoad(), 99u);
+		const unsigned seq = CPU_METER_MIN(cpuMeter.seqLatePeakUs / 100, 999u);
+		snprintf(&editDisplayBuffer[0][0], 17, "dma%4uus lt%3u%%", dmaGap, late);
+		snprintf(&editDisplayBuffer[1][0], 17, "adc%2u%% seq%2u.%ums", adc, seq / 10, seq % 10);
+		return;
+	}
 	if(menu_cpuMeterShown == 2)
 	{
 		//peak per section: drum voices 1-3, snare, cymbal, hi-hat, FX bus, rest of the mixer

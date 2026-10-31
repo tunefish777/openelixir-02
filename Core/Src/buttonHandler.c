@@ -861,7 +861,9 @@ static void buttonHandler_seqButtonPressed(uint8_t seqButtonPressed)
 		case SEQ_MORPH: //morph
 #if CPU_METER
 			//development builds: simulate more FM voices (0..4), restart the peak measurement
-			cpuMeter.stressFm = (cpuMeter.stressFm + 1) % (CPU_METER_MAX_STRESS + 1);
+			//(on the timing and stall pages: only restart the measurement)
+			if(menu_cpuMeterPage() < 3)
+				cpuMeter.stressFm = (cpuMeter.stressFm + 1) % (CPU_METER_MAX_STRESS + 1);
 			cpuMeter_resetPeaks();
 #endif
 			break;

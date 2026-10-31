@@ -37,6 +37,7 @@
 #include "ledHandler.h"
 #include "buttonHandler.h"
 #include "Preset/PresetManager.h"
+#include "Soundengine/CpuMeter.h"
 
 void seq_setPendingPatternActive();
 
@@ -1792,6 +1793,10 @@ float seq_getElapsedStepTimePercent()
 		{
 
 			float rest = systick_ticks-seq_lastTick - seq_deltaT;
+#if CPU_METER
+			if(seq_isRunning())
+				cpuMeter_seqTickLate(rest);
+#endif
 			seq_lastTick = systick_ticks;
 
 
