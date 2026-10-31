@@ -75,6 +75,7 @@ add_library(lxr_dsp OBJECT
     Src/Soundengine/DSPAudio/CymbalVoice.c
     Src/Soundengine/DSPAudio/Decay.c
     Src/Soundengine/DSPAudio/distortion.c
+    Src/Soundengine/DSPAudio/DjFilter.c
     Src/Soundengine/DSPAudio/dither.c
     Src/Soundengine/DSPAudio/DrumVoice.c
     Src/Soundengine/DSPAudio/HiHat.c
@@ -168,6 +169,7 @@ set(LXR_ITCM_SOURCES
     Src/Soundengine/DSPAudio/CymbalVoice.c
     Src/Soundengine/DSPAudio/Decay.c
     Src/Soundengine/DSPAudio/distortion.c
+    Src/Soundengine/DSPAudio/DjFilter.c
     Src/Soundengine/DSPAudio/DrumVoice.c
     Src/Soundengine/DSPAudio/HiHat.c
     Src/Soundengine/DSPAudio/lfo.c

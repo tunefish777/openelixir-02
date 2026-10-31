@@ -366,8 +366,8 @@ enum ParamEnums
 	PAR_TRACK_LENGTH,
 	
 	UNUSED_PAR_GLO_SAT,						//  - global saturation
-	PAR_POS_Y,						//  - UNUSED
-	PAR_FLUX,						//  - UNUSED
+	PAR_DJ_FILTER,					// OpenElixir-02: global DJ filter, 63 = off (performance page, not saved)
+	PAR_DJ_RESO,					// OpenElixir-02: its resonance
 	PAR_SOM_FREQ,					//  - UNUSED
 	PAR_TRACK_ROTATION,				// **PATROT
 

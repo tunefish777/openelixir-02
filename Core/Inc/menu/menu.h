@@ -274,6 +274,8 @@ enum NamesEnum
 	TEXT_FX_P4,
 	TEXT_PATTERN_MODE,
 	TEXT_MIXER_LIMITER,
+	TEXT_DJ_FILTER,
+	TEXT_DJ_RESO,
 
 
 	NUM_NAMES
@@ -384,7 +386,8 @@ enum shortNamesEnum
 	SHORT_KCM,
 	SHORT_FLAM,
 	SHORT_SHIFT,
-	SHORT_LIMITER
+	SHORT_LIMITER,
+	SHORT_DJ_FILTER
 
 	
 };
@@ -420,7 +423,8 @@ enum catNamesEnum
 	CAT_GENERATOR,
 	CAT_MIDI,
 	CAT_CLOCK,
-	CAT_FX
+	CAT_FX,
+	CAT_DJ_FILTER
 };
 //-----------------------------------------------------------------
 // these must correspond with longNames in MenuText.h
@@ -514,7 +518,9 @@ enum longNamesEnum
 	LONG_PATTERN_MODE,
 	LONG_FLAM,
 	LONG_SHIFT,
-	LONG_LIMITER
+	LONG_LIMITER,
+	LONG_DJ_FILTER,
+	LONG_DJ_RESO
 	
 };
 

@@ -12,6 +12,7 @@
  */
 
 #include "Soundengine/DSPAudio/mixer.h"
+#include "Soundengine/DSPAudio/DjFilter.h"
 #include "Soundengine/config.h"
 #include "Soundengine/AudioCodecManager.h"
 #include "Soundengine/DSPAudio/CymbalVoice.h"
@@ -684,6 +685,14 @@ IN_ITCM_RAM void mixer_calcNextSampleBlock(int16_t* output,int16_t* output2)
 #if CPU_METER
 	cpuMeter_section(CPU_SECTION_FX, meterStart);
 #endif
+
+	//global DJ filter on the final mix of all outputs (performance page); off: unchanged
+	if(djFilter_process(mix, mix2) && !mixer_limiterOn)
+	{
+		//its resonance can exceed full scale: clip like the stock mix
+		mixer_saturateMix(mix);
+		mixer_saturateMix(mix2);
+	}
 
 	//bring the sums back into the 16-bit range of the DACs
 	mixer_limitBlock(&mixer_limiterGain[0], mix, output);

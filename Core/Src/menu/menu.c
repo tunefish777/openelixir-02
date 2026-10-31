@@ -30,6 +30,7 @@
 #include "menu/voiceLoad.h"
 #include "menu/projectBrowse.h"
 #include "Soundengine/DSPAudio/mixer.h"
+#include "Soundengine/DSPAudio/DjFilter.h"
 #include "buttonHandler.h"
 #include <ctype.h>
 #include <frontPanelParser_ui.h>
@@ -261,6 +262,8 @@ const Name valueNames[NUM_NAMES] =
 		{SHORT_P4, CAT_FX, LONG_P4},/*TEXT_FX_P4*/
 		{SHORT_KCM, CAT_GLOBAL, LONG_PATTERN_MODE},/*TEXT_AUTO_SWITCH_KIT*/
 		{SHORT_LIMITER, CAT_GLOBAL, LONG_LIMITER},/*TEXT_MIXER_LIMITER*/
+		{SHORT_DJ_FILTER, CAT_DJ_FILTER, LONG_DJ_FILTER},/*TEXT_DJ_FILTER*/
+		{SHORT_FIL_RESO, CAT_DJ_FILTER, LONG_DJ_RESO},/*TEXT_DJ_RESO*/
 
 
 };
@@ -540,8 +543,8 @@ const enum Datatypes PROGMEM parameter_dtypes[NUM_PARAMS] = {
 	    /*PAR_PATTERN_NEXT*/ 	DTYPE_MENU | (MENU_NEXT_PATTERN<<8),
 	    /*PAR_TRACK_LENGTH*/ 	DTYPE_1B64,
 	    /*PAR_GLO_SAT*/			DTYPE_0B127,
-	    /*PAR_POS_Y*/ 			DTYPE_0B127,
-	    /*PAR_FLUX*/ 			DTYPE_0B127,
+	    /*PAR_DJ_FILTER*/ 		DTYPE_PM63,
+	    /*PAR_DJ_RESO*/ 		DTYPE_0B127,
 	    /*PAR_SOM_FREQ*/ 		DTYPE_0B127,
 	    /*PAR_TRACK_ROTATION*/  DTYPE_1B16,  //**PATROT this is not shown in menu, but if it were it would really be 0 to 15
 		/*PAR_STEP_FLAM*/ 		DTYPE_MENU | (MENU_STEP_FLAM<<8),							//251
@@ -880,6 +883,9 @@ void menu_init()
 
 	//initialize the roll value
 	activeParameters[PAR_ROLL] = 5;
+	//DJ filter off (not saved)
+	activeParameters[PAR_DJ_FILTER] = DJ_FILTER_OFF;
+	activeParameters[PAR_DJ_RESO] = 0;
 	//frontPanel_sendData(SEQ_CC,SEQ_ROLL_RATE,8); //value is initialized in cortex firmware
 
 	activeParameters[PAR_BPM] = 120;
@@ -1782,6 +1788,16 @@ void menu_repaintGeneric()
 				(const char PROGMEM *)(&longNames[pgm_read_byte(&valueNames[parName].longName)]));
 
 			//Bottom row -> parameter value (set below)
+			if(parNr == PAR_DJ_FILTER)
+			{
+				//"Off" around the center, "LP -xx" below it, "HP xx" above
+				const int8_t offset = (int8_t)(curParmVal - DJ_FILTER_OFF);
+				if(offset >= -DJ_FILTER_DEAD_ZONE && offset <= DJ_FILTER_DEAD_ZONE)
+					memcpy(&editDisplayBuffer[1][13], "Off", 3);
+				else
+					snprintf(&editDisplayBuffer[1][10], 7, offset < 0 ? "LP %3d" : "HP %3d", offset);
+			}
+			else
 			switch(menu_paramDtype(parNr) & 0xFF)
 			{
 			case DTYPE_TARGET_SELECTION_VELO: //switch(parameters_dtypes[parNr] & 0x0F)
@@ -3786,14 +3802,12 @@ void menu_parseGlobalParam(uint16_t paramNr, uint8_t value)
 
 		break;
 
-	case PAR_POS_Y:
-		frontPanel_sendData(SEQ_CC,SEQ_SET_ACTIVE_TRACK,menu_getActiveVoice());
-		frontPanel_sendData(SEQ_CC,SEQ_POSY,value);
+	case PAR_DJ_FILTER:
+		djFilter_value = value;
 		break;
 
-	case PAR_FLUX:
-		frontPanel_sendData(SEQ_CC,SEQ_SET_ACTIVE_TRACK,menu_getActiveVoice());
-		frontPanel_sendData(SEQ_CC,SEQ_FLUX,value);
+	case PAR_DJ_RESO:
+		djFilter_reso = value;
 		break;
 
 	case PAR_SOM_FREQ:

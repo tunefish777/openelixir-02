@@ -36,6 +36,10 @@ Details for both: [docs/ENGINES.md](docs/ENGINES.md).
 no longer hard-clip. Levels that didn't clip before are unchanged. Config menu "lim" (2nd page)
 switches it off for exactly the stock mix.
 
+**DJ filter.** A filter on the final mix of all outputs, on the performance page: `dj` turned left of
+the center is a low-pass (down to 40 Hz), right of it a high-pass (up to 8 kHz), around the center it
+is off; `res` sets the resonance. It isn't saved and starts off; while off, the sound is unchanged.
+
 **Uninterrupted playback.** Turning knobs, working in the menus, loading and saving kits (also
 from and to other projects on the SD card) and saving projects don't interrupt the audio or the
 sequencer while it plays.
