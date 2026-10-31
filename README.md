@@ -10,6 +10,8 @@ Custom firmware for the Erica Synths LXR-02 drum machine. It is based on the ope
 
 ## Goals
 
+- **Sound and timing come first.** Nothing has a higher priority than uninterrupted audio and a
+  steady sequencer: menus, the display, the SD card and MIDI all wait for them.
 - **More functionality, fully backwards compatible.** OpenElixir-02 extends what is already there.
   Kits, patterns and projects from the stock firmware load and play as before, the MIDI
   implementation is unchanged, and the update works with the stock bootloader.
@@ -33,6 +35,10 @@ Details for both: [docs/ENGINES.md](docs/ENGINES.md).
 **Limiter.** Voices and FX are summed in 32 bit, followed by a limiter on each output, so loud kits
 no longer hard-clip. Levels that didn't clip before are unchanged. Config menu "lim" (2nd page)
 switches it off for exactly the stock mix.
+
+**Uninterrupted playback.** Turning knobs, working in the menus, loading and saving kits (also
+from and to other projects on the SD card) and saving projects don't interrupt the audio or the
+sequencer while it plays.
 
 **Under the hood.** About 10 % less CPU load, many stock firmware bugs fixed (MIDI, sequencer, SD
 card, memory corruption; most found in the firmware review by jhw in
