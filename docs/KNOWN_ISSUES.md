@@ -3,6 +3,7 @@
 Issues of the stock LXR-02 firmware that OpenElixir-02 knowingly keeps, or that are still open. The
 IDs refer to the firmware review by jhw in
 [erica-synths/lxr-desktop-app#3](https://github.com/erica-synths/lxr-desktop-app/issues/3).
+The status of every finding from that review is in [REVIEW_STATUS.md](REVIEW_STATUS.md).
 
 ## Kept on purpose (stock sound)
 
