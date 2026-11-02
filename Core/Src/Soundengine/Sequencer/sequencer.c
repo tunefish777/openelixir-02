@@ -1608,7 +1608,7 @@ void seq_resetDeltaAndTick()
 	{
 		//seq_deltaT = 0;^
 
-		seq_deltaT 	= (1000*60)/seq_tempo; 	//bei 12 = 500ms = time for one beat
+		seq_deltaT 	= (1000*60.f)/seq_tempo; 	//bei 12 = 500ms = time for one beat (float, as the other two: the truncation cost up to 0.45 % at 274 bpm)
 		seq_deltaT /= 96.f; //we run the internal clock at 96ppq -> seq clock 32 ppq == prescaler 3, midi clock 24 ppq == prescale 4
 		seq_deltaT *= 4;
 
