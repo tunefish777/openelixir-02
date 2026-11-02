@@ -164,8 +164,10 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 	{
 
 		const uint16_t paramNr = msg.data1-1;
+		//msg.data1, not paramNr+1: paramNr underflows to 0xFFFF for CC 0 and the
+		//index becomes 65536. For every other CC the two are the same value.
 		if(updateOriginalValue && !isFloatModulator) {
-			midiParser_originalCcValues[paramNr+1] = value.itg;
+			midiParser_originalCcValues[msg.data1] = value.itg;
 		}
 
 		//engine specific parameters: handled by the engine the slot runs
