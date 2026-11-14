@@ -43,8 +43,10 @@ slot 6 (both decays). If the engine changes, the same rules apply as in the engi
 The load kit and save kit menus (LOAD/SAVE + KIT) have "Change Project" below kit 0 as well:
 
 - **Load** a kit of another project: it replaces all parameters of the active kit (all voices,
-  engines, LFOs incl. targets in other voices, FX, ...). Nothing is written, neither a kit slot nor
-  the autosave; save it yourself afterwards (into any slot of any project, renaming it if you like).
+  engines, LFOs incl. targets in other voices, FX, ...). It stays temporary until you save it into a
+  slot (of any project, renaming it if you like): nothing writes it, neither a project save (the kit
+  slot you had loaded before keeps its sound) nor the autosave, also not after editing it. Loading
+  another kit, or a pattern change that loads the pattern's kit, discards it.
 - **Save** the active kit into another project: the encoder button on a slot saves it there right
   away with the kit's name (the name of the kit it was loaded from), without the name dialog. To
   rename it, save it into a slot of the active project. Only existing projects can be chosen.

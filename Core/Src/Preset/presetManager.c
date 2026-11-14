@@ -719,7 +719,10 @@ void preset_processTimer()
 		if(HAL_GetTick()-preset_kitTimer >= PRESET_SAVE_TIME )
 		{
 			preset_kitDirty = 0;
-			preset_saveTmpKit();
+			//a kit loaded from another project stays temporary until it is saved into a slot:
+			//the autosave would bring it back after a reboot as the sound of the current slot
+			if(!preset_otherKitLoaded)
+				preset_saveTmpKit();
 		}
 	}
 }
@@ -2391,8 +2394,11 @@ FRESULT preset_saveProject(uint8_t presetNr)
 	FRESULT res;
 	FILINFO fno;
 
-	//the current kit (not the one last scrolled to on the load/save page)
-	preset_saveDrumsetRam(menu_loadedPresetNr[CURRENT_KIT], 0);
+	//the current kit (not the one last scrolled to on the load/save page); not a kit loaded
+	//from another project: it is temporary until saved into a slot and would overwrite the
+	//slot of the kit loaded before it
+	if(!preset_otherKitLoaded)
+		preset_saveDrumsetRam(menu_loadedPresetNr[CURRENT_KIT], 0);
 	preset_savePatternRAM(seq_activePattern);
 
 #if USE_INTERRUPT_ONLY_DURING_SAVE_PROJ
