@@ -12,6 +12,7 @@
  */
 
 #include "Soundengine/DSPAudio/ResonantFilter.h"
+#include <string.h>
 
 
 // to make the linker happy. __errno seems not defined
@@ -123,13 +124,14 @@ IN_ITCM_RAM float softClipTwo(float in)
 
 //	return in;
 }
-#pragma GCC push_options
-#pragma GCC optimize("O0")
-#define is_nan(x) ((x) != (x))
-
+//A filter that blew up (very high cutoff and resonance with a lot of drive) keeps
+//NaN/infinite states and stays silent; reset them. Checks the exponent bits: with
+//-ffast-math the compiler assumes there is no NaN and removed the old (in != in) test.
 float removeMaliciousSample(float in)
 {
-	if(is_nan(in))
+	uint32_t bits;
+	memcpy(&bits, &in, sizeof(bits));
+	if((bits & 0x7F800000) == 0x7F800000)
 	{
 		return 0.f;
 	}
@@ -151,7 +153,6 @@ float removeMaliciousSample(float in)
     *floatInput = sample * ( aNaN & aDen );
     *floatInput */
 }
-#pragma GCC pop_options
 #define USE_FMAF 0
 //------------------------------------------------------------------------------------
 IN_ITCM_RAM void SVF_calcBlockZDF(ResonantFilter* filter, const uint8_t type, int16_t* buf, const uint8_t size)
