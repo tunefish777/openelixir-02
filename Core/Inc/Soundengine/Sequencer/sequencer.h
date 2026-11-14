@@ -104,6 +104,25 @@ typedef struct PatternSettingsStruct
 
 
 
+//OpenElixir-02 step arp: the flam substeps of a step play the notes of a chord.
+//one byte per step: chord (bits 0-3, ARP_REPEAT = every substep plays the step's note
+//like a stock flam), direction (bit 4)
+#define ARP_CHORD_MASK	0x0F
+#define ARP_DIR_DOWN	0x10
+enum ArpChordEnum
+{
+	ARP_REPEAT,
+	ARP_MAJ,
+	ARP_MIN,
+	ARP_DIM,
+	ARP_AUG,
+	ARP_MAJ7,
+	ARP_MIN7,
+	ARP_DIM7,
+	ARP_AUG7,
+	ARP_NUM_CHORDS
+};
+
 typedef struct PatternSetStruct
 {
 	Step seq_subStepPattern[NUM_PATTERN][NUM_TRACKS][NUM_STEPS];	//contains step data
@@ -113,6 +132,7 @@ typedef struct PatternSetStruct
 	uint8_t length[NUM_PATTERN][NUM_TRACKS];	//only used in euklid generator?
 	uint8_t shuffle[NUM_PATTERN];
 	uint8_t kitNr[NUM_PATTERN];
+	uint8_t arp[NUM_PATTERN][NUM_TRACKS][NUM_STEPS];				//step arp (chord, direction)
 }PatternSet;
 
 typedef struct PatternBackupBufferStruct
@@ -124,6 +144,7 @@ typedef struct PatternBackupBufferStruct
 	uint8_t length[NUM_TRACKS];	//only used in euklid generator?
 	uint8_t shuffle;
 	uint8_t kitNr;
+	uint8_t arp[NUM_TRACKS][NUM_STEPS];
 }PatternBackupBuffer;
 
 /*

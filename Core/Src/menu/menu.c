@@ -264,6 +264,8 @@ const Name valueNames[NUM_NAMES] =
 		{SHORT_LIMITER, CAT_GLOBAL, LONG_LIMITER},/*TEXT_MIXER_LIMITER*/
 		{SHORT_DJ_FILTER, CAT_DJ_FILTER, LONG_DJ_FILTER},/*TEXT_DJ_FILTER*/
 		{SHORT_FIL_RESO, CAT_DJ_FILTER, LONG_DJ_RESO},/*TEXT_DJ_RESO*/
+		{SHORT_STEP_CHORD, CAT_STEP, LONG_STEP_CHORD},/*TEXT_STEP_CHORD*/
+		{SHORT_STEP_DIR, CAT_STEP, LONG_STEP_DIR},/*TEXT_STEP_DIR*/
 
 
 };
@@ -539,13 +541,13 @@ const enum Datatypes PROGMEM parameter_dtypes[NUM_PARAMS] = {
 	    /*PAR_P1_VAL*/ 			DTYPE_0B127,							//240
 	    /*PAR_P2_VAL*/ 			DTYPE_0B127,
 	    /*PAR_SHUFFLE*/ 		DTYPE_0B127,
-	    /*PAR_UNUSED*/ 			DTYPE_0B127,
+	    /*PAR_STEP_CHORD*/ 		DTYPE_MENU | (MENU_STEP_CHORD<<8),
 	    /*PAR_PATTERN_NEXT*/ 	DTYPE_MENU | (MENU_NEXT_PATTERN<<8),
 	    /*PAR_TRACK_LENGTH*/ 	DTYPE_1B64,
 	    /*PAR_GLO_SAT*/			DTYPE_0B127,
 	    /*PAR_DJ_FILTER*/ 		DTYPE_PM63,
 	    /*PAR_DJ_RESO*/ 		DTYPE_0B127,
-	    /*PAR_SOM_FREQ*/ 		DTYPE_0B127,
+	    /*PAR_STEP_DIR*/ 		DTYPE_MENU | (MENU_STEP_DIR<<8),
 	    /*PAR_TRACK_ROTATION*/  DTYPE_1B16,  //**PATROT this is not shown in menu, but if it were it would really be 0 to 15
 		/*PAR_STEP_FLAM*/ 		DTYPE_MENU | (MENU_STEP_FLAM<<8),							//251
 		/*PAR_STEP_SHIFT*/		DTYPE_MENU | (MENU_STEP_SHIFT<<8),
@@ -1816,6 +1818,11 @@ void menu_repaintGeneric()
 				else
 					snprintf(&editDisplayBuffer[1][10], 7, offset < 0 ? "LP %3d" : "HP %3d", offset);
 			}
+			else if(parNr == PAR_STEP_CHORD && curParmVal < ARP_NUM_CHORDS)
+			{
+				//the full chord name ("Maj7")
+				memcpy(&editDisplayBuffer[1][12], stepChordLongNames[curParmVal], 4);
+			}
 			else
 			switch(menu_paramDtype(parNr) & 0xFF)
 			{
@@ -2926,6 +2933,12 @@ static uint8_t getMaxEntriesForMenu(uint8_t menuId)
 	case MENU_STEP_SHIFT:
 			return stepShiftNames[0][0];
 
+	case MENU_STEP_CHORD:
+		return stepChordNames[0][0];
+
+	case MENU_STEP_DIR:
+		return stepDirNames[0][0];
+
 	default:
 		return 0;
 	}
@@ -3034,6 +3047,14 @@ static void getMenuItemNameForValue(const uint8_t menuId, const uint8_t curParmV
 
 	case MENU_STEP_SHIFT:
 		p = MENU_ITEM(stepShiftNames);
+		break;
+
+	case MENU_STEP_CHORD:
+		p = MENU_ITEM(stepChordNames);
+		break;
+
+	case MENU_STEP_DIR:
+		p = MENU_ITEM(stepDirNames);
 		break;
 
 
@@ -3830,10 +3851,6 @@ void menu_parseGlobalParam(uint16_t paramNr, uint8_t value)
 		djFilter_reso = value;
 		break;
 
-	case PAR_SOM_FREQ:
-		frontPanel_sendData(SEQ_CC,SEQ_SET_ACTIVE_TRACK,menu_getActiveVoice());
-		frontPanel_sendData(SEQ_CC,SEQ_SOM_FREQ,value);
-		break;
 
 	case PAR_TRACK_LENGTH:
 		frontPanel_sendData(SEQ_CC,SEQ_SET_ACTIVE_TRACK,menu_getActiveVoice());
@@ -4031,6 +4048,12 @@ void menu_parseGlobalParam(uint16_t paramNr, uint8_t value)
 
 	case PAR_STEP_SHIFT:
 		frontPanel_sendData(SEQ_CC,SEQ_SHIFT,value);
+		break;
+
+	case PAR_STEP_CHORD:
+	case PAR_STEP_DIR:
+		frontPanel_sendData(SEQ_CC,SEQ_ARP,
+			activeParameters[PAR_STEP_CHORD] | (activeParameters[PAR_STEP_DIR] ? ARP_DIR_DOWN : 0));
 		break;
 
 	case PAR_STEP_VOLUME:

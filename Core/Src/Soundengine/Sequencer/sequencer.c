@@ -237,6 +237,7 @@ void seq_copyPatternToBackupBuffer(uint8_t patternNr)
 
 	patternBackupBuffer.shuffle = seq_patternSet.shuffle[patternNr];;
 	patternBackupBuffer.kitNr = seq_patternSet.kitNr[patternNr];
+	memcpy(&patternBackupBuffer.arp, &seq_patternSet.arp[patternNr], sizeof(patternBackupBuffer.arp));
 
 }
 //------------------------------------------------------------------------------
@@ -252,6 +253,7 @@ void seq_copyBackupBufferToPattern(uint8_t patternNr)
 
 	seq_patternSet.shuffle[patternNr] = patternBackupBuffer.shuffle;
 	seq_patternSet.kitNr[patternNr] = patternBackupBuffer.kitNr;
+	memcpy(&seq_patternSet.arp[patternNr], &patternBackupBuffer.arp, sizeof(patternBackupBuffer.arp));
 }
 /*
 //------------------------------------------------------------------------------
@@ -1090,6 +1092,57 @@ uint32_t seq_getShiftFlamPattern(const uint8_t track, uint8_t step, StepPosition
 #endif
 }
 
+//------------------------------------------------------------------------------
+//step arp: chord tones in semitones above the step's note, they repeat one octave higher
+static const int8_t seq_arpChords[ARP_NUM_CHORDS][5] =
+{
+	//number of tones, tones
+	{1, 0},				//ARP_REPEAT
+	{3, 0, 4, 7},		//ARP_MAJ
+	{3, 0, 3, 7},		//ARP_MIN
+	{3, 0, 3, 6},		//ARP_DIM
+	{3, 0, 4, 8},		//ARP_AUG
+	{4, 0, 4, 7, 11},	//ARP_MAJ7
+	{4, 0, 3, 7, 10},	//ARP_MIN7
+	{4, 0, 3, 6, 9},	//ARP_DIM7
+	{4, 0, 4, 8, 10},	//ARP_AUG7
+};
+//number of substeps for the flam values (off, x2, x3, x4, x6, x8)
+static const uint8_t seq_flamSubsteps[6] = {1, 2, 3, 4, 6, 8};
+//------------------------------------------------------------------------------
+//the note a substep of step plays at tick idx of the current step. stepPos tells where idx is
+//relative to step: the step before (STEP_PREV, shifted forward), the step (STEP_CURRENT) or
+//the step after (STEP_NEXT, shifted backwards)
+static uint8_t seq_arpNote(const uint8_t track, const uint8_t step, const StepPosition stepPos, const uint8_t idx)
+{
+	const uint8_t note = seq_patternSet.seq_subStepPattern[seq_activePattern][track][step].note;
+	const uint8_t arp = seq_patternSet.arp[seq_activePattern][track][step];
+	const uint8_t chord = arp & ARP_CHORD_MASK;
+	if(chord == ARP_REPEAT || chord >= ARP_NUM_CHORDS)
+		return note;
+
+	const StepTiming timing = seq_patternSet.seq_stepTiming[seq_activePattern][track][step];
+	const uint8_t numSubsteps = timing.flam < 6 ? seq_flamSubsteps[timing.flam] : 1;
+
+	//tick within the step without its shift -> substep
+	int16_t tick = idx - getShiftValue(timing.shift)*3;
+	if(stepPos == STEP_PREV)
+		tick += 24;
+	else if(stepPos == STEP_NEXT)
+		tick -= 24;
+	if(tick < 0)
+		tick = 0;
+	uint8_t substep = (uint8_t)(tick / (24/numSubsteps));
+	if(substep >= numSubsteps)
+		substep = numSubsteps-1;
+	if(arp & ARP_DIR_DOWN)
+		substep = numSubsteps-1 - substep;
+
+	const uint8_t numTones = seq_arpChords[chord][0];
+	const int16_t arpNote = note + seq_arpChords[chord][1 + substep%numTones] + 12*(substep/numTones);
+	return arpNote > 127 ? 127 : (uint8_t)arpNote;
+}
+//------------------------------------------------------------------------------
 uint8_t chokeCurrent=0;
 uint8_t chokeNext=0;
 void seq_processFlam(uint8_t idx)
@@ -1137,7 +1190,7 @@ void seq_processFlam(uint8_t idx)
 				lastWasNoteOn[track] = 1;
 				chokeNext = 1;
 				const uint8_t vol = seq_patternSet.seq_subStepPattern[seq_activePattern][track][nextStep].volume&STEP_VOLUME_MASK;
-				const uint8_t note = seq_patternSet.seq_subStepPattern[seq_activePattern][track][nextStep].note;
+				const uint8_t note = seq_arpNote(track, nextStep, STEP_NEXT, idx);
 				seq_triggerVoice(track,vol,note);
 			}
 			else if((currentActive) && (chokeNext == 0))
@@ -1145,14 +1198,14 @@ void seq_processFlam(uint8_t idx)
 				lastWasNoteOn[track] = 1;
 				chokeCurrent = 1;
 				const uint8_t vol = seq_patternSet.seq_subStepPattern[seq_activePattern][track][currentStep].volume&STEP_VOLUME_MASK;
-				const uint8_t note = seq_patternSet.seq_subStepPattern[seq_activePattern][track][currentStep].note;
+				const uint8_t note = seq_arpNote(track, currentStep, STEP_CURRENT, idx);
 				seq_triggerVoice(track,vol,note);
 			}
 			else if((prevActive) && (chokeNext == 0) && (chokeCurrent == 0))
 			{
 				lastWasNoteOn[track] = 1;
 				const uint8_t vol = seq_patternSet.seq_subStepPattern[seq_activePattern][track][prevStep].volume&STEP_VOLUME_MASK;
-				const uint8_t note = seq_patternSet.seq_subStepPattern[seq_activePattern][track][prevStep].note;
+				const uint8_t note = seq_arpNote(track, prevStep, STEP_PREV, idx);
 				seq_triggerVoice(track,vol,note);
 			}
 			else if (lastWasNoteOn[track])
@@ -2561,6 +2614,7 @@ void seq_clearTrack(uint8_t trackNr, uint8_t pattern)
 
 		seq_patternSet.seq_stepTiming[pattern][trackNr][k].flam = 0;
 		seq_patternSet.seq_stepTiming[pattern][trackNr][k].shift = 7;   // 7 = no shift
+		seq_patternSet.arp[pattern][trackNr][k] = ARP_REPEAT;
 
 		//every 1st step in a substep pattern active
 		if( (k%8) == 0)
@@ -2622,6 +2676,7 @@ void seq_copyTrack(uint8_t srcNr, uint8_t dstNr, uint8_t pattern)
 		dst->volume		= src->volume;
 
 		seq_patternSet.seq_stepTiming[pattern][dstNr][k] = seq_patternSet.seq_stepTiming[pattern][srcNr][k];
+		seq_patternSet.arp[pattern][dstNr][k] = seq_patternSet.arp[pattern][srcNr][k];
 	}
 
 	// copy which main steps are on/off
@@ -2665,6 +2720,7 @@ void seq_copyPattern(uint8_t src, uint8_t dst)
 			pdst->volume		= psrc->volume;
 
 			seq_patternSet.seq_stepTiming[dst][j][k] = seq_patternSet.seq_stepTiming[src][j][k];
+			seq_patternSet.arp[dst][j][k] = seq_patternSet.arp[src][j][k];
 		}
 
 		for( uint8_t i=0;i<NUM_BARS;i++)

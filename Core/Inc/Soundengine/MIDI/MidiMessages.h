@@ -500,6 +500,7 @@ extern Param2EnumsDefinition Param2Enums;
 #define FRONT_SEQ_TRIGGER_OUT1_PPQ 		0x37
 #define FRONT_SEQ_TRIGGER_OUT2_PPQ 		0x38
 #define FRONT_SEQ_TRIGGER_GATE_MODE 	0x39
+#define FRONT_SEQ_ARP					0x3A	// OpenElixir-02: step arp of the active step (chord | direction, see ARP_CHORD_MASK)
 
 //codec control messages
 #define EQ_ON_OFF						0x01

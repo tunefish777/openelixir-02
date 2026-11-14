@@ -418,6 +418,12 @@ void frontPanel_parseData(uint8_t data)
 							menu_repaintAll();
 							break;
 
+						case SEQ_ARP:
+							activeParameters[PAR_STEP_CHORD] = frontParser_midiMsg.data2 & ARP_CHORD_MASK;
+							activeParameters[PAR_STEP_DIR] = (frontParser_midiMsg.data2 & ARP_DIR_DOWN) != 0;
+							menu_repaintAll();
+							break;
+
 						/*
 						case SEQ_GET_ACTIVE_PAT:
 						//only in mute mode relevant

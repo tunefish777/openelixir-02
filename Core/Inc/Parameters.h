@@ -360,7 +360,7 @@ enum ParamEnums
 	
 	PAR_SHUFFLE,
 
-	PAR_UNUSED,				// auto -> switch kits with pattern, off -> pattern change won't change kit
+	PAR_STEP_CHORD,			// OpenElixir-02: step arp chord of the active step (was unused)
 	PAR_PATTERN_NEXT,				//  - UNUSED
 	
 	PAR_TRACK_LENGTH,
@@ -368,7 +368,7 @@ enum ParamEnums
 	UNUSED_PAR_GLO_SAT,						//  - global saturation
 	PAR_DJ_FILTER,					// OpenElixir-02: global DJ filter, 63 = off (performance page, not saved)
 	PAR_DJ_RESO,					// OpenElixir-02: its resonance
-	PAR_SOM_FREQ,					//  - UNUSED
+	PAR_STEP_DIR,					// OpenElixir-02: step arp direction of the active step (was unused)
 	PAR_TRACK_ROTATION,				// **PATROT
 
 	PAR_STEP_FLAM,

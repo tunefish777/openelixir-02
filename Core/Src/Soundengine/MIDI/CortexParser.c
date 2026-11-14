@@ -746,6 +746,11 @@ static void frontParser_handleSeqCC()
 		seq_patternSet.seq_stepTiming[frontParser_shownPattern][frontParser_activeTrack][frontParser_activeStep].shift = (cortex_midiMsg.data2);
 		break;
 
+	case FRONT_SEQ_ARP:
+		if((cortex_midiMsg.data2 & ARP_CHORD_MASK) < ARP_NUM_CHORDS)
+			seq_patternSet.arp[frontParser_shownPattern][frontParser_activeTrack][frontParser_activeStep] = cortex_midiMsg.data2 & (ARP_CHORD_MASK | ARP_DIR_DOWN);
+		break;
+
 	case FRONT_SEQ_PROB:
 
 		seq_patternSet.seq_subStepPattern[frontParser_shownPattern][frontParser_activeTrack][frontParser_activeStep].prob = (cortex_midiMsg.data2);
@@ -944,6 +949,10 @@ static void frontParser_handleSeqCC()
 		uart_sendFrontpanelByte(FRONT_SEQ_CC);
 		uart_sendFrontpanelByte(FRONT_SEQ_SHIFT);
 		uart_sendFrontpanelByte(seq_patternSet.seq_stepTiming[frontParser_shownPattern][frontParser_activeTrack][cortex_midiMsg.data2].shift);
+
+		uart_sendFrontpanelByte(FRONT_SEQ_CC);
+		uart_sendFrontpanelByte(FRONT_SEQ_ARP);
+		uart_sendFrontpanelByte(seq_patternSet.arp[frontParser_shownPattern][frontParser_activeTrack][cortex_midiMsg.data2]);
 
 
 

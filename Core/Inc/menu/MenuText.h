@@ -43,6 +43,8 @@
 #define MENU_STEP_FLAM	 	24
 #define MENU_STEP_SHIFT	 	25
 #define MENU_AUDIO_OUT_FX	26
+#define MENU_STEP_CHORD		27
+#define MENU_STEP_DIR		28
 
 //-----------------------------------------------------------------
 // Shared texts. Reduce mem usage by pooling common text
@@ -68,6 +70,40 @@ const char stepFlamNames[][4] =
 
 	//{"+8"},
 
+};
+//-----------------------------------------------------------------
+//step arp (OpenElixir-02), same order as ArpChordEnum in sequencer.h
+const char stepChordNames[][4] =
+{
+	{9},		//number of entries
+	{"Rep"},
+	{"Maj"},
+	{"Min"},
+	{"Dim"},
+	{"Aug"},
+	{"Ma7"},
+	{"Mi7"},
+	{"Di7"},
+	{"Au7"},
+};
+//full names for the edit page
+const char stepChordLongNames[][5] =
+{
+	{" Rep"},
+	{" Maj"},
+	{" Min"},
+	{" Dim"},
+	{" Aug"},
+	{"Maj7"},
+	{"Min7"},
+	{"Dim7"},
+	{"Aug7"},
+};
+const char stepDirNames[][4] =
+{
+	{2},		//number of entries
+	{"Up"},
+	{"Dn"},
 };
 //-----------------------------------------------------------------
 const char stepShiftNames[][4] =
@@ -482,6 +518,8 @@ const char shortNames[][4]  =
 	{"shf"},
 	{"lim"},
 	{"dj"},
+	{"chd"},
+	{"dir"},
 
 };
 //-----------------------------------------------------------------
@@ -616,6 +654,8 @@ const char longNames[][16] =
 	{"Limiter"},
 	{" Cutoff"},	//after the 8 characters of the category: "DJ Filt. Cutoff"
 	{" Reso"},
+	{"ArpChord"},
+	{"Arp Dir"},
 };
 
 

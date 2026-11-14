@@ -146,6 +146,7 @@ extern uint8_t frontPanel_sysexMode;
 #define SEQ_TRIGGER_OUT1_PPQ  0x37
 #define SEQ_TRIGGER_OUT2_PPQ  0x38
 #define SEQ_TRIGGER_GATE_MODE 0x39
+#define SEQ_ARP				  0x3A // OpenElixir-02: step arp of the active step (chord | direction, see ARP_CHORD_MASK)
 
 //SysEx
 #define SYSEX_REQUEST_STEP_DATA			0x01

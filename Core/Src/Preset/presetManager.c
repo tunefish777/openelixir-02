@@ -80,6 +80,7 @@ static void preset_makeFileNameOld(char *buf, uint8_t num, uint8_t type);
 static FRESULT preset_makeFileNameLoad(char *buf, uint8_t num, uint8_t type);
 static FRESULT preset_removeOtherFiles(uint8_t num, uint8_t type, const char *keep);
 static uint8_t preset_readPatternData(uint8_t patternNr, uint8_t dataVersion);
+static FRESULT preset_fwrite(FIL* fp, const void* buf, UINT btw, UINT* bw);
 //save uses the kit name to create a filename eg 00-NAME.ext
 static void preset_makeFileNameSave(char *buf, uint8_t num, uint8_t type, char *name);
 
@@ -103,8 +104,49 @@ typedef struct PatternFileDataStruct
 	uint8_t length[NUM_TRACKS];
 	uint8_t shuffle;
 	uint8_t kitNr;
+	uint8_t arp[NUM_TRACKS][NUM_STEPS];
 }PatternFileData;
 static PatternFileData preset_patternBuffer;
+
+//Pattern files (also in projects) and tmp.pat carry the step arp in a block appended
+//after the kit nr: "OE02", version (1), the arp byte of each step (track by track).
+//Later versions may only append to the block. Files without it (from the stock firmware
+//or older versions) load with the plain flam (ARP_REPEAT), and the stock firmware ignores it.
+static const char preset_patternBlockSignature[4] = {'O','E','0','2'};
+#define PATTERN_BLOCK_VERSION 1
+//write the arp block after the pattern data
+static void preset_writePatternArp(uint8_t patternNr)
+{
+	UINT bytesWritten;
+	const uint8_t version = PATTERN_BLOCK_VERSION;
+	preset_fwrite((FIL*)&SDFile, preset_patternBlockSignature, 4, &bytesWritten);
+	preset_fwrite((FIL*)&SDFile, &version, 1, &bytesWritten);
+	preset_fwrite((FIL*)&SDFile, seq_patternSet.arp[patternNr], sizeof(seq_patternSet.arp[patternNr]), &bytesWritten);
+}
+//read the arp block after the pattern data (plain flam if there is none)
+static void preset_readPatternArp(uint8_t arp[NUM_TRACKS][NUM_STEPS])
+{
+	uint8_t header[5];
+	UINT bytesRead = 0;
+	memset(arp, ARP_REPEAT, NUM_TRACKS*NUM_STEPS);
+	if(f_read((FIL*)&SDFile, header, sizeof(header), &bytesRead) != FR_OK || bytesRead != sizeof(header)
+		|| memcmp(header, preset_patternBlockSignature, 4) != 0 || header[4] < 1)
+		return;
+	if(f_read((FIL*)&SDFile, arp, NUM_TRACKS*NUM_STEPS, &bytesRead) != FR_OK || bytesRead != NUM_TRACKS*NUM_STEPS)
+	{
+		memset(arp, ARP_REPEAT, NUM_TRACKS*NUM_STEPS);
+		return;
+	}
+	for(uint8_t trk=0; trk<NUM_TRACKS; trk++)
+	{
+		for(uint8_t stp=0; stp<NUM_STEPS; stp++)
+		{
+			if((arp[trk][stp] & ARP_CHORD_MASK) >= ARP_NUM_CHORDS)
+				arp[trk][stp] = ARP_REPEAT;
+			arp[trk][stp] &= ARP_CHORD_MASK | ARP_DIR_DOWN;
+		}
+	}
+}
 
 //values read from files are used as indices: keep them in range
 //track length: 0 is read as 16 by the sequencer, more than NUM_STEPS steps don't exist
@@ -564,6 +606,7 @@ FRESULT preset_saveTmpPat()
 		//write associated kit nr
 		preset_fwrite((FIL*)&SDFile,&seq_patternSet.kitNr[presetNr],sizeof(uint8_t),&bytesWritten);
 
+		preset_writePatternArp(presetNr);
 #endif
 
 	//close the file
@@ -1684,6 +1727,7 @@ static void preset_writePatternData(uint8_t patternNr)
 		//write associated kit nr
 		preset_fwrite((FIL*)&SDFile,&seq_patternSet.kitNr[patternNr],sizeof(uint8_t),&bytesWritten);
 
+		preset_writePatternArp(patternNr);
 #endif
 }
 
@@ -1987,6 +2031,7 @@ static uint8_t preset_readPatternData(uint8_t patternNr, uint8_t dataVersion)
 		if(bytesRead == 0)
 			return 0;
 	}
+	preset_readPatternArp(buf->arp);
 
 	//complete: copy into the pattern
 	memcpy(seq_patternSet.seq_subStepPattern[patternNr], buf->steps, sizeof(buf->steps));
@@ -1996,6 +2041,7 @@ static uint8_t preset_readPatternData(uint8_t patternNr, uint8_t dataVersion)
 	memcpy(seq_patternSet.length[patternNr], buf->length, sizeof(buf->length));
 	seq_patternSet.shuffle[patternNr] = buf->shuffle;
 	seq_patternSet.kitNr[patternNr] = buf->kitNr;
+	memcpy(seq_patternSet.arp[patternNr], buf->arp, sizeof(buf->arp));
 	preset_validateKitNr(patternNr);
 	return 1;
 #endif
