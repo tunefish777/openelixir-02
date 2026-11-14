@@ -52,6 +52,8 @@ void led_reset(uint8_t ledNr);
 
 //update BarButtons in pattern Mode
 void led_initPatternSelectLeds();
+//pattern load/save page: repaint if slots of the shown bank got steps or were cleared
+void led_refreshPatternSelectLeds();
 
 //update the sequencer leds with active steps
 void led_updateSeqLeds();
@@ -84,6 +86,8 @@ void led_pulseLed(uint8_t ledNr);
 
 /** activate and deactivate blinking mode for LEDs*/
 void led_setBlinkLed(const uint8_t ledNr, const uint8_t onOff);
+/** blink 4 times as fast as led_setBlinkLed, turn it off with led_setBlinkLed(ledNr, 0)*/
+void led_setFastBlinkLed(const uint8_t ledNr);
 void led_clearAllBlinkLeds();
 
 /**this function needs to be called periodically to check if it is time to turn of a pulsed led*/

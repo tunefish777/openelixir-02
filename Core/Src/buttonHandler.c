@@ -29,6 +29,7 @@
 #include "Preset/PresetManager.h"
 #include "Soundengine/FxBus.h"
 #include "Soundengine/CpuMeter.h"
+#include "Soundengine/Soundengine.h"
 
 //used to remember the last active page when entering the sequencer mode
 //needed to return to the previously shown page when seq mode button is released
@@ -1161,7 +1162,16 @@ static void buttonHandler_seqButtonPressed(uint8_t seqButtonPressed)
 		case SELECT_MODE_PATTERN:
 			if(menu_getActivePage() == PATTERN_SAVE_PAGE)
 			{
-
+				//saving over another pattern with steps needs a 2nd press on the same button
+				const uint8_t target = seqButtonPressed + 16 * menu_activePatternBank;
+				if(target != seq_activePattern && target != menu_patternOverwriteTarget && seq_patternHasSteps(target))
+				{
+					menu_patternOverwriteTarget = target;
+					led_initPatternSelectLeds();
+					menu_repaint();
+					break;
+				}
+				menu_patternOverwriteTarget = NO_PATTERN;
 
 				//write pattern edit buffer back to RAM pattern array
 			//	seq_copyEditBufferToRam(seqButtonPressed + 16 * menu_activePatternBank);
@@ -1179,18 +1189,10 @@ static void buttonHandler_seqButtonPressed(uint8_t seqButtonPressed)
 
 				preset_savePatternRAM(seqButtonPressed + 16 * menu_activePatternBank);
 
-				//save to tmp folder
-				#if USE_INTERRUPT_ONLY_DURING_SAVE_PROJ
-					HAL_TIM_Base_Start_IT(&htim2);	//calc sample interrupt - prio 1
-				#else
-
-				#endif
-					preset_savePatternSD(seqButtonPressed + 16 * menu_activePatternBank);
-				#if USE_INTERRUPT_ONLY_DURING_SAVE_PROJ
-							HAL_TIM_Base_Stop_IT(&htim2);	//calc sample interrupt - prio 1
-				#else
-
-				#endif
+				//save to tmp folder, audio keeps running during the SD access
+				const uint8_t audioStarted = soundengine_backgroundAudioBegin();
+				preset_savePatternSD(seqButtonPressed + 16 * menu_activePatternBank);
+				soundengine_backgroundAudioEnd(audioStarted);
 
 
 				menu_selectedPresetNr[SAVE_TYPE_PATTERN] = seqButtonPressed + 16 * menu_activePatternBank;
@@ -1212,10 +1214,6 @@ static void buttonHandler_seqButtonPressed(uint8_t seqButtonPressed)
 
 				//select pattern to show // shownPattern
 				menu_setShownPattern(seqButtonPressed + 16 * menu_activePatternBank);
-				led_clearSequencerLeds();
-
-				led_clearAllBlinkLeds();
-				led_setBlinkLed(led_idx2StepLed(seqButtonPressed), 1);
 
 				frontPanel_sendData(SEQ_CC, SEQ_REQUEST_EUKLID_PARAMS,
 						menu_activePage/*menu_getActiveVoice()*/);
@@ -1225,11 +1223,8 @@ static void buttonHandler_seqButtonPressed(uint8_t seqButtonPressed)
 	//-----------------------------------------------------------------
 
 
-				//flash corresponding LED until ACK (SEQ_CHANGE_PAT) received
-				ledNr = led_idx2StepLed(seqButtonPressed);
-				led_clearAllBlinkLeds();
-
-				led_setBlinkLed(ledNr, 1);
+				//fast blink of the selected pattern until ACK (SEQ_CHANGE_PAT) received
+				led_initPatternSelectLeds();
 
 				//tell sequencer to change pattern
 				frontPanel_sendData(SEQ_CC, SEQ_CHANGE_PAT, seqButtonPressed + 16 * menu_activePatternBank);

@@ -290,6 +290,9 @@ void seq_copyTrack(uint8_t srcNr, uint8_t dstNr, uint8_t pattern);
 //------------------------------------------------------------------------------
 void seq_copyPattern(uint8_t src, uint8_t dst);
 //------------------------------------------------------------------------------
+//returns 1 if at least one main step of the pattern is active
+uint8_t seq_patternHasSteps(uint8_t pattern);
+//------------------------------------------------------------------------------
 //selects the automation track (0:1) that is recorded to
 void seq_setActiveAutomationTrack(uint8_t trackNr);
 //------------------------------------------------------------------------------

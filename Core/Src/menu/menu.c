@@ -778,6 +778,8 @@ uint8_t menu_selectedPresetNr[NUM_PRESET_LOCATIONS];
 uint8_t menu_loadedPresetNr[NUM_CURRENT];
 
 uint32_t sucessTimer = 0;
+uint8_t menu_patternOverwriteTarget = NO_PATTERN;
+static uint32_t menu_patternLedTimer = 0;
 
 uint8_t menu_shownPattern = 0;
 uint8_t menu_muteModeActive = 0;
@@ -1133,6 +1135,14 @@ void menu_uiTick()
 	}
 #endif
 
+	//pattern load/save: show slots that got steps or were cleared meanwhile (live recording, copy, clear)
+	if( (menu_activePage == PATTERN_LOAD_PAGE || menu_activePage == PATTERN_SAVE_PAGE)
+		&& (systick_ticks - menu_patternLedTimer > 400))
+	{
+		menu_patternLedTimer = systick_ticks;
+		led_refreshPatternSelectLeds();
+	}
+
 	if((menu_activePage == PATTERN_SAVE_PAGE_OK) || (menu_activePage == KIT_SAVE_PAGE_OK))
 	{
 		if(systick_ticks - sucessTimer > 4000)
@@ -1289,6 +1299,15 @@ static void menu_repaintSimplePage()
 		strcpy(&editDisplayBuffer[0][0], "Select Pattern");
 		strcpy(&editDisplayBuffer[1][0], "Current: ");
 		numtostrps(&editDisplayBuffer[1][9],menu_playedPattern+1);
+	}
+	else if(menu_activePage == PATTERN_SAVE_PAGE && menu_patternOverwriteTarget != NO_PATTERN)
+	{
+		memset(&editDisplayBuffer[0][0], ' ', 16);
+		memset(&editDisplayBuffer[1][0], ' ', 16);
+		memcpy(&editDisplayBuffer[0][0], "Overwrite", 9);
+		numtostrps(&editDisplayBuffer[0][10],menu_patternOverwriteTarget+1);
+		editDisplayBuffer[0][13] = '?';
+		memcpy(&editDisplayBuffer[1][0], "Press again: yes", 16);
 	}
 	else if(menu_activePage == PATTERN_SAVE_PAGE)
 	{
@@ -3567,6 +3586,7 @@ void menu_switchPage(uint8_t pageNr)
 		led_setBlinkLed(LED_STEP8, 0);
 	if(menu_activePage == VOICE_LOAD_PAGE && pageNr != VOICE_LOAD_PAGE)
 		voiceLoad_leave();
+	menu_patternOverwriteTarget = NO_PATTERN;
 
 	//autosave config page settings
 	/*

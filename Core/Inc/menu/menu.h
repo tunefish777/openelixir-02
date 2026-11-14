@@ -65,6 +65,9 @@ enum
 
 extern uint8_t menu_loadedPresetNr[NUM_CURRENT];
 extern uint32_t sucessTimer;
+//pattern save page: slot with steps that the next press on the same step button overwrites
+#define NO_PATTERN 0xFF
+extern uint8_t menu_patternOverwriteTarget;
 
 void menu_setShownPattern(uint8_t patternNr);
 uint8_t menu_getViewedPattern();

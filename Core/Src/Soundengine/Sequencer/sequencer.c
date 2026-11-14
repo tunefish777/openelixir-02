@@ -2633,6 +2633,19 @@ void seq_copyTrack(uint8_t srcNr, uint8_t dstNr, uint8_t pattern)
 
 }
 //------------------------------------------------------------------------------
+uint8_t seq_patternHasSteps(uint8_t pattern)
+{
+	for(uint8_t bar=0;bar<NUM_BARS;bar++)
+	{
+		for(uint8_t track=0;track<NUM_TRACKS;track++)
+		{
+			if(seq_patternSet.seq_mainSteps[bar][pattern][track])
+				return 1;
+		}
+	}
+	return 0;
+}
+//------------------------------------------------------------------------------
 void seq_copyPattern(uint8_t src, uint8_t dst)
 {
 	int k,j;

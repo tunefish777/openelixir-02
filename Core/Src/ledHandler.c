@@ -50,6 +50,15 @@ volatile uint8_t led_blinkLedNumber[NUM_OF_BLINKABLE_LEDS];	/**< stores the corr
 volatile uint8_t led_blinkingLeds;
 uint8_t led_blinkToggleState = 0;							//to synchronize all blinking LEDs
 uint8_t led_blinkPrescaler = 0;
+//fast blink: one period per sequencer step (4 times the normal blink), in phase with the steps
+#define LED_FAST_BLINK_MIN_STEP 20		/**< 5 ms, shorter step intervals are not measured*/
+#define LED_FAST_BLINK_MAX_STEP 4000	/**< 1 s*/
+volatile uint8_t led_fastBlinkingLeds;			/**< blink slots that blink fast*/
+static volatile uint32_t led_stepTime;			/**< systick of the last step (step length measurement only)*/
+static volatile uint32_t led_lastStepTicks;		/**< length of the step before (shuffle: the other step of the pair)*/
+static volatile uint32_t led_stepTicks = 500;	/**< mean step length, also used while no steps come in*/
+static volatile uint32_t led_fastBlinkStart;	/**< start of the current fast blink period*/
+static volatile uint8_t led_fastBlinkFreeRun;	/**< no steps come in (stopped external clock): blink on our own*/
 //--------------------------------------------
 void led_init()
 {
@@ -74,29 +83,9 @@ void led_clearSelectLeds()
 
 }
 //--------------------------------------------
-void led_initPatternSelectLeds()
+//bank buttons (PAGE DOWN/UP) show the shown pattern bank in binary
+static void led_showPatternBank()
 {
-	const uint8_t bank = menu_playedPattern/16;
-	const uint8_t ledIdx = led_idx2StepLed(menu_playedPattern); //led_idx2SelectLed(menu_playedPattern);
-
-	// a blinking LED shows the viewed pattern if different from the played pattern
-	if(menu_playedPattern != menu_getViewedPattern())
-	{
-		led_setBlinkLed((uint8_t)(ledIdx) ,1);
-	}		
-	else
-	{
-		//no playing pattern is shown, so clear the seq leds.
-		led_clearAllBlinkLeds();
-		led_clearSequencerLeds();
-	}
-
-	//Show current pattern on step seq buttons if in current bank
-	if(bank == menu_activePatternBank)
-	{
-		led_setValue(1,ledIdx);
-	}
-
 	//Bar /Bank buttons
 	switch(menu_activePatternBank)
 	{
@@ -120,8 +109,85 @@ void led_initPatternSelectLeds()
 			led_setValue(1, LED_PAGE_UP);
 			break;
 	}
+}
+//--------------------------------------------
+//song mode: the played pattern is lit, a viewed pattern different from it blinks
+static void led_initSongPatternLeds()
+{
+	const uint8_t bank = menu_playedPattern/16;
+	const uint8_t ledIdx = led_idx2StepLed(menu_playedPattern); //led_idx2SelectLed(menu_playedPattern);
 
-};
+	// a blinking LED shows the viewed pattern if different from the played pattern
+	if(menu_playedPattern != menu_getViewedPattern())
+	{
+		led_setBlinkLed((uint8_t)(ledIdx) ,1);
+	}		
+	else
+	{
+		//no playing pattern is shown, so clear the seq leds.
+		led_clearAllBlinkLeds();
+		led_clearSequencerLeds();
+	}
+
+	//Show current pattern on step seq buttons if in current bank
+	if(bank == menu_activePatternBank)
+	{
+		led_setValue(1,ledIdx);
+	}
+
+	led_showPatternBank();
+}
+//--------------------------------------------
+//bit i is set if pattern i of the shown bank has steps
+static uint16_t led_patternBankContent()
+{
+	uint16_t content = 0;
+	for(uint8_t i=0;i<16;i++)
+	{
+		if(seq_patternHasSteps(menu_activePatternBank*16 + i))
+			content |= (uint16_t)(1<<i);
+	}
+	return content;
+}
+static uint16_t led_patternContent;		/**< content shown on the step LEDs by led_initPatternSelectLeds()*/
+//--------------------------------------------
+void led_initPatternSelectLeds()
+{
+	if(menu_activePage != PATTERN_LOAD_PAGE && menu_activePage != PATTERN_SAVE_PAGE && menu_activePage != PATTERN_SAVE_PAGE_OK)
+	{
+		led_initSongPatternLeds();
+		return;
+	}
+
+	//pattern load/save: lit = slot has steps, slow blink = playing pattern,
+	//fast blink = pattern that plays next and the slot a save would overwrite
+	const uint8_t bank = menu_activePatternBank;
+	led_patternContent = led_patternBankContent();
+
+	led_clearAllBlinkLeds();
+	for(uint8_t i=0;i<16;i++)
+	{
+		led_setValue((led_patternContent>>i) & 1, led_idx2StepLed(i));
+	}
+
+	const uint8_t next = menu_getViewedPattern();
+	if(menu_playedPattern/16 == bank)
+		led_setBlinkLed(led_idx2StepLed(menu_playedPattern), 1);
+	if(next != menu_playedPattern && next/16 == bank)
+		led_setFastBlinkLed(led_idx2StepLed(next));
+
+	const uint8_t target = menu_patternOverwriteTarget;
+	if(target != NO_PATTERN && target != next && target != menu_playedPattern && target/16 == bank)
+		led_setFastBlinkLed(led_idx2StepLed(target));
+
+	led_showPatternBank();
+}
+//--------------------------------------------
+void led_refreshPatternSelectLeds()
+{
+	if(led_patternBankContent() != led_patternContent)
+		led_initPatternSelectLeds();
+}
 //--------------------------------------------
 void led_clearVoiceLeds()
 {
@@ -402,6 +468,13 @@ void led_clearActive_step()
 //-------------------------------------------------
 void led_updateSeqLeds()
 {
+	//pattern load/save: the step LEDs show the pattern slots
+	if(menu_activePage == PATTERN_LOAD_PAGE || menu_activePage == PATTERN_SAVE_PAGE || menu_activePage == PATTERN_SAVE_PAGE_OK)
+	{
+		led_initPatternSelectLeds();
+		return;
+	}
+
 	//prevent steps showing up in manual trigger edit mode  (perf) and in the engine menu
 	if(buttonHandler_getMode() != SELECT_MODE_PERF && buttonHandler_getMode() != SELECT_MODE_ENGINE && menu_getActivePage() != VOICE_LOAD_PAGE)
 	{
@@ -569,6 +642,7 @@ void led_clearAllBlinkLeds()
 		//set slot to inactive
 		led_blinkingLeds &= (uint8_t)~(1<<i);
 	}
+	led_fastBlinkingLeds = 0;
 };
 //-------------------------------------------------------
 void led_setBlinkLed(const uint8_t ledNr, const uint8_t onOff)
@@ -605,11 +679,53 @@ void led_setBlinkLed(const uint8_t ledNr, const uint8_t onOff)
 				//we found the matching slot
 				//set slot to inactive
 				led_blinkingLeds &= (uint8_t)~(1<<i);
+				led_fastBlinkingLeds &= (uint8_t)~(1<<i);
 				led_reset(ledNr);
 			}
 		}
 	}
 };
+//-------------------------------------------------------
+void led_setFastBlinkLed(const uint8_t ledNr)
+{
+	//search for a free blink slot
+	for(int i=0;i<NUM_OF_BLINKABLE_LEDS;i++)
+	{
+		if( !(led_blinkingLeds & (1<<i)))
+		{
+			led_blinkLedNumber[i] = ledNr;
+			led_fastBlinkingLeds |= (uint8_t)(1<<i);
+			led_blinkingLeds |= (uint8_t)(1<<i);
+			break;
+		}
+	}
+}
+//-------------------------------------------------------
+//fast blink: on in the first half of each step, off in the second half
+static void led_fastBlinkHandler()
+{
+	if(!led_fastBlinkingLeds)
+		return;
+
+	const uint32_t stepTicks = led_stepTicks;
+	uint32_t elapsed = systick_ticks - led_fastBlinkStart;
+	//a shuffled step can be longer than the mean: stay off until it comes,
+	//only blink on our own when steps stopped coming (stopped external clock)
+	if(elapsed >= 2*stepTicks)
+		led_fastBlinkFreeRun = 1;
+	if(led_fastBlinkFreeRun && elapsed >= stepTicks)
+	{
+		elapsed %= stepTicks;
+		led_fastBlinkStart = systick_ticks - elapsed;
+	}
+
+	const uint8_t on = elapsed < stepTicks/2;
+	for(int i=0;i<NUM_OF_BLINKABLE_LEDS;i++)
+	{
+		if(led_fastBlinkingLeds & (1<<i))
+			led_setValueTemp(on, led_blinkLedNumber[i]);
+	}
+}
 //-------------------------------------------------------
 void led_resetBlinkTimer()
 {
@@ -627,8 +743,8 @@ void led_blinkHandler()
 		led_blinkToggleState = 1- led_blinkToggleState;
 		for(int i=0;i<NUM_OF_BLINKABLE_LEDS;i++)
 		{
-			//if the led is active at the moment
-			if(led_blinkingLeds & (1<<i))
+			//if the led is active at the moment (fast blinking LEDs: see led_fastBlinkHandler)
+			if((led_blinkingLeds & ~led_fastBlinkingLeds) & (1<<i))
 			{
 				if(led_blinkToggleState)
 					led_setValueTemp(1,led_blinkLedNumber[i]);
@@ -641,10 +757,29 @@ void led_blinkHandler()
 	}
 	led_blinkPrescaler++;
 	if(led_blinkPrescaler>=2)led_blinkPrescaler=0;
+
+	//step length for the fast blink: mean of the last 2 steps, so shuffle doesn't change the rate
+	const uint32_t now = systick_ticks;
+	const uint32_t stepTicks = now - led_stepTime;
+	if(stepTicks >= LED_FAST_BLINK_MIN_STEP && stepTicks <= LED_FAST_BLINK_MAX_STEP)
+	{
+		const uint32_t lastStepTicks = led_lastStepTicks ? led_lastStepTicks : stepTicks;
+		led_stepTicks = (stepTicks + lastStepTicks) / 2;
+		led_lastStepTicks = stepTicks;
+	}
+	else
+	{
+		led_lastStepTicks = 0;
+	}
+	led_stepTime = now;
+	led_fastBlinkStart = now;
+	led_fastBlinkFreeRun = 0;
 }
 //-------------------------------------------------------
 void led_tickHandler()
 {
+	led_fastBlinkHandler();
+
 	for(int i=0;i<NUM_OF_PULSABLE_LEDS;i++)
 	{
 		//if the led is active at the moment
