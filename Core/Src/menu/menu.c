@@ -4268,6 +4268,32 @@ uint8_t getMenuIndx(void)
   return menuIndex;
 }
 //-----------------------------------------------------------------
+//SHIFT + knob: bigger steps for value ranges, lists and small ranges keep single steps
+static int16_t menu_accelerateKnob(int16_t diff, uint16_t paramNr)
+{
+	if(!buttonHandler_getShift())
+		return diff;
+
+	if( (menu_activePage == SAVE_PAGE) || (menu_activePage == LOAD_PAGE))
+		return diff * 8;
+
+	switch(menu_paramDtype(paramNr) & 0xFF)
+	{
+	case DTYPE_0B127:
+	case DTYPE_PM63:
+	case DTYPE_PM100:
+	case DTYPE_0B100:
+		return diff * 8;
+	case DTYPE_0B255:
+		return diff * 10;
+	case DTYPE_1B64:
+	case DTYPE_NOTE_NAME:
+		return diff * 4;
+	default:
+		return diff;
+	}
+}
+//-----------------------------------------------------------------
 uint8_t menu_parseKnobValue(uint8_t potNr, int16_t diff)
 {
 	screensaver_touch();
@@ -4278,6 +4304,8 @@ uint8_t menu_parseKnobValue(uint8_t potNr, int16_t diff)
 	const uint8_t isOn2ndPage		= ( activeParameter > 3) * 4;
 	uint16_t paramNr				= pgm_read_word(&menu_getPage(menu_activePage,activePage)->bot1 +
 										potNr + isOn2ndPage);
+
+	diff = menu_accelerateKnob(diff, paramNr);
 
 	//-------------------------------------------------
 
@@ -4303,6 +4331,15 @@ uint8_t menu_parseKnobValue(uint8_t potNr, int16_t diff)
 	//parameter fetch. given the value of the pot, and the parameter number
 	// fetch the actual numeric value that the parameter should be set to
 	uint8_t dtypeValue = limitPotValue(diff, paramNr);//getDtypeValue(potValue,paramNr);
+
+	//a fast step (SHIFT) stops at the center of a bipolar value (DJ filter off, no detune...)
+	if((menu_paramDtype(paramNr) & 0xFF) == DTYPE_PM63)
+	{
+		const uint8_t center = menu_isTuningParam(paramNr) ? 60 : 63;
+		const uint8_t oldValue = activeParameters[paramNr];
+		if( (oldValue < center && dtypeValue > center) || (oldValue > center && dtypeValue < center))
+			dtypeValue = center;
+	}
 
 	menu_processSpecialCaseValues(paramNr/*,&dtypeValue*/);
 
