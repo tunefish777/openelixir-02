@@ -173,6 +173,8 @@ void buttonHandler_setMode(uint8_t mode);
 uint8_t buttonHandler_getCopy();
 //--------------------------------------------------------
 uint8_t buttonHandler_getShift();
+/** pattern load/save page: the slot pressed by step button or encoder (load it / save into it)*/
+void buttonHandler_patternSlot(uint8_t pattern);
 //--------------------------------------------------------
 uint8_t buttonHandler_getLoad();
 //--------------------------------------------------------

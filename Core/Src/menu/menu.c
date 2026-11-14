@@ -867,6 +867,105 @@ uint8_t menu_getViewedPattern()
 {
 	return menu_shownPattern;
 }
+//-----------------------------------------------------------------
+//pattern load/save pages: the slot under the encoder cursor
+static uint8_t menu_patternCursor = 0;
+uint8_t menu_getPatternCursor(void)
+{
+	return menu_patternCursor;
+}
+void menu_patternCursorSet(uint8_t pattern)
+{
+	if(pattern >= NUM_PATTERN)
+		pattern = NUM_PATTERN-1;
+	menu_patternCursor = pattern;
+	//the step buttons show the bank of the cursor
+	if(menu_activePatternBank != pattern/16)
+	{
+		menu_activePatternBank = pattern/16;
+		led_initPatternSelectLeds();
+	}
+	menu_repaint();
+}
+//no name: all blank or "Empty"
+static uint8_t menu_isPatternNameEmpty(char* name)
+{
+	for(uint8_t i=0;i<8;i++)
+	{
+		if(name[i] != 0 && name[i] != ' ')
+			return preset_isNameEmpty(name);
+	}
+	return 1;
+}
+//the name shown for a slot (8 characters): its name, "Unnamed" (steps but no name) or "Empty"
+static void menu_patternName(uint8_t pattern, char* buf)
+{
+	char* name = savefileNames[pattern][PATTERN_NAMES];
+	if(menu_isPatternNameEmpty(name))
+		name = seq_patternHasSteps(pattern) ? "Unnamed " : "Empty   ";
+	for(uint8_t i=0;i<8;i++)
+	{
+		buf[i] = name[i] ? name[i] : ' ';
+	}
+}
+//"[05] Name" for the slot under the cursor
+static void menu_repaintPatternRow(char* row)
+{
+	memset(row, ' ', 16);
+	const uint8_t nr = (uint8_t)(menu_patternCursor + 1);
+	row[0] = '[';
+	row[1] = (char)('0' + nr/10);
+	row[2] = (char)('0' + nr%10);
+	row[3] = ']';
+	menu_patternName(menu_patternCursor, &row[5]);
+}
+//-----------------------------------------------------------------
+//pattern save into target: the kit save dialog ("Edit Name? [y/N]", name editor, ok)
+//takes over; the name starts as the one of the saved (playing) pattern
+void menu_patternSaveDialog(uint8_t target)
+{
+	char name[8];
+	memcpy(name, savefileNames[seq_activePattern][PATTERN_NAMES], 8);
+	if(menu_isPatternNameEmpty(name))
+		memcpy(name, "Unnamed ", 8);
+
+	menu_saveOptions.category = SAVE_TYPE_PATTERN;
+	menu_saveOptions.nameBuffer = PATTERN_NAMES;
+	menu_selectedPresetNr[SAVE_TYPE_PATTERN] = target;
+	menu_copyStringToEditBuffer(name);
+	menu_activePage = SAVE_PAGE;
+	menu_saveOptions.state = SAVE_STATE_CHANGE_NAME_DIALOG_N;
+	editModeActive = 1;
+	menu_repaintAll();
+}
+//the playing pattern (with its edits, shuffle and the name from the dialog) into target
+void menu_savePattern(uint8_t target)
+{
+	if(activeParameters[PAR_PATTERN_MODE] == 1)
+	{
+		//prevent saving to a new slot reloading the kit and discarding unsaved changes
+		activeParameters[PAR_PATTERN_MODE] = SKIP_NEXT_KIT_AUTOLOAD;
+	}
+	seq_patternSet.shuffle[target] = activeParameters[PAR_SHUFFLE];
+	preset_savePatternRAM(target);
+
+	//save to tmp folder, audio keeps running during the SD access
+	const uint8_t audioStarted = soundengine_backgroundAudioBegin();
+	const FRESULT res = preset_savePatternSD(target);
+	soundengine_backgroundAudioEnd(audioStarted);
+
+	menu_selectedPresetNr[SAVE_TYPE_PATTERN] = target;
+	if(res != FR_OK)
+	{
+		//the card write failed (e.g. card full): no "success", back to the slots
+		menu_showSdError(res);
+		menu_switchPage(PATTERN_SAVE_PAGE);
+		return;
+	}
+	menu_activePage = PATTERN_SAVE_PAGE_OK;
+	sucessTimer = systick_ticks;
+	menu_repaint();
+}
 
 //-----------------------------------------------------------------
 void menu_init()
@@ -1302,9 +1401,9 @@ static void menu_repaintSimplePage()
 	}
 	else if(menu_activePage == PATTERN_LOAD_PAGE)
 	{
-		strcpy(&editDisplayBuffer[0][0], "Select Pattern");
-		strcpy(&editDisplayBuffer[1][0], "Current: ");
-		numtostrps(&editDisplayBuffer[1][9],menu_playedPattern+1);
+		memset(&editDisplayBuffer[0][0], ' ', 16);
+		memcpy(&editDisplayBuffer[0][0], "Select Pattern", 14);
+		menu_repaintPatternRow(editDisplayBuffer[1]);
 	}
 	else if(menu_activePage == PATTERN_SAVE_PAGE && menu_patternOverwriteTarget != NO_PATTERN)
 	{
@@ -1317,9 +1416,9 @@ static void menu_repaintSimplePage()
 	}
 	else if(menu_activePage == PATTERN_SAVE_PAGE)
 	{
-		strcpy(&editDisplayBuffer[0][0], "Save Pattern");
-		strcpy(&editDisplayBuffer[1][0], "Current: ");
-		numtostrps(&editDisplayBuffer[1][9],menu_playedPattern+1);
+		memset(&editDisplayBuffer[0][0], ' ', 16);
+		memcpy(&editDisplayBuffer[0][0], "Save Pattern", 12);
+		menu_repaintPatternRow(editDisplayBuffer[1]);
 	}
 	else if(menu_activePage == PATTERN_SAVE_PAGE_OK)
 	{
@@ -1539,8 +1638,9 @@ static void menu_repaintLoadSavePage()
 
 		//Bottom row - name and number if applicable
 		if( menu_saveOptions.category < SAVE_TYPE_GLO) { //no name and number for global settings or samples
-			//the preset number
-			numtostrpu(&editDisplayBuffer[1][1], menu_selectedPresetNr[menu_saveOptions.category],' ');
+			//the preset number (patterns 1-64 like on the pattern pages)
+			numtostrpu(&editDisplayBuffer[1][1], (uint8_t)(menu_selectedPresetNr[menu_saveOptions.category]
+					+ (menu_saveOptions.category == SAVE_TYPE_PATTERN)),' ');
 
 			if(menu_saveOptions.state == SAVE_STATE_EDIT_PRESET_NR)
 			{
@@ -2339,28 +2439,8 @@ void menu_handleLoadSaveMenu(int8_t inc, uint8_t btnClicked)
 							//nothing to do here
 							break;
 						case SAVE_TYPE_PATTERN:
-
-
-
-							preset_savePatternRAM(menu_selectedPresetNr[SAVE_TYPE_PATTERN]);
-
-							//save to tmp folder
-										#if USE_INTERRUPT_ONLY_DURING_SAVE_PROJ
-											HAL_TIM_Base_Start_IT(&htim2);	//calc sample interrupt - prio 1
-										#else
-
-										#endif
-							{
-								const FRESULT res = preset_savePatternSD(menu_selectedPresetNr[SAVE_TYPE_PATTERN]);
-										#if USE_INTERRUPT_ONLY_DURING_SAVE_PROJ
-													HAL_TIM_Base_Stop_IT(&htim2);	//calc sample interrupt - prio 1
-										#else
-
-										#endif
-								//the card write failed (e.g. card full)
-								if(res != FR_OK)
-									menu_showSdError(res);
-							}
+							//from the pattern save page (menu_patternSaveDialog)
+							menu_savePattern(menu_selectedPresetNr[SAVE_TYPE_PATTERN]);
 							break;
 
 						case SAVE_TYPE_KIT:
@@ -2424,18 +2504,8 @@ void menu_handleLoadSaveMenu(int8_t inc, uint8_t btnClicked)
 					break;
 
 				case SAVE_STATE_CHANGE_NAME_DIALOG_Y:
-					if(menu_saveOptions.category == SAVE_TYPE_PATTERN)
-					{
-						for(uint8_t i=0;i<NUM_PATTERN;i++)
-						{
-							preset_savePatternRAM(i);
-
-						}
-						menu_activePage = PATTERN_SAVE_PAGE_OK;
-						sucessTimer = systick_ticks;
-						menu_repaint();
-					}
-					else
+					//(stock: a pattern copied all patterns to RAM here; now it gets a name like a kit,
+					//starting with the one menu_patternSaveDialog put into the edit buffer)
 					{
 						//click -> edit name
 						menu_saveOptions.state = SAVE_STATE_EDIT_NAME1;
@@ -3098,6 +3168,14 @@ void menu_parseEncoder(int8_t inc, uint8_t button)
 			{
 				voiceLoad_click();
 			}
+			else if(menu_activePage == PATTERN_LOAD_PAGE || menu_activePage == PATTERN_SAVE_PAGE)
+			{
+				//the same as the step button of the slot under the cursor (it may open the
+				//save page's name dialog, which must not see this click)
+				lastEncoderButton = button;
+				buttonHandler_patternSlot(menu_patternCursor);
+				return;
+			}
 			else if (copyClear_Mode == MODE_CLEAR)
 			{
 				//execute
@@ -3123,6 +3201,17 @@ void menu_parseEncoder(int8_t inc, uint8_t button)
 	//invert encoder
 	//inc = (int8_t)(inc * -1);
 
+	if(menu_activePage == PATTERN_LOAD_PAGE || menu_activePage == PATTERN_SAVE_PAGE) {
+		//the encoder scrolls through the 64 slots; it ends a pending overwrite question
+		if(menu_patternOverwriteTarget != NO_PATTERN)
+		{
+			menu_patternOverwriteTarget = NO_PATTERN;
+			led_initPatternSelectLeds();
+		}
+		const int16_t cursor = menu_patternCursor + inc;
+		menu_patternCursorSet((uint8_t)(cursor < 0 ? 0 : cursor >= NUM_PATTERN ? NUM_PATTERN-1 : cursor));
+		return;
+	}
 	if(menu_activePage == LOAD_PAGE || menu_activePage == SAVE_PAGE) {
 		menu_handleLoadSaveMenu(inc, btnClicked);
 	}
@@ -3672,6 +3761,9 @@ void menu_switchPage(uint8_t pageNr)
 		// leave edit mode if active
 		editModeActive = 0;
 		menu_activePage=PATTERN_LOAD_PAGE;
+		//the cursor starts on the playing pattern, the step buttons show its bank
+		menu_patternCursor = menu_playedPattern;
+		menu_activePatternBank = menu_patternCursor/16;
 		led_initPatternSelectLeds();
 
 	}
@@ -3683,6 +3775,8 @@ void menu_switchPage(uint8_t pageNr)
 		// leave edit mode if active
 		editModeActive = 0;
 		menu_activePage=PATTERN_SAVE_PAGE;
+		menu_patternCursor = menu_playedPattern;
+		menu_activePatternBank = menu_patternCursor/16;
 		led_initPatternSelectLeds();
 
 	}

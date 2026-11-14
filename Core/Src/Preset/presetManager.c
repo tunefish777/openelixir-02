@@ -2109,6 +2109,8 @@ FRESULT preset_loadPatternSD(uint8_t presetNr)
 	char filename[13];
 	UINT bytesRead;
 	uint8_t success=0;
+	//no file (empty slot of the project): no name left from the previous project
+	memset(savefileNames[presetNr][PATTERN_NAMES], 0, 8);
 	//sprintf(filename,"p%03d.pat",presetNr);
 
 	/*
@@ -2369,6 +2371,7 @@ FRESULT preset_createProject(uint8_t presetNr)
 		//seq_patternSet.seq_patternSettings[i].changeBar 	= 0;	//default setting: zero repeats (play once then change)
 		//seq_patternSet.seq_patternSettings[i].nextPattern 	= i;	//default setting: repeat same pattern
 		seq_clearPattern(i); // will clear all tracks in the pattern
+		memset(savefileNames[i][PATTERN_NAMES], 0, 8);
 		preset_init(i); //set all kits to init sound
 	}
 

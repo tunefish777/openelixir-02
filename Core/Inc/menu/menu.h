@@ -71,6 +71,12 @@ extern uint8_t menu_patternOverwriteTarget;
 
 void menu_setShownPattern(uint8_t patternNr);
 uint8_t menu_getViewedPattern();
+//pattern load/save pages: the slot under the encoder cursor (the bank follows it)
+uint8_t menu_getPatternCursor(void);
+void menu_patternCursorSet(uint8_t pattern);
+//pattern save into target: "Edit Name? [y/N]" and the name editor, then menu_savePattern()
+void menu_patternSaveDialog(uint8_t target);
+void menu_savePattern(uint8_t target);
 
 
 enum PageNames

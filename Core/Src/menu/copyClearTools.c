@@ -18,6 +18,7 @@
 #include "menu/menu.h"
 #include "Preset/PresetManager.h"
 #include "Soundengine/Sequencer/sequencer.h"
+#include <string.h>
 
 uint8_t copyClear_Mode = MODE_NONE;
 #define SRC_DST_NONE -1
@@ -39,6 +40,8 @@ void copyClear_clearCurrentPattern()
 	uint8_t pattern = menu_getViewedPattern();
 	led_clearSequencerLeds();
 	seq_clearPattern(pattern);
+	//a cleared pattern shows "Empty" again
+	memset(savefileNames[pattern][PATTERN_NAMES], 0, 8);
 	//frontPanel_sendData(SEQ_CC,SEQ_CLEAR_PATTERN,pattern);
 };
 //-----------------------------------------------------------------------------

@@ -752,6 +752,55 @@ static void buttonHandler_leaveSeqMode() {
 //	return buttonHandler_mutedVoices;
 //}
 //--------------------------------------------------------
+//pattern load/save page: a step button (pattern + 16 * bank) or the encoder button on the
+//slot under the cursor
+void buttonHandler_patternSlot(uint8_t pattern)
+{
+	if(pattern >= NUM_PATTERN)
+		return;
+	menu_patternCursorSet(pattern);
+
+	if(menu_getActivePage() == PATTERN_SAVE_PAGE)
+	{
+		//saving over another pattern with steps needs a 2nd press on the same slot
+		if(pattern != seq_activePattern && pattern != menu_patternOverwriteTarget && seq_patternHasSteps(pattern))
+		{
+			menu_patternOverwriteTarget = pattern;
+			led_initPatternSelectLeds();
+			menu_repaint();
+			return;
+		}
+		menu_patternOverwriteTarget = NO_PATTERN;
+
+		//"Edit Name?", then menu_savePattern()
+		menu_patternSaveDialog(pattern);
+	}
+	else
+	{
+		//a new pattern is manually selected -> KCM=auto should load in every case
+		//SKIP_NEXT_KIT_AUTOLOAD is just to prevent autoload after saving to a new slot
+		if(activeParameters[PAR_PATTERN_MODE] == SKIP_NEXT_KIT_AUTOLOAD)
+		{
+			activeParameters[PAR_PATTERN_MODE] = 1;
+		}
+
+		//select pattern to show // shownPattern
+		menu_setShownPattern(pattern);
+
+		frontPanel_sendData(SEQ_CC, SEQ_REQUEST_EUKLID_PARAMS,
+				menu_activePage/*menu_getActiveVoice()*/);
+		//update autosave pattern on manual pattern change
+		preset_touchTimer(PRESET_PAT_TIMER);
+
+		//fast blink of the selected pattern until ACK (SEQ_CHANGE_PAT) received
+		led_initPatternSelectLeds();
+
+		//tell sequencer to change pattern
+		frontPanel_sendData(SEQ_CC, SEQ_CHANGE_PAT, pattern);
+		menu_repaint();
+	}
+}
+//--------------------------------------------------------
 static void buttonHandler_selectActiveStep(uint8_t ledNr, uint8_t seqButtonPressed) {
 
 	led_setBlinkLed(selectedStepLed, 0);
@@ -1160,75 +1209,9 @@ static void buttonHandler_seqButtonPressed(uint8_t seqButtonPressed)
 			break;
 
 		case SELECT_MODE_PATTERN:
-			if(menu_getActivePage() == PATTERN_SAVE_PAGE)
-			{
-				//saving over another pattern with steps needs a 2nd press on the same button
-				const uint8_t target = seqButtonPressed + 16 * menu_activePatternBank;
-				if(target != seq_activePattern && target != menu_patternOverwriteTarget && seq_patternHasSteps(target))
-				{
-					menu_patternOverwriteTarget = target;
-					led_initPatternSelectLeds();
-					menu_repaint();
-					break;
-				}
-				menu_patternOverwriteTarget = NO_PATTERN;
-
-				//write pattern edit buffer back to RAM pattern array
-			//	seq_copyEditBufferToRam(seqButtonPressed + 16 * menu_activePatternBank);
-
-
-				if(activeParameters[PAR_PATTERN_MODE] == 1)
-				{
-					//prevent saving to a new slot reloading the kit and discarding unsaved changes
-					activeParameters[PAR_PATTERN_MODE] = SKIP_NEXT_KIT_AUTOLOAD;
-				}
-
-				seq_patternSet.shuffle[seqButtonPressed + 16 * menu_activePatternBank] = activeParameters[PAR_SHUFFLE];
-
-
-
-				preset_savePatternRAM(seqButtonPressed + 16 * menu_activePatternBank);
-
-				//save to tmp folder, audio keeps running during the SD access
-				const uint8_t audioStarted = soundengine_backgroundAudioBegin();
-				preset_savePatternSD(seqButtonPressed + 16 * menu_activePatternBank);
-				soundengine_backgroundAudioEnd(audioStarted);
-
-
-				menu_selectedPresetNr[SAVE_TYPE_PATTERN] = seqButtonPressed + 16 * menu_activePatternBank;
-				menu_activePage = PATTERN_SAVE_PAGE_OK;
-				sucessTimer = systick_ticks;
-				menu_repaint();
-
-			}
-			else
-			{
-				//a new pattern is manually selected -> KCM=auto should load in every case
-				//SKIP_NEXT_KIT_AUTOLOAD is just to prevent autoload after saving to a new slot
-				if(activeParameters[PAR_PATTERN_MODE] == SKIP_NEXT_KIT_AUTOLOAD)
-				{
-					activeParameters[PAR_PATTERN_MODE] = 1;
-				}
-				//select another pattern to play -> copy to edit buffer
-
-
-				//select pattern to show // shownPattern
-				menu_setShownPattern(seqButtonPressed + 16 * menu_activePatternBank);
-
-				frontPanel_sendData(SEQ_CC, SEQ_REQUEST_EUKLID_PARAMS,
-						menu_activePage/*menu_getActiveVoice()*/);
-				//update autosave pattern on manual pattern change
-				preset_touchTimer(PRESET_PAT_TIMER);
-
-	//-----------------------------------------------------------------
-
-
-				//fast blink of the selected pattern until ACK (SEQ_CHANGE_PAT) received
-				led_initPatternSelectLeds();
-
-				//tell sequencer to change pattern
-				frontPanel_sendData(SEQ_CC, SEQ_CHANGE_PAT, seqButtonPressed + 16 * menu_activePatternBank);
-			}
+			//while the pattern save asks for the name, the step buttons do nothing
+			if(menu_getActivePage() != SAVE_PAGE)
+				buttonHandler_patternSlot((uint8_t)(seqButtonPressed + 16 * menu_activePatternBank));
 			break;
 
 
@@ -1624,8 +1607,14 @@ void buttonHandler_buttonPressed(uint8_t buttonNr) {
 	case BUT_PAGE_UP:
 		if((buttonHandler_stateMemory.selectButtonMode == SELECT_MODE_PATTERN) || (buttonHandler_stateMemory.selectButtonMode == SELECT_MODE_SONG))
 		{
-			//pattern bank mode
-			if(menu_activePatternBank < 3)
+			//pattern load/save pages: the cursor moves to the same slot in the next bank
+			if(menu_activePage == PATTERN_LOAD_PAGE || menu_activePage == PATTERN_SAVE_PAGE)
+			{
+				if(menu_activePatternBank < 3)
+					menu_patternCursorSet((uint8_t)(menu_getPatternCursor() + 16));
+			}
+			//pattern bank mode (not while the pattern save asks for the name)
+			else if(menu_activePatternBank < 3 && menu_activePage != SAVE_PAGE)
 			{
 				//save current pattern set
 				//preset_savePatternTemp(menu_activePatternBank);
@@ -1707,8 +1696,14 @@ void buttonHandler_buttonPressed(uint8_t buttonNr) {
 	case BUT_PAGE_DOWN:
 		if((buttonHandler_stateMemory.selectButtonMode == SELECT_MODE_PATTERN) || (buttonHandler_stateMemory.selectButtonMode == SELECT_MODE_SONG))
 		{
-			//pattern bank mode
-			if(menu_activePatternBank > 0)
+			//pattern load/save pages: the cursor moves to the same slot in the previous bank
+			if(menu_activePage == PATTERN_LOAD_PAGE || menu_activePage == PATTERN_SAVE_PAGE)
+			{
+				if(menu_activePatternBank > 0)
+					menu_patternCursorSet((uint8_t)(menu_getPatternCursor() - 16));
+			}
+			//pattern bank mode (not while the pattern save asks for the name)
+			else if(menu_activePatternBank > 0 && menu_activePage != SAVE_PAGE)
 			{
 				//save current pattern set
 				//preset_savePatternTemp(menu_activePatternBank);
