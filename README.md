@@ -44,6 +44,25 @@ is off; `res` sets the resonance. It isn't saved and starts off; while off, the 
 from and to other projects on the SD card) and saving projects don't interrupt the audio or the
 sequencer while it plays.
 
+**New in 1.3 (in development, not released yet):**
+- **Step arp:** two new step parameters next to flam and shift. `chd` picks a chord (Rep, Maj, Min,
+  Dim, Aug, Maj7, Min7, Dim7, Aug7), `dir` the direction (Up, Dn), and the flam setting the number
+  of notes. Rep is the stock flam.
+- **Faster knobs:** hold SHIFT while turning a knob to change values in bigger steps. Bipolar values
+  stop at their center on the way.
+- **LFOs on the whole unit:** set an LFO's target voice to `Prf` to modulate the global sample rate or
+  the DJ filter cutoff and resonance.
+- **Pattern management:** on the pattern load and save pages, lit step buttons show the slots that
+  contain steps; the playing pattern blinks slowly, the next one fast. The encoder scrolls through all
+  64 slots (`[05] Name`) and its button works like the step button of that slot. Patterns have names:
+  saving asks "Edit Name?" like kits, and saving over a used slot asks for a second press first.
+  "Change Project" above slot 1 loads patterns from other projects (temporarily, until saved) and
+  saves into them.
+- **Note names** follow the usual convention: MIDI note 0 is C-1, 60 is C4.
+- **Fixes:** a voice no longer stays silent until reboot after its filter blew up (very high
+  cutoff, resonance and drive), turning one knob no longer nudges the value of another, and the
+  encoder no longer needs an extra click when changing direction.
+
 **Under the hood.** About 10 % less CPU load, many stock firmware bugs fixed (MIDI, sequencer, SD
 card, memory corruption; most found in the firmware review by jhw in
 [erica-synths/lxr-desktop-app#3](https://github.com/erica-synths/lxr-desktop-app/issues/3)), and a
