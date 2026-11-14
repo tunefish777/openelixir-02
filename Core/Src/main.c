@@ -301,6 +301,9 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  //the encoder's rest state (detent) can only be read now: it was taken from the first SysTick
+  //before the pins were set up, so every change of direction lost one detent
+  encode_init();
   MX_DMA_Init();
   MX_ADC1_Init();
   MX_I2S2_Init();

@@ -71,11 +71,10 @@ static void sampleRotation(void)
 {
 	const uint8_t state = readPhases();
 
+	/* Not before encode_init() from main() after the GPIO setup: the SysTick runs
+	 * earlier, when both phases still read 0, and that is not the rest state. */
 	if (!encInitialised)
-	{
-		encode_init();
 		return;
-	}
 	if (state == encState)
 		return;
 
