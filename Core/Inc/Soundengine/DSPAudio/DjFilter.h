@@ -28,6 +28,11 @@
 extern volatile uint8_t djFilter_value;
 extern volatile uint8_t djFilter_reso;
 
+/** LFO modulation (LFO target group "Perf"): offset -1..1 (amount * bipolar LFO value)
+ * around the knob position, replaces it until djFilter_modulationOff() */
+void djFilter_modulate(uint8_t reso, float offset);
+void djFilter_modulationOff(uint8_t reso);
+
 /** filters the two interleaved stereo int32 mix buffers of one block in place;
  * returns 1 if it changed them (0 while off) */
 uint8_t djFilter_process(int32_t* mix, int32_t* mix2);

@@ -14,6 +14,7 @@
 #include "menu/CcNr2Text.h"
 #include "menu/menu.h"
 #include "Preset/KitEngines.h"
+#include "Soundengine/DSPAudio/modulationNode.h"
 
 
 //-----------------------------------------------------------------
@@ -339,19 +340,26 @@ const ModTarg modTargets[] ={
 {TEXT_FX_P2,PAR_FX_P2},
 {TEXT_FX_P3,PAR_FX_P3},
 {TEXT_FX_P4,PAR_FX_P4},						//228
+//////////////////////////////////////////////////
+//Perf (OpenElixir-02): performance page settings of the whole unit, LFO target voice "Prf"
+//(LFO_VOICE_PERF). Only for LFOs: not velocity or step automation targets
+{TEXT_PERF_SRT,PAR_VOICE_DECIMATION_ALL},			//229
+{TEXT_PERF_DJ,MOD_DEST_DJ_FILTER},
+{TEXT_PERF_RES,MOD_DEST_DJ_RESO},					//231
 
 };
 
 //**AUTOM modTargetVoiceOffsets definition
 // this is the starting and ending offset for voice. index into above array.
 // see declaration in menu.h for more info
-const ModTargetVoiceOffset modTargetVoiceOffsets[6] = {
+const ModTargetVoiceOffset modTargetVoiceOffsets[LFO_VOICE_PERF] = {
 	/*voice 1*/ {   2,  39 }, //34
 	/*voice 2*/ {  40,  77 }, //34
 	/*voice 3*/ {  78, 115 }, //34
 	/*voice 4*/ { 116, 152 }, //33
 	/*voice 5*/ { 153, 190 }, //34
 	/*voice 6*/ { 191, 228 }, //34
+	/*Perf*/    { 229, 231 }, //3
 };
 
 // These values are generated in the excel spreadsheet mod_targ_lineup.xls
@@ -379,8 +387,8 @@ uint8_t getModTargetGapIndex(uint8_t modTargetIdx)
 {
 	// determine which voice is being targeted (1 based)
 	uint8_t voice=voiceFromModTargValue(modTargetIdx);
-	if(!voice)
-		return 0xFF; // off
+	if(!voice || voice == LFO_VOICE_PERF)
+		return 0xFF; // off (the Perf group has no equivalent in the voices)
 	// rebase to offset from 00b100
 	modTargetIdx = (uint8_t)(modTargetIdx - pgm_read_byte(&modTargetVoiceOffsets[(uint8_t)(voice-1)].start));
 
@@ -414,8 +422,8 @@ uint8_t getModTargetGapIndex(uint8_t modTargetIdx)
 uint8_t getModTargetIdxFromGapIdx(uint8_t v, uint8_t gapidx)
 {
 	uint8_t i, val, bitoffset, ctr=0;
-	if(gapidx==0xFF)
-		return 0; // off
+	if(gapidx==0xFF || v >= LFO_VOICE_PERF-1)
+		return 0; // off (the Perf group has no equivalent in the voices)
 
 	// voice is 0 based. calculate the bit column
 	bitoffset=(uint8_t)(5-v);
@@ -468,7 +476,8 @@ void paramToModTargetInit()
 {
 	// populate this array with indices into modTargets so we can do reverse lookup
 	uint8_t i;
-	for(i=0;i<(sizeof(modTargets)/sizeof(ModTarg));i++){
+	//not the Perf group: it repeats the sample rate (entry 1) and has destinations above the sound parameters
+	for(i=0;i<MOD_TARGET_PERF_START;i++){
 		paramToModTarget[pgm_read_word(&modTargets[i].param)]=i;
 	}
 } 
@@ -478,6 +487,8 @@ void paramToModTargetInit()
 // returns 1 based index or 0 for invalid
 uint8_t voiceFromModTargValue(uint8_t val)
 {
+	if(val >= MOD_TARGET_PERF_START)
+		return val <= modTargetVoiceOffsets[LFO_VOICE_PERF-1].end ? LFO_VOICE_PERF : 0;
 	if(pgm_read_byte(&modTargetVoiceOffsets[3].start) <= val) {
 		// lower half
 		if(pgm_read_byte(&modTargetVoiceOffsets[4].start) <= val) {

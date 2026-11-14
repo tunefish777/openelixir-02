@@ -35,7 +35,7 @@ including unsaved changes, like in the load kit menu; other projects' from the S
 were never saved show "Empty".
 
 The voice is loaded completely: its engine and all its sound parameters, volume, pan, output and LFO.
-Its LFO target comes along only if that LFO modulated the voice itself. CL HH and OP HH both load
+Its LFO target comes along only if that LFO modulated the voice itself or the Perf group. CL HH and OP HH both load
 slot 6 (both decays). If the engine changes, the same rules apply as in the engine menu.
 
 ## Kits from other projects
@@ -55,6 +55,10 @@ The engines are saved in kits, projects and the autosave (a block after the 247 
 the `.snd` file). Kits without it, from the stock firmware or anywhere else, load with the stock
 engines and sound as before. The stock firmware loads OpenElixir-02 kits too, but plays every slot
 with its stock engine.
+
+The same block holds LFO targets in the Perf group (target voice `Prf`: global sample rate, DJ filter
+cutoff and resonance). In the parameter bytes such an LFO is stored as targeting nothing, so in the
+stock firmware it is simply off.
 
 Morph keeps the engines of the source kit; the engine specific settings of a slot whose engine
 differs in the morph kit are not morphed.

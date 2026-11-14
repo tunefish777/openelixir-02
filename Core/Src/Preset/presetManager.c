@@ -209,21 +209,31 @@ static uint8_t preset_isMorphEngineMismatch(uint16_t par)
 	const uint8_t slot = kitEngines_rolePar2Slot(par);
 	return slot < NUM_VOICE_SLOTS && kitEngines[slot] != preset_morphEngines()[slot];
 }
-//write the engine block after the kit parameters
-static FRESULT preset_writeEngines(const uint8_t* engines)
+//write the kit parameters as the stock firmware can read them (no Perf LFO targets)
+static FRESULT preset_writeKitParams(const uint8_t* params)
 {
-	uint8_t block[KIT_ENGINES_BLOCK_SIZE];
+	uint8_t kit[END_OF_SOUND_PARAMETERS];
 	unsigned int bytesWritten;
-	return preset_fwrite((FIL*)&SDFile, block, kitEngines_encode(engines, block), &bytesWritten);
+	memcpy(kit, params, END_OF_SOUND_PARAMETERS);
+	kitEngines_stockLfoTargets(kit);
+	return preset_fwrite((FIL*)&SDFile, kit, END_OF_SOUND_PARAMETERS, &bytesWritten);
 }
-//read the engine block after the kit parameters (stock engines if there is none)
-static void preset_readEngines(uint8_t* engines)
+//write the block after the kit parameters: engines and the Perf LFO targets of params[]
+static FRESULT preset_writeEngines(const uint8_t* engines, const uint8_t* params)
+{
+	uint8_t block[KIT_BLOCK_SIZE];
+	unsigned int bytesWritten;
+	return preset_fwrite((FIL*)&SDFile, block, kitEngines_encodeKit(engines, params, block), &bytesWritten);
+}
+//read the block after the kit parameters (stock engines if there is none) and
+//restore the Perf LFO targets in params[] (may be NULL)
+static void preset_readEngines(uint8_t* engines, uint8_t* params)
 {
 	uint8_t block[32];
 	unsigned int bytesRead = 0;
 	if(f_read((FIL*)&SDFile, block, sizeof(block), &bytesRead) != FR_OK)
 		bytesRead = 0;
-	kitEngines_decode(block, (uint16_t)bytesRead, engines);
+	kitEngines_decodeKit(block, (uint16_t)bytesRead, engines, params);
 }
 
 void preset_initTmpFolder()
@@ -369,8 +379,8 @@ FRESULT preset_saveTmpKit()
 		return res;
 	}
 	//write the preset data
-	preset_fwrite((FIL*)&SDFile,activeParameters,END_OF_SOUND_PARAMETERS,&bytesWritten);
-	preset_writeEngines(kitEngines);
+	preset_writeKitParams(activeParameters);
+	preset_writeEngines(kitEngines, activeParameters);
 
 	//close the file
 	res = preset_fcloseWrite();
@@ -418,7 +428,7 @@ FRESULT preset_LoadTmpKit()
 			// set to 0 for any that were not read from the file
 			if(END_OF_SOUND_PARAMETERS-bytesRead)
 				memset(para+bytesRead,0,END_OF_SOUND_PARAMETERS-bytesRead);
-			preset_readEngines(kitEngines);
+			preset_readEngines(kitEngines, para);
 
 			//special case mod targets. normalize.
 			const uint8_t nmt=getNumModTargets();
@@ -872,10 +882,10 @@ void preset_init(uint8_t presetNr)
 static void preset_writeDrumsetData(uint8_t presetNr, uint8_t isMorph)
 {
 	uint16_t i;
-	unsigned int bytesWritten;
 
 	if(isMorph)
 	{
+		uint8_t kit[END_OF_SOUND_PARAMETERS];
 		for(i=0;i<END_OF_SOUND_PARAMETERS;i++)
 		{
 			uint8_t value;
@@ -894,16 +904,14 @@ static void preset_writeDrumsetData(uint8_t presetNr, uint8_t isMorph)
 			{
 				value = preset_getMorphValue(i,activeParameters[PAR_MORPH]);
 			}					
-			preset_fwrite((FIL*)&SDFile,&value,1,&bytesWritten);
+			kit[i] = value;
 		}
+		preset_writeKitParams(kit);
 		//a morphed kit keeps the engines of the source kit
-		preset_writeEngines(kitEngines);
+		preset_writeEngines(kitEngines, kit);
 	} else {
-		for(i=0;i<END_OF_SOUND_PARAMETERS;i++)
-		{
-			preset_fwrite((FIL*)&SDFile,&mainParameters[presetNr][i],1,&bytesWritten);
-		}
-		preset_writeEngines(kitEngines_ram[presetNr]);
+		preset_writeKitParams(mainParameters[presetNr]);
+		preset_writeEngines(kitEngines_ram[presetNr], mainParameters[presetNr]);
 	}
 }
 
@@ -1252,7 +1260,7 @@ static FRESULT preset_readDrumsetData(uint8_t presetNr, uint8_t isMorph)
 		// set to 0 for any that were not read from the file
 		if(END_OF_SOUND_PARAMETERS-bytesRead)
 			memset(para+bytesRead,0,END_OF_SOUND_PARAMETERS-bytesRead);
-		preset_readEngines(isMorph ? preset_morphEngines() : kitEngines_ram[presetNr]);
+		preset_readEngines(isMorph ? preset_morphEngines() : kitEngines_ram[presetNr], para);
 		
 		//special case mod targets. normalize.
 		const uint8_t nmt=getNumModTargets();
@@ -1378,7 +1386,7 @@ void preset_sendDrumsetParametersImmediate()
 			frontPanel_sendData(CC_VELO_TARGET,upper,lower);
 
 			// ensure target voice # is valid
-			if(activeParameters[PAR_VOICE_LFO1+i] < 1 || activeParameters[PAR_VOICE_LFO1+i] > 6 )
+			if(activeParameters[PAR_VOICE_LFO1+i] < 1 || activeParameters[PAR_VOICE_LFO1+i] > LFO_VOICE_PERF )
 				activeParameters[PAR_VOICE_LFO1+i]=1;
 
 			// **LFO par_target_lfo will be an index into modTargets, but we need a parameter number to send
@@ -1468,7 +1476,7 @@ void preset_sendDrumsetParameters()
 		frontPanel_sendData(CC_VELO_TARGET,upper,lower);
 
 		// ensure target voice # is valid
-		if(activeParameters[PAR_VOICE_LFO1+i] < 1 || activeParameters[PAR_VOICE_LFO1+i] > 6 )
+		if(activeParameters[PAR_VOICE_LFO1+i] < 1 || activeParameters[PAR_VOICE_LFO1+i] > LFO_VOICE_PERF )
 			activeParameters[PAR_VOICE_LFO1+i]=1;
 
 		// **LFO par_target_lfo will be an index into modTargets, but we need a parameter number to send
@@ -2765,7 +2773,7 @@ FRESULT preset_scanProjectKits(uint8_t projectNr, char names[][8], uint8_t engin
 		if(f_read((FIL*)&SDFile, names[kit], 8, &bytesRead) == FR_OK && bytesRead == 8
 				&& f_lseek((FIL*)&SDFile, 8 + END_OF_SOUND_PARAMETERS) == FR_OK)
 		{
-			preset_readEngines(engines[kit]);
+			preset_readEngines(engines[kit], NULL);
 			exists[kit] = 1;
 		}
 		f_close((FIL*)&SDFile);
@@ -2801,7 +2809,7 @@ FRESULT preset_readProjectKit(uint8_t projectNr, uint8_t kitNr, uint8_t* params,
 			if(params[PAR_TARGET_LFO1+i] >= nmt)
 				params[PAR_TARGET_LFO1+i] = 0;
 		}
-		preset_readEngines(engines);
+		preset_readEngines(engines, params);
 	}
 	f_close((FIL*)&SDFile);
 	return res;
@@ -2835,9 +2843,9 @@ FRESULT preset_saveProjectKit(uint8_t projectNr, uint8_t kitNr, char* name, cons
 		return res;
 	res = preset_fwrite((FIL*)&SDFile, name, 8, &bytesWritten);
 	if(res == FR_OK)
-		res = preset_fwrite((FIL*)&SDFile, params, END_OF_SOUND_PARAMETERS, &bytesWritten);
+		res = preset_writeKitParams(params);
 	if(res == FR_OK)
-		res = preset_writeEngines(engines);
+		res = preset_writeEngines(engines, params);
 	return preset_fcloseWrite();
 }
 //----------------------------------------------------

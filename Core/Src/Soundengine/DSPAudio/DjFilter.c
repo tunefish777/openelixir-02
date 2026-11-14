@@ -30,6 +30,10 @@
 volatile uint8_t djFilter_value = DJ_FILTER_OFF;
 volatile uint8_t djFilter_reso = 0;
 
+//LFO modulated knob positions (0xFF: not modulated, the knobs apply)
+#define DJ_NOT_MODULATED	0xFF
+static volatile uint8_t djFilter_mod[2] = {DJ_NOT_MODULATED, DJ_NOT_MODULATED};
+
 //state: 4 channels (both stereo outputs), zero delay feedback state variable filter
 INDTCMZ static float djFilter_ic1[4];
 INDTCMZ static float djFilter_ic2[4];
@@ -75,11 +79,28 @@ IN_ITCM_RAM __attribute__((noinline)) static void djFilter_channel(int32_t* buf,
 	*ic2eq = ic2;
 }
 
+//----------------------------------------------------------------------
+void djFilter_modulate(uint8_t reso, float offset)
+{
+	const float knob = (reso ? djFilter_reso : djFilter_value) / 127.f;
+	float value = knob + offset;
+	value = value < 0.f ? 0.f : value > 1.f ? 1.f : value;
+	djFilter_mod[reso != 0] = (uint8_t)(value * 127.f + 0.5f);
+}
+//----------------------------------------------------------------------
+void djFilter_modulationOff(uint8_t reso)
+{
+	djFilter_mod[reso != 0] = DJ_NOT_MODULATED;
+}
+//----------------------------------------------------------------------
 //once per block: runs from flash, only the sample loop is in ITCM
 uint8_t djFilter_process(int32_t* mix, int32_t* mix2)
 {
+	const uint8_t value = djFilter_mod[0] != DJ_NOT_MODULATED ? djFilter_mod[0] : djFilter_value;
+	const uint8_t reso = djFilter_mod[1] != DJ_NOT_MODULATED ? djFilter_mod[1] : djFilter_reso;
+
 	//target from the knob: type and how far it is closed
-	const int16_t offset = (int16_t)djFilter_value - DJ_FILTER_OFF;
+	const int16_t offset = (int16_t)value - DJ_FILTER_OFF;
 	const int16_t amount = (offset < 0 ? -offset : offset) - DJ_FILTER_DEAD_ZONE;
 	const int8_t targetMode = amount <= 0 ? 0 : (offset < 0 ? -1 : 1);
 	float target = amount <= 0 ? 0.f : amount / (float)(DJ_FILTER_OFF - DJ_FILTER_DEAD_ZONE);
@@ -131,7 +152,7 @@ uint8_t djFilter_process(int32_t* mix, int32_t* mix2)
 			DJ_LP_OPEN * powf(DJ_LP_CLOSED / DJ_LP_OPEN, djFilter_pos) :
 			DJ_HP_OPEN * powf(DJ_HP_CLOSED / DJ_HP_OPEN, djFilter_pos);
 	const float g = tanf(3.14159265f * fc / REAL_FS);
-	const float k = DJ_DAMPING_MIN * powf(DJ_DAMPING_MAX / DJ_DAMPING_MIN, djFilter_reso / 127.f);
+	const float k = DJ_DAMPING_MIN * powf(DJ_DAMPING_MAX / DJ_DAMPING_MIN, reso / 127.f);
 	const float a1 = 1.f / (1.f + g*(g + k));
 	const float a2 = g * a1;
 	const float a3 = g * a2;

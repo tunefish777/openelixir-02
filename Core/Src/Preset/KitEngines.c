@@ -61,6 +61,62 @@ void kitEngines_decode(const uint8_t* block, const uint16_t size, uint8_t* engin
 	}
 }
 //---------------------------------------------------
+static uint8_t kitEngines_isPerfLfo(const uint8_t* params, const uint8_t lfo)
+{
+	return params[PAR_VOICE_LFO1+lfo] == LFO_VOICE_PERF && params[PAR_TARGET_LFO1+lfo] >= MOD_TARGET_PERF_START
+		&& params[PAR_TARGET_LFO1+lfo] <= modTargetVoiceOffsets[LFO_VOICE_PERF-1].end;
+}
+//---------------------------------------------------
+uint8_t kitEngines_encodeKit(const uint8_t* engines, const uint8_t* params, uint8_t* block)
+{
+	kitEngines_encode(engines, block);
+	block[4] = 2*NUM_VOICE_SLOTS;
+	for(uint8_t lfo=0;lfo<NUM_VOICE_SLOTS;lfo++)
+	{
+		block[5+NUM_VOICE_SLOTS+lfo] = kitEngines_isPerfLfo(params, lfo) ?
+				(uint8_t)(params[PAR_TARGET_LFO1+lfo] - MOD_TARGET_PERF_START + 1) : 0;
+	}
+	return KIT_BLOCK_SIZE;
+}
+//---------------------------------------------------
+void kitEngines_decodeKit(const uint8_t* block, const uint16_t size, uint8_t* engines, uint8_t* params)
+{
+	kitEngines_decode(block, size, engines);
+	if(!params)
+		return;
+	const uint8_t numPerf = modTargetVoiceOffsets[LFO_VOICE_PERF-1].end - MOD_TARGET_PERF_START + 1;
+	for(uint8_t lfo=0;lfo<NUM_VOICE_SLOTS;lfo++)
+	{
+		//no Perf group in the parameter bytes (only the block may set it)
+		if(params[PAR_VOICE_LFO1+lfo] == LFO_VOICE_PERF || params[PAR_TARGET_LFO1+lfo] >= MOD_TARGET_PERF_START)
+		{
+			params[PAR_VOICE_LFO1+lfo] = lfo+1;
+			params[PAR_TARGET_LFO1+lfo] = 0;
+		}
+		if(size >= KIT_BLOCK_SIZE && memcmp(block, kitEngines_signature, 4) == 0 && block[4] >= 2*NUM_VOICE_SLOTS)
+		{
+			const uint8_t perf = block[5+NUM_VOICE_SLOTS+lfo];
+			if(perf >= 1 && perf <= numPerf)
+			{
+				params[PAR_VOICE_LFO1+lfo] = LFO_VOICE_PERF;
+				params[PAR_TARGET_LFO1+lfo] = (uint8_t)(MOD_TARGET_PERF_START + perf - 1);
+			}
+		}
+	}
+}
+//---------------------------------------------------
+void kitEngines_stockLfoTargets(uint8_t* params)
+{
+	for(uint8_t lfo=0;lfo<NUM_VOICE_SLOTS;lfo++)
+	{
+		if(params[PAR_VOICE_LFO1+lfo] == LFO_VOICE_PERF || params[PAR_TARGET_LFO1+lfo] >= MOD_TARGET_PERF_START)
+		{
+			params[PAR_VOICE_LFO1+lfo] = lfo+1;
+			params[PAR_TARGET_LFO1+lfo] = 0;
+		}
+	}
+}
+//---------------------------------------------------
 uint8_t kitEngines_stockSlot(const uint8_t engine)
 {
 	switch(engine)
@@ -317,11 +373,12 @@ void kitEngines_loadVoice(const uint8_t slot, const uint8_t engine, const uint8_
 
 	//velocity modulation always targets the voice itself; the LFO only if it
 	//did so in the other kit (a target in another voice of that kit would
-	//modulate an unrelated voice here)
+	//modulate an unrelated voice here) or targets the Perf group (the whole unit)
 	kitEngines_setTarget(PAR_VEL_DEST_1+slot, CC_VELO_TARGET, slot, kit[PAR_VEL_DEST_1+slot]);
 	const uint8_t lfoOnItself = kit[PAR_VOICE_LFO1+slot] == slot+1;
-	activeParameters[PAR_VOICE_LFO1+slot] = slot+1;
-	kitEngines_setTarget(PAR_TARGET_LFO1+slot, CC_LFO_TARGET, slot, lfoOnItself ? kit[PAR_TARGET_LFO1+slot] : 0);
+	const uint8_t lfoOnPerf = kitEngines_isPerfLfo(kit, slot);
+	activeParameters[PAR_VOICE_LFO1+slot] = lfoOnPerf ? LFO_VOICE_PERF : slot+1;
+	kitEngines_setTarget(PAR_TARGET_LFO1+slot, CC_LFO_TARGET, slot, (lfoOnItself || lfoOnPerf) ? kit[PAR_TARGET_LFO1+slot] : 0);
 
 	if(engineChanged)
 	{

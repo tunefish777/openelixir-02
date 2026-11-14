@@ -18,6 +18,11 @@
 #include "stm32f7xx_hal.h"
 #include "Soundengine/MIDI/ParameterArray.h"
 
+//LFO destinations of the target group "Perf" that are no sound parameters (the DJ
+//filter): numbers right after the sound parameters (the LFO target is sent as 8 bit)
+#define MOD_DEST_DJ_FILTER	(END_OF_SOUND_PARAMETERS)
+#define MOD_DEST_DJ_RESO	(END_OF_SOUND_PARAMETERS+1)
+
 typedef struct ModulatorStruct
 {
 

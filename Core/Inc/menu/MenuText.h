@@ -557,6 +557,7 @@ const char catNames[][16] =
 	{"Clock"},
 	{"Fx"},
 	{"DJ Filt."},
+	{"Perf"},
 };
 //-----------------------------------------------------------------
 // these must correspond to longNamesEnum
@@ -656,6 +657,8 @@ const char longNames[][16] =
 	{" Reso"},
 	{"ArpChord"},
 	{"Arp Dir"},
+	{"DJ Cut"},
+	{"DJ Reso"},
 };
 
 

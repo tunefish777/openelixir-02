@@ -14,6 +14,7 @@
 
 
 #include "Soundengine/DSPAudio/modulationNode.h"
+#include "Soundengine/DSPAudio/DjFilter.h"
 #include "Soundengine/DSPAudio/VoiceSlot.h"
 #include "Soundengine/DSPAudio/DrumVoice.h"
 #include "Soundengine/DSPAudio/CymbalVoice.h"
@@ -97,7 +98,8 @@ IN_ITCM_RAM void modNode_resetTargets()
 	for(i=0;i<6;i++)
 	{
 		const ModulationNode* target = &voiceSlots[i].u.c.lfo.modTarget;
-		paramArray_setParameter(target->destination,target->originalValue);
+		if(target->destination < END_OF_SOUND_PARAMETERS)	//not the DJ filter
+			paramArray_setParameter(target->destination,target->originalValue);
 	}
 
 
@@ -124,8 +126,16 @@ void modNode_setDestination(ModulationNode* vm, uint16_t dest)
 	//restore old value to original TODO isn't this already being done above for all nodes?
 	//paramArray_setParameter(vm->destination,vm->originalValue);
 
+	//leaving the DJ filter: its knobs apply again
+	if(vm->destination == MOD_DEST_DJ_FILTER || vm->destination == MOD_DEST_DJ_RESO)
+		djFilter_modulationOff(vm->destination == MOD_DEST_DJ_RESO);
+
 	//update dest param
 	vm->destination = dest;
+
+	//the DJ filter has no entry in parameterArray (and no original value to keep)
+	if(dest >= END_OF_SOUND_PARAMETERS)
+		return;
 
 	const Parameter *p = &parameterArray[vm->destination];
 
@@ -161,9 +171,18 @@ void modNode_setDestination(ModulationNode* vm, uint16_t dest)
 // This is called to actually modulate the value for a modulation node
 void modNode_updateValue(ModulationNode* vm, float val)
 {
-	Parameter const *p = &parameterArray[vm->destination];
-
 	vm->lastVal = val;
+
+	//LFO target group "Perf": the DJ filter, modulated around its knob positions
+	if(vm->destination == MOD_DEST_DJ_FILTER || vm->destination == MOD_DEST_DJ_RESO)
+	{
+		djFilter_modulate(vm->destination == MOD_DEST_DJ_RESO, vm->amount * (val*2.f-1.f));
+		return;
+	}
+	if(vm->destination >= END_OF_SOUND_PARAMETERS)
+		return;
+
+	Parameter const *p = &parameterArray[vm->destination];
 
 	// **PATROT avoid setting this if it's not set to something good
 	if(!p->ptr)

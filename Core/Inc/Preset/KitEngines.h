@@ -25,11 +25,15 @@
 
 //Kit files (.snd, also in projects and the tmp folder) and tmp.snd carry the
 //engines in a block appended after the 247 parameter bytes:
-//	"OE02", payload size, payload: the engine of each slot (6 bytes)
+//	"OE02", payload size, payload: the engine of each slot (6 bytes),
+//	the Perf group LFO target of each LFO (6 bytes, 0 = none, n = n-th entry)
 //Later versions may only append to the payload. Files without the block (from
 //the stock firmware or anywhere else) load with the stock engines, and the
-//stock firmware ignores the block.
+//stock firmware ignores the block. LFOs with a Perf target are stored in the
+//parameter bytes as LFO on its own voice, off (the stock firmware doesn't know
+//the group), the block restores them.
 #define KIT_ENGINES_BLOCK_SIZE	(5 + NUM_VOICE_SLOTS)
+#define KIT_BLOCK_SIZE			(5 + 2*NUM_VOICE_SLOTS)
 
 //version of this interface (for the host tests, which also build older trees)
 #define KIT_ENGINES_API		3
@@ -71,5 +75,13 @@ uint8_t kitEngines_encode(const uint8_t* engines, uint8_t* block);
 //block (size bytes read after the parameters, maybe 0) -> engines; the stock
 //engines if it isn't a valid block
 void kitEngines_decode(const uint8_t* block, const uint16_t size, uint8_t* engines);
+
+//the whole block (engines and Perf LFO targets of the kit params[]), returns its size (KIT_BLOCK_SIZE)
+uint8_t kitEngines_encodeKit(const uint8_t* engines, const uint8_t* params, uint8_t* block);
+//block -> engines and the Perf LFO targets into params[] (params may be NULL)
+void kitEngines_decodeKit(const uint8_t* block, const uint16_t size, uint8_t* engines, uint8_t* params);
+//the kit params[] as the stock firmware gets them in the file: LFOs with a Perf target
+//on their own voice, off
+void kitEngines_stockLfoTargets(uint8_t* params);
 
 #endif /* KITENGINES_H_ */

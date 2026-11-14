@@ -281,6 +281,9 @@ enum NamesEnum
 	TEXT_DJ_RESO,
 	TEXT_STEP_CHORD,
 	TEXT_STEP_DIR,
+	TEXT_PERF_SRT,
+	TEXT_PERF_DJ,
+	TEXT_PERF_RES,
 
 
 	NUM_NAMES
@@ -431,7 +434,8 @@ enum catNamesEnum
 	CAT_MIDI,
 	CAT_CLOCK,
 	CAT_FX,
-	CAT_DJ_FILTER
+	CAT_DJ_FILTER,
+	CAT_PERF
 };
 //-----------------------------------------------------------------
 // these must correspond with longNames in MenuText.h
@@ -529,7 +533,9 @@ enum longNamesEnum
 	LONG_DJ_FILTER,
 	LONG_DJ_RESO,
 	LONG_STEP_CHORD,
-	LONG_STEP_DIR
+	LONG_STEP_DIR,
+	LONG_PERF_DJ,
+	LONG_PERF_RES
 	
 };
 
@@ -604,6 +610,11 @@ typedef struct ModTargetVoiceOffsetStruct {
 	uint8_t end;
 }  ModTargetVoiceOffset;
 
+//LFO target voice 7 "Prf": the target group Perf (performance page settings of the whole
+//unit) after the 6 voices
+#define LFO_VOICE_PERF			7
+#define MOD_TARGET_PERF_START	(modTargetVoiceOffsets[LFO_VOICE_PERF-1].start)
+
 
 
 // need array corresponding to parameters with indices into above array
@@ -657,7 +668,7 @@ extern const Page menuPages[NUM_PAGES][NUM_SUB_PAGES];
 // we have a separate array of indices into this array called modTargetVoiceOffsets that determines
 // where a voice starts and ends in modTargets array.
 extern const ModTarg modTargets[];
-extern const ModTargetVoiceOffset modTargetVoiceOffsets[6];
+extern const ModTargetVoiceOffset modTargetVoiceOffsets[LFO_VOICE_PERF];
 
 // **AUTOM declare paramToModTarget array
 // this is an array of indices into modTargets which is defined in cc2text.c

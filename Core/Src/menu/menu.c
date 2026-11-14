@@ -267,6 +267,9 @@ const Name valueNames[NUM_NAMES] =
 		{SHORT_FIL_RESO, CAT_DJ_FILTER, LONG_DJ_RESO},/*TEXT_DJ_RESO*/
 		{SHORT_STEP_CHORD, CAT_STEP, LONG_STEP_CHORD},/*TEXT_STEP_CHORD*/
 		{SHORT_STEP_DIR, CAT_STEP, LONG_STEP_DIR},/*TEXT_STEP_DIR*/
+		{SHORT_SR, CAT_PERF, LONG_SAMPLE_RATE},/*TEXT_PERF_SRT*/
+		{SHORT_DJ_FILTER, CAT_PERF, LONG_PERF_DJ},/*TEXT_PERF_DJ*/
+		{SHORT_FIL_RESO, CAT_PERF, LONG_PERF_RES},/*TEXT_PERF_RES*/
 
 
 };
@@ -1910,6 +1913,10 @@ void menu_repaintGeneric()
 						numtostrpu(&editDisplayBuffer[1][13],(uint8_t)(curParmVal),' ');
 					}
 				}
+				else if((menu_paramDtype(parNr) & 0xFF) == DTYPE_VOICE_LFO && curParmVal == LFO_VOICE_PERF)
+				{
+					memcpy(&editDisplayBuffer[1][13],"Prf",3);
+				}
 				else
 				{
 					numtostrpu(&editDisplayBuffer[1][13],(uint8_t)(curParmVal),' ');
@@ -2048,7 +2055,10 @@ void menu_repaintGeneric()
 					else
 					{
 						// fallthrough for the rest of the unsigned values
-						numtostrpu(valueAsText,curParmVal,' ');
+						if((menu_paramDtype(parNr) & 0xFF) == DTYPE_VOICE_LFO && curParmVal == LFO_VOICE_PERF)
+							memcpy(valueAsText,"Prf",3);
+						else
+							numtostrpu(valueAsText,curParmVal,' ');
 					}
 					break;
 
@@ -3277,11 +3287,11 @@ static void menu_encoderChangeParameter(int8_t inc)
 
 	case DTYPE_VOICE_LFO://parameter_dtypes[paramNr] & 0x0F
 	{
-		//**LFO - limit voice number to 1-6 range. determine target selection so we can send it with voice #
+		//**LFO - limit voice number to 1-6 range (7: Perf). determine target selection so we can send it with voice #
 		if(*paramValue < 1)
 			*paramValue = 1;
-		else if(*paramValue > 6)
-			*paramValue = 6;
+		else if(*paramValue > LFO_VOICE_PERF)
+			*paramValue = LFO_VOICE_PERF;
 
 		// **LFOTARGFIX - ensure that the lfo mod target is pointing to the same type of modulation
 		// on the new voice
@@ -3334,7 +3344,7 @@ static void menu_encoderChangeParameter(int8_t inc)
 		break;
 
 	case DTYPE_AUTOM_TARGET: {//parameter_dtypes[paramNr] & 0x0F
-		const uint8_t nmt=getNumModTargets();
+		const uint8_t nmt=MOD_TARGET_PERF_START;	//the Perf group is only for LFOs
 		//**AUTOM - limit to valid range for encoder
 		if(*paramValue >= nmt)
 			*paramValue = (uint8_t)(nmt-1);
@@ -4162,7 +4172,8 @@ static uint8_t limitPotValue(int8_t diff, uint16_t paramNr)
 
 	case DTYPE_AUTOM_TARGET:
 		//**AUTOM - scale to our range for pot value
-		if(newValue >= (getNumModTargets()-1)) newValue =  (getNumModTargets()-1);
+		//the Perf group at the end is only for LFOs
+		if(newValue >= (MOD_TARGET_PERF_START-1)) newValue =  (MOD_TARGET_PERF_START-1);
 		//return (uint8_t)((getNumModTargets()-1) * frac);
 
 
@@ -4170,8 +4181,8 @@ static uint8_t limitPotValue(int8_t diff, uint16_t paramNr)
 		//return value;
 		break;
 	case DTYPE_VOICE_LFO:
-		// the LFO target voice number is stored and displayed as 1 based
-		if(newValue > 6) newValue = 6;
+		// the LFO target voice number is stored and displayed as 1 based (7: Perf)
+		if(newValue > LFO_VOICE_PERF) newValue = LFO_VOICE_PERF;
 		else if(newValue < 1) newValue = 1;
 		//return (uint8_t)(1 + 5*frac);
 		break;
