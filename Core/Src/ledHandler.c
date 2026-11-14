@@ -18,6 +18,8 @@
 #include "menu/menu.h"
 #include "Soundengine/globals.h"
 #include "Soundengine/Sequencer/sequencer.h"
+#include "menu/projectBrowse.h"
+#include "Preset/PresetManager.h"
 
 //since we need an array to store the start time we have to limit the number of simultanousely pulsable LEDs
 #define NUM_OF_PULSABLE_LEDS 8	//MAX 8 at the moment (because of led_pulsingLeds)
@@ -171,13 +173,20 @@ void led_initPatternSelectLeds()
 	}
 
 	const uint8_t next = menu_getViewedPattern();
+	//the playing pattern blinks fast too while a pattern of another project waits to replace it
 	if(menu_playedPattern/16 == bank)
-		led_setBlinkLed(led_idx2StepLed(menu_playedPattern), 1);
+	{
+		if(preset_isOtherPatternPending())
+			led_setFastBlinkLed(led_idx2StepLed(menu_playedPattern));
+		else
+			led_setBlinkLed(led_idx2StepLed(menu_playedPattern), 1);
+	}
 	if(next != menu_playedPattern && next/16 == bank)
 		led_setFastBlinkLed(led_idx2StepLed(next));
 
+	//(a slot of another project isn't shown here)
 	const uint8_t target = menu_patternOverwriteTarget;
-	if(target != NO_PATTERN && target != next && target != menu_playedPattern && target/16 == bank)
+	if(target != NO_PATTERN && !projectBrowse_isOther() && target != next && target != menu_playedPattern && target/16 == bank)
 		led_setFastBlinkLed(led_idx2StepLed(target));
 
 	led_showPatternBank();

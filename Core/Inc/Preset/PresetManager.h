@@ -103,6 +103,29 @@ FRESULT preset_scanProjectKits(uint8_t projectNr, char names[][8], uint8_t engin
 FRESULT preset_readProjectKit(uint8_t projectNr, uint8_t kitNr, uint8_t* params, uint8_t* engines);
 //save a kit into an existing project folder (replaces the kit's old file)
 FRESULT preset_saveProjectKit(uint8_t projectNr, uint8_t kitNr, char* name, const uint8_t* params, const uint8_t* engines);
+
+//patterns of other projects (pattern load/save pages, "Change Project")
+//names (8 characters, not terminated, zero if no file) and whether the patterns have steps
+FRESULT preset_scanProjectPatterns(uint8_t projectNr, char names[][8], uint8_t* hasSteps);
+//save the playing pattern (with its changes and the current shuffle, kit 1) into another project
+FRESULT preset_saveProjectPattern(uint8_t projectNr, uint8_t nr, char* name);
+//load pattern nr of another project: it replaces the playing pattern at the next pattern change
+//(at once while stopped) as unsaved changes of that slot, only the pattern (the kit stays). It is
+//temporary until saved into a slot: the project save and the autosave leave it out, a change to
+//another pattern discards it
+FRESULT preset_loadOtherPattern(uint8_t projectNr, uint8_t nr);
+//from the sequencer: a pattern became active (after its saved version was restored)
+void preset_patternActivated(void);
+//another pattern was selected before the pattern of the other project started
+void preset_cancelOtherPattern(void);
+//project load/new: no pattern of another project
+void preset_clearOtherPattern(void);
+//it was saved into the slot it plays in: a normal pattern now
+void preset_otherPatternSaved(void);
+uint8_t preset_isOtherPatternLoaded(void);
+uint8_t preset_isOtherPatternPending(void);
+//the name of what is playing: the slot's or the one of the pattern of another project
+char* preset_activePatternName(void);
 //the active kit becomes these parameters and engines (a kit from another
 //project); nothing is written (no RAM kit, no autosave) until the user saves it
 void preset_loadKitData(const uint8_t* params, const uint8_t* engines, const char* name);

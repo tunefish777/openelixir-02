@@ -51,6 +51,20 @@ The load kit and save kit menus (LOAD/SAVE + KIT) have "Change Project" below ki
   away with the kit's name (the name of the kit it was loaded from), without the name dialog. To
   rename it, save it into a slot of the active project. Only existing projects can be chosen.
 
+## Patterns from other projects
+
+The pattern load and save pages (LOAD/SAVE + PATTERN) have "Change Project" above slot 1. While
+another project is listed, the step buttons keep showing the active project; a step or bank button
+returns to it and acts there as usual.
+
+- **Load** a pattern of another project: it replaces the playing pattern at the next pattern change
+  (at once while stopped; the playing slot blinks fast meanwhile), only the pattern, the kit stays.
+  It is temporary until you save it into a slot: a project save keeps the slot's saved pattern, the
+  autosave leaves it out, and a change to another pattern discards it, like unsaved changes.
+- **Save** the playing pattern into another project: like saving into a slot of the active project
+  (overwrite question for a slot with steps, then "Edit Name?"). Only that project's file is written;
+  the saved pattern uses kit 1 there.
+
 ## Kits
 
 The engines are saved in kits, projects and the autosave (a block after the 247 parameter bytes of

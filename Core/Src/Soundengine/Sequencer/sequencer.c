@@ -641,6 +641,8 @@ IN_ITCM_RAM void seq_setPendingPatternActive()
 		seq_copyPatternToBackupBuffer(seq_pendingPattern);
 
 		seq_activePattern = seq_pendingPattern;
+		//a pattern loaded from another project replaces the slot's restored version now
+		preset_patternActivated();
 
 		activeParameters[PAR_SHUFFLE] = seq_patternSet.shuffle[seq_activePattern];
 		seq_setShuffle(activeParameters[PAR_SHUFFLE]/127.f);

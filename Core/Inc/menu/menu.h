@@ -76,6 +76,8 @@ uint8_t menu_getPatternCursor(void);
 void menu_patternCursorSet(uint8_t pattern);
 //pattern save into target: "Edit Name? [y/N]" and the name editor, then menu_savePattern()
 void menu_patternSaveDialog(uint8_t target);
+//back to the active project's list (step and bank buttons act on the active project)
+void menu_patternLeaveOtherProject(void);
 void menu_savePattern(uint8_t target);
 
 

@@ -879,8 +879,9 @@ void menu_patternCursorSet(uint8_t pattern)
 	if(pattern >= NUM_PATTERN)
 		pattern = NUM_PATTERN-1;
 	menu_patternCursor = pattern;
-	//the step buttons show the bank of the cursor
-	if(menu_activePatternBank != pattern/16)
+	//the step buttons show the bank of the cursor (not while another project is browsed:
+	//they keep showing the active project)
+	if(!projectBrowse_isBrowsing() && menu_activePatternBank != pattern/16)
 	{
 		menu_activePatternBank = pattern/16;
 		led_initPatternSelectLeds();
@@ -917,7 +918,52 @@ static void menu_repaintPatternRow(char* row)
 	row[1] = (char)('0' + nr/10);
 	row[2] = (char)('0' + nr%10);
 	row[3] = ']';
-	menu_patternName(menu_patternCursor, &row[5]);
+	if(projectBrowse_isOther())
+		projectBrowse_patternName(menu_patternCursor, &row[5]);
+	else
+		menu_patternName(menu_patternCursor, &row[5]);
+}
+//"Load Pattern"/"Save Pattern" (" pNN" for another project), the slot or the project browser
+static void menu_repaintPatternPage(const char* title)
+{
+	memset(&editDisplayBuffer[0][0], ' ', 16);
+	memset(&editDisplayBuffer[1][0], ' ', 16);
+	memcpy(&editDisplayBuffer[0][0], title, 12);
+	projectBrowse_repaintProjectNr(editDisplayBuffer[0]);
+	if(!projectBrowse_repaint(editDisplayBuffer))
+		menu_repaintPatternRow(editDisplayBuffer[1]);
+}
+//back to the active project's list (a step or bank button acts on the active project)
+void menu_patternLeaveOtherProject(void)
+{
+	if(!projectBrowse_isBrowsing())
+		return;
+	projectBrowse_resetPatterns();
+	menu_patternOverwriteTarget = NO_PATTERN;
+	led_initPatternSelectLeds();
+}
+//encoder button on a slot of another project's list
+static void menu_patternOtherSlot(uint8_t nr)
+{
+	if(menu_activePage == PATTERN_SAVE_PAGE)
+	{
+		//saving over a pattern with steps there needs a 2nd press, then the name dialog
+		if(projectBrowse_patternHasSteps(nr) && menu_patternOverwriteTarget != nr)
+		{
+			menu_patternOverwriteTarget = nr;
+			menu_repaint();
+			return;
+		}
+		menu_patternOverwriteTarget = NO_PATTERN;
+		menu_patternSaveDialog(nr);
+		return;
+	}
+	//load: temporary, replaces the playing pattern at the next pattern change
+	const FRESULT res = projectBrowse_loadPattern(nr);
+	if(res != FR_OK)
+		menu_showSdError(res);
+	led_initPatternSelectLeds();
+	menu_repaint();
 }
 //-----------------------------------------------------------------
 //pattern save into target: the kit save dialog ("Edit Name? [y/N]", name editor, ok)
@@ -925,7 +971,7 @@ static void menu_repaintPatternRow(char* row)
 void menu_patternSaveDialog(uint8_t target)
 {
 	char name[8];
-	memcpy(name, savefileNames[seq_activePattern][PATTERN_NAMES], 8);
+	memcpy(name, preset_activePatternName(), 8);
 	if(menu_isPatternNameEmpty(name))
 		memcpy(name, "Unnamed ", 8);
 
@@ -941,6 +987,27 @@ void menu_patternSaveDialog(uint8_t target)
 //the playing pattern (with its edits, shuffle and the name from the dialog) into target
 void menu_savePattern(uint8_t target)
 {
+	if(projectBrowse_isOther())
+	{
+		//into another project: only its file; nothing changes here (the changes stay unsaved)
+		char name[8];
+		for(uint8_t i=0;i<8;i++)
+		{
+			name[i] = characterOrder[(uint8_t)nameEditBuffer[i]];
+		}
+		const FRESULT res = projectBrowse_savePattern(target, name);
+		if(res != FR_OK)
+		{
+			menu_showSdError(res);
+			menu_switchPage(PATTERN_SAVE_PAGE);
+			return;
+		}
+		menu_activePage = PATTERN_SAVE_PAGE_OK;
+		sucessTimer = systick_ticks;
+		menu_repaint();
+		return;
+	}
+
 	if(activeParameters[PAR_PATTERN_MODE] == 1)
 	{
 		//prevent saving to a new slot reloading the kit and discarding unsaved changes
@@ -955,6 +1022,10 @@ void menu_savePattern(uint8_t target)
 	soundengine_backgroundAudioEnd(audioStarted);
 
 	menu_selectedPresetNr[SAVE_TYPE_PATTERN] = target;
+	//a pattern of another project saved into the slot it plays in is a normal pattern now
+	//(saved into another slot: the pattern change to it ends it)
+	if(target == seq_activePattern)
+		preset_otherPatternSaved();
 	if(res != FR_OK)
 	{
 		//the card write failed (e.g. card full): no "success", back to the slots
@@ -1401,9 +1472,7 @@ static void menu_repaintSimplePage()
 	}
 	else if(menu_activePage == PATTERN_LOAD_PAGE)
 	{
-		memset(&editDisplayBuffer[0][0], ' ', 16);
-		memcpy(&editDisplayBuffer[0][0], "Select Pattern", 14);
-		menu_repaintPatternRow(editDisplayBuffer[1]);
+		menu_repaintPatternPage("Load Pattern");
 	}
 	else if(menu_activePage == PATTERN_SAVE_PAGE && menu_patternOverwriteTarget != NO_PATTERN)
 	{
@@ -1412,13 +1481,14 @@ static void menu_repaintSimplePage()
 		memcpy(&editDisplayBuffer[0][0], "Overwrite", 9);
 		numtostrps(&editDisplayBuffer[0][10],menu_patternOverwriteTarget+1);
 		editDisplayBuffer[0][13] = '?';
-		memcpy(&editDisplayBuffer[1][0], "Press again: yes", 16);
+		if(projectBrowse_isOther())
+			snprintf(&editDisplayBuffer[1][0], 17, "p%02u: press again", (unsigned)(projectBrowse.project % 100));
+		else
+			memcpy(&editDisplayBuffer[1][0], "Press again: yes", 16);
 	}
 	else if(menu_activePage == PATTERN_SAVE_PAGE)
 	{
-		memset(&editDisplayBuffer[0][0], ' ', 16);
-		memcpy(&editDisplayBuffer[0][0], "Save Pattern", 12);
-		menu_repaintPatternRow(editDisplayBuffer[1]);
+		menu_repaintPatternPage("Save Pattern");
 	}
 	else if(menu_activePage == PATTERN_SAVE_PAGE_OK)
 	{
@@ -1593,7 +1663,7 @@ static void menu_repaintLoadSavePage()
 	}
 
 	strcpy(&editDisplayBuffer[0][6],toptxt);
-	if(menu_saveOptions.category == SAVE_TYPE_KIT)
+	if(menu_saveOptions.category == SAVE_TYPE_KIT || menu_saveOptions.category == SAVE_TYPE_PATTERN)
 		projectBrowse_repaintProjectNr(editDisplayBuffer[0]);
 	/*
 	if(menu_saveOptions.state == SAVE_STATE_EDIT_TYPE) {
@@ -2432,7 +2502,9 @@ void menu_handleLoadSaveMenu(int8_t inc, uint8_t btnClicked)
 				case SAVE_STATE_CHANGE_NAME_DIALOG_N:
 					//click -> save
 
-					copyEditBufferToName(menu_selectedPresetNr[menu_saveOptions.category] ,menu_saveOptions.nameBuffer );
+					//(not a pattern saved into another project: the slot of the same number here keeps its name)
+					if(!(menu_saveOptions.category == SAVE_TYPE_PATTERN && projectBrowse_isOther()))
+						copyEditBufferToName(menu_selectedPresetNr[menu_saveOptions.category] ,menu_saveOptions.nameBuffer );
 					switch(menu_saveOptions.category)
 					{
 						case SAVE_TYPE_SONG:
@@ -3170,10 +3242,21 @@ void menu_parseEncoder(int8_t inc, uint8_t button)
 			}
 			else if(menu_activePage == PATTERN_LOAD_PAGE || menu_activePage == PATTERN_SAVE_PAGE)
 			{
-				//the same as the step button of the slot under the cursor (it may open the
-				//save page's name dialog, which must not see this click)
+				//"Change Project" and the project list; a slot of another project; otherwise the
+				//same as the step button of the slot under the cursor (it may open the save
+				//page's name dialog, which must not see this click)
 				lastEncoderButton = button;
-				buttonHandler_patternSlot(menu_patternCursor);
+				if(projectBrowse_click(menu_activePage == PATTERN_SAVE_PAGE))
+				{
+					menu_patternOverwriteTarget = NO_PATTERN;
+					led_initPatternSelectLeds();
+					//back in the active project's list: the bank follows the cursor again
+					menu_patternCursorSet(menu_patternCursor);
+				}
+				else if(projectBrowse_isOther())
+					menu_patternOtherSlot(menu_patternCursor);
+				else
+					buttonHandler_patternSlot(menu_patternCursor);
 				return;
 			}
 			else if (copyClear_Mode == MODE_CLEAR)
@@ -3207,6 +3290,12 @@ void menu_parseEncoder(int8_t inc, uint8_t button)
 		{
 			menu_patternOverwriteTarget = NO_PATTERN;
 			led_initPatternSelectLeds();
+		}
+		//"Change Project" above slot 1 and the project list
+		if(projectBrowse_encoder(inc, &menu_patternCursor))
+		{
+			menu_patternCursorSet(menu_patternCursor);
+			return;
 		}
 		const int16_t cursor = menu_patternCursor + inc;
 		menu_patternCursorSet((uint8_t)(cursor < 0 ? 0 : cursor >= NUM_PATTERN ? NUM_PATTERN-1 : cursor));
@@ -3583,7 +3672,11 @@ checkvalid:
 void menu_setLoadSaveCategory(uint8_t cat)
 {
 	menu_saveOptions.category = cat;
-	projectBrowse_reset();
+	//(SAVE + PATTERN calls this after opening the pattern save page: keep listing patterns)
+	if(cat == SAVE_TYPE_PATTERN)
+		projectBrowse_resetPatterns();
+	else
+		projectBrowse_reset();
 
 	switch(menu_saveOptions.category) {
 		default:
@@ -3761,6 +3854,7 @@ void menu_switchPage(uint8_t pageNr)
 		// leave edit mode if active
 		editModeActive = 0;
 		menu_activePage=PATTERN_LOAD_PAGE;
+		projectBrowse_resetPatterns();
 		//the cursor starts on the playing pattern, the step buttons show its bank
 		menu_patternCursor = menu_playedPattern;
 		menu_activePatternBank = menu_patternCursor/16;
@@ -3775,6 +3869,7 @@ void menu_switchPage(uint8_t pageNr)
 		// leave edit mode if active
 		editModeActive = 0;
 		menu_activePage=PATTERN_SAVE_PAGE;
+		projectBrowse_resetPatterns();
 		menu_patternCursor = menu_playedPattern;
 		menu_activePatternBank = menu_patternCursor/16;
 		led_initPatternSelectLeds();

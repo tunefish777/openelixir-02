@@ -13,7 +13,8 @@
  * save kit menus: "Change Project" (below kit 0) shows the project list
  * ("Select Project:"), confirming a project lists its kits. The active
  * project's kits come from RAM (incl. unsaved changes), other projects' from
- * their folder on the SD card.
+ * their folder on the SD card. The pattern load/save pages list patterns the
+ * same way ("Change Project" above slot 1).
  */
 
 #ifndef PROJECTBROWSE_H_
@@ -28,12 +29,17 @@ typedef struct
 	uint8_t selecting;		//the project list is shown
 	uint8_t projectSel;		//position in the project list
 	uint8_t changeRow;		//"Change Project" (below kit 0) is selected
+	uint8_t patterns;		//the list holds patterns (pattern pages), not kits
 } ProjectBrowse;
 
 extern ProjectBrowse projectBrowse;
 
 //list the active project's kits
 void projectBrowse_reset(void);
+//list the active project's patterns (pattern load/save pages)
+void projectBrowse_resetPatterns(void);
+//the project list, "Change Project" or another project's list is shown
+uint8_t projectBrowse_isBrowsing(void);
 //are the kits of another project than the active one listed?
 uint8_t projectBrowse_isOther(void);
 
@@ -51,6 +57,13 @@ uint8_t projectBrowse_kitEngine(const uint8_t kit, const uint8_t slot);
 FRESULT projectBrowse_readKit(const uint8_t kit, uint8_t* params, uint8_t* engines);
 //save the active kit into the listed (other) project
 FRESULT projectBrowse_saveKit(const uint8_t kit, char* name);
+
+//the listed (other) project's patterns: name for the list (8 characters, "Empty" without steps,
+//"Unnamed" with steps but no name), steps, load (temporary) and save the playing pattern into it
+void projectBrowse_patternName(const uint8_t nr, char* buf);
+uint8_t projectBrowse_patternHasSteps(const uint8_t nr);
+FRESULT projectBrowse_loadPattern(const uint8_t nr);
+FRESULT projectBrowse_savePattern(const uint8_t nr, char* name);
 
 //the 2 display lines for the project list or "Change Project"; returns 1 if
 //it drew line 1 (and line 0 for the project list)

@@ -15,12 +15,14 @@
 #include "Preset/PresetManager.h"
 #include "Preset/KitEngines.h"
 #include "Soundengine/Soundengine.h"
+#include "Soundengine/Sequencer/sequencer.h"
 #include <stdio.h>
 #include <string.h>
 
 ProjectBrowse projectBrowse;
 
-//names and engines of another project's kits, read from the SD card when it is chosen
+//names and engines of another project's kits (patterns: names and exists = has steps), read
+//from the SD card when it is chosen
 static char projectBrowse_names[NUM_KIT_SLOTS][8];
 static uint8_t projectBrowse_engines[NUM_KIT_SLOTS][NUM_VOICE_SLOTS];
 static uint8_t projectBrowse_exists[NUM_KIT_SLOTS];
@@ -30,6 +32,18 @@ void projectBrowse_reset(void)
 	projectBrowse.project = menu_loadedPresetNr[CURRENT_PROJECT];
 	projectBrowse.selecting = 0;
 	projectBrowse.changeRow = 0;
+	projectBrowse.patterns = 0;
+}
+//---------------------------------------------------
+void projectBrowse_resetPatterns(void)
+{
+	projectBrowse_reset();
+	projectBrowse.patterns = 1;
+}
+//---------------------------------------------------
+uint8_t projectBrowse_isBrowsing(void)
+{
+	return projectBrowse.selecting || projectBrowse.changeRow || projectBrowse_isOther();
 }
 //---------------------------------------------------
 uint8_t projectBrowse_isOther(void)
@@ -80,9 +94,13 @@ uint8_t projectBrowse_click(const uint8_t forSave)
 		{
 			//reads up to 64 files: keep the audio running meanwhile
 			const uint8_t bg = soundengine_backgroundAudioBegin();
-			if(preset_scanProjectKits(projectBrowse.project, projectBrowse_names, projectBrowse_engines, projectBrowse_exists) != FR_OK)
+			const FRESULT res = projectBrowse.patterns ?
+					preset_scanProjectPatterns(projectBrowse.project, projectBrowse_names, projectBrowse_exists) :
+					preset_scanProjectKits(projectBrowse.project, projectBrowse_names, projectBrowse_engines, projectBrowse_exists);
+			if(res != FR_OK)
 			{
 				memset(projectBrowse_exists, 0, sizeof(projectBrowse_exists));
+				memset(projectBrowse_names, 0, sizeof(projectBrowse_names));
 			}
 			soundengine_backgroundAudioEnd(bg);
 		}
@@ -138,6 +156,49 @@ FRESULT projectBrowse_saveKit(const uint8_t kit, char* name)
 		memcpy(projectBrowse_names[kit], name, 8);
 		memcpy(projectBrowse_engines[kit], kitEngines, NUM_VOICE_SLOTS);
 		projectBrowse_exists[kit] = 1;
+	}
+	return res;
+}
+//---------------------------------------------------
+void projectBrowse_patternName(const uint8_t nr, char* buf)
+{
+	const char* name = projectBrowse_names[nr];
+	uint8_t empty = 1;
+	for(uint8_t i=0;i<8;i++)
+	{
+		if(name[i] != 0 && name[i] != ' ')
+			empty = 0;
+	}
+	if(empty || preset_isNameEmpty((char*)name))
+		name = projectBrowse_exists[nr] ? "Unnamed " : "Empty   ";
+	for(uint8_t i=0;i<8;i++)
+	{
+		buf[i] = name[i] ? name[i] : ' ';
+	}
+}
+//---------------------------------------------------
+uint8_t projectBrowse_patternHasSteps(const uint8_t nr)
+{
+	return projectBrowse_exists[nr];
+}
+//---------------------------------------------------
+FRESULT projectBrowse_loadPattern(const uint8_t nr)
+{
+	const uint8_t bg = soundengine_backgroundAudioBegin();
+	const FRESULT res = preset_loadOtherPattern(projectBrowse.project, nr);
+	soundengine_backgroundAudioEnd(bg);
+	return res;
+}
+//---------------------------------------------------
+FRESULT projectBrowse_savePattern(const uint8_t nr, char* name)
+{
+	const uint8_t bg = soundengine_backgroundAudioBegin();
+	const FRESULT res = preset_saveProjectPattern(projectBrowse.project, nr, name);
+	soundengine_backgroundAudioEnd(bg);
+	if(res == FR_OK)
+	{
+		memcpy(projectBrowse_names[nr], name, 8);
+		projectBrowse_exists[nr] = seq_patternHasSteps(seq_activePattern);
 	}
 	return res;
 }

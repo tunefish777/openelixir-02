@@ -710,7 +710,9 @@ void preset_processTimer()
 		if(HAL_GetTick()-preset_patTimer >= PRESET_SAVE_TIME )
 		{
 			preset_patDirty = 0;
-			preset_saveTmpPat();
+			//a pattern loaded from another project stays temporary until it is saved into a slot
+			if(!preset_isOtherPatternLoaded())
+				preset_saveTmpPat();
 		}
 	}
 
@@ -1692,7 +1694,8 @@ void preset_queryMainStepDataFromSeq(uint16_t stepNr, uint16_t *mainStepData, ui
 };
 
 //----------------------------------------------------
-static void preset_writePatternData(uint8_t patternNr)
+//the pattern data of slot patternNr with the given shuffle and kit nr (saving into another project)
+static void preset_writePatternDataAs(uint8_t patternNr, uint8_t shuffle, uint8_t kitNr)
 {
 #if 0
 #else
@@ -1721,7 +1724,7 @@ static void preset_writePatternData(uint8_t patternNr)
 
 
 		//preset_fwrite((FIL*)&SDFile,(const void*)&activeParameters[PAR_SHUFFLE],sizeof(uint8_t),&bytesWritten);
-		preset_fwrite((FIL*)&SDFile,(const void*)&seq_patternSet.shuffle[patternNr],sizeof(uint8_t),&bytesWritten);
+		preset_fwrite((FIL*)&SDFile,(const void*)&shuffle,sizeof(uint8_t),&bytesWritten);
 
 		//----- pattern/track lengths ------
 		// we reuse the same call from above (when saving main step data)
@@ -1736,10 +1739,14 @@ static void preset_writePatternData(uint8_t patternNr)
 		}
 
 		//write associated kit nr
-		preset_fwrite((FIL*)&SDFile,&seq_patternSet.kitNr[patternNr],sizeof(uint8_t),&bytesWritten);
+		preset_fwrite((FIL*)&SDFile,&kitNr,sizeof(uint8_t),&bytesWritten);
 
 		preset_writePatternArp(patternNr);
 #endif
+}
+static void preset_writePatternData(uint8_t patternNr)
+{
+	preset_writePatternDataAs(patternNr, seq_patternSet.shuffle[patternNr], seq_patternSet.kitNr[patternNr]);
 }
 
 //----------------------------------------------------
@@ -1814,6 +1821,86 @@ FRESULT preset_savePatternSD(uint8_t presetNr)
 
 //----------------------------------------------------
 // returns 1 on success
+//read the pattern data of the open file (after name and version tag) into buf; 1 if complete.
+//V1 files have no kit nr: defaultKitNr
+static uint8_t preset_readPatternFile(PatternFileData* buf, uint8_t dataVersion, uint8_t defaultKitNr)
+{
+	UINT bytesRead;
+	uint8_t next=0;
+	// ---------- Load step data first
+	// load step data
+	for(uint8_t trk=0; trk<NUM_TRACKS;trk++)
+	{
+		f_read((FIL*)&SDFile,(void*)&buf->steps[trk][0],sizeof(Step)*STEPS_PER_PATTERN,&bytesRead);
+		if(bytesRead!=sizeof(Step)*(STEPS_PER_PATTERN))
+			return 0; // file error, or we ran out of file (eof)
+		//Pattern V3 and up => flam added
+		if(dataVersion > 2)
+		{
+			f_read((FIL*)&SDFile,(void*)&buf->timing[trk][0],sizeof(StepTiming)*STEPS_PER_PATTERN,&bytesRead);
+			if(bytesRead!=sizeof(StepTiming)*(STEPS_PER_PATTERN))
+				return 0; // file error, or we ran out of file (eof)
+		}
+		else
+		{
+			//older files: no flam, no shift
+			for(uint8_t stp=0; stp<STEPS_PER_PATTERN; stp++)
+			{
+				buf->timing[trk][stp].flam = 0;
+				buf->timing[trk][stp].shift = 7;   // 7 = no shift
+			}
+		}
+	}
+	// ---------- load the main step data next
+	for(uint8_t trk=0; trk<NUM_TRACKS;trk++)
+	{
+		for(uint8_t bar=0;bar<NUM_BARS; bar++)
+		{
+			f_read((FIL*)&SDFile,(void*)&buf->mainSteps[bar][trk],sizeof(uint16_t),&bytesRead);
+			if( bytesRead!=sizeof(uint16_t))
+				return 0;
+		}
+	}
+	// ------------ shuffle settings
+	f_read((FIL*)&SDFile,(void*)&buf->shuffle,sizeof(uint8_t),&bytesRead);
+	if(!bytesRead)
+		return 0;
+	// ----------- Pattern/track lengths
+	// -- AS this might not exist in the saved data file, we still want success
+	for(uint8_t trk=0; trk<NUM_TRACKS;trk++)
+	{
+		f_read((FIL*)&SDFile,(void*)&next,sizeof(uint8_t),&bytesRead);
+		buf->length[trk] = preset_validLength(next);
+	}
+	//V1 files have no kit nr: the pattern keeps its kit nr
+	buf->kitNr = defaultKitNr;
+	if(dataVersion > 1)
+	{
+		f_read((FIL*)&SDFile,(void*)&buf->kitNr,sizeof(uint8_t),&bytesRead);
+		if(bytesRead == 0)
+			return 0;
+	}
+	preset_readPatternArp(buf->arp);
+
+	return 1;
+}
+//----------------------------------------------------
+//a completely read pattern into slot patternNr (withKitNr 0: the slot keeps its kit nr)
+static void preset_commitPattern(uint8_t patternNr, const PatternFileData* buf, uint8_t withKitNr)
+{
+	//complete: copy into the pattern
+	memcpy(seq_patternSet.seq_subStepPattern[patternNr], buf->steps, sizeof(buf->steps));
+	memcpy(seq_patternSet.seq_stepTiming[patternNr], buf->timing, sizeof(buf->timing));
+	for(uint8_t bar=0;bar<NUM_BARS; bar++)
+		memcpy(seq_patternSet.seq_mainSteps[bar][patternNr], buf->mainSteps[bar], sizeof(buf->mainSteps[bar]));
+	memcpy(seq_patternSet.length[patternNr], buf->length, sizeof(buf->length));
+	seq_patternSet.shuffle[patternNr] = buf->shuffle;
+	if(withKitNr)
+		seq_patternSet.kitNr[patternNr] = buf->kitNr;
+	memcpy(seq_patternSet.arp[patternNr], buf->arp, sizeof(buf->arp));
+	preset_validateKitNr(patternNr);
+}
+//----------------------------------------------------
 static uint8_t preset_readPatternData(uint8_t patternNr, uint8_t dataVersion)
 {
 
@@ -1986,74 +2073,10 @@ static uint8_t preset_readPatternData(uint8_t patternNr, uint8_t dataVersion)
 	// ignored and a standard length used. I think it's acceptable as long as users are aware of this.
 	//everything is read into preset_patternBuffer first and only copied into the pattern after the
 	//whole file was read: a damaged file leaves the pattern as it was
-	PatternFileData* buf = &preset_patternBuffer;
-	UINT bytesRead;
-	uint8_t next=0;
-	// ---------- Load step data first
-	// load step data
-	for(uint8_t trk=0; trk<NUM_TRACKS;trk++)
-	{
-		f_read((FIL*)&SDFile,(void*)&buf->steps[trk][0],sizeof(Step)*STEPS_PER_PATTERN,&bytesRead);
-		if(bytesRead!=sizeof(Step)*(STEPS_PER_PATTERN))
-			return 0; // file error, or we ran out of file (eof)
-		//Pattern V3 and up => flam added
-		if(dataVersion > 2)
-		{
-			f_read((FIL*)&SDFile,(void*)&buf->timing[trk][0],sizeof(StepTiming)*STEPS_PER_PATTERN,&bytesRead);
-			if(bytesRead!=sizeof(StepTiming)*(STEPS_PER_PATTERN))
-				return 0; // file error, or we ran out of file (eof)
-		}
-		else
-		{
-			//older files: no flam, no shift
-			for(uint8_t stp=0; stp<STEPS_PER_PATTERN; stp++)
-			{
-				buf->timing[trk][stp].flam = 0;
-				buf->timing[trk][stp].shift = 7;   // 7 = no shift
-			}
-		}
-	}
-	// ---------- load the main step data next
-	for(uint8_t trk=0; trk<NUM_TRACKS;trk++)
-	{
-		for(uint8_t bar=0;bar<NUM_BARS; bar++)
-		{
-			f_read((FIL*)&SDFile,(void*)&buf->mainSteps[bar][trk],sizeof(uint16_t),&bytesRead);
-			if( bytesRead!=sizeof(uint16_t))
-				return 0;
-		}
-	}
-	// ------------ shuffle settings
-	f_read((FIL*)&SDFile,(void*)&buf->shuffle,sizeof(uint8_t),&bytesRead);
-	if(!bytesRead)
+	//read completely into preset_patternBuffer first, then copy into the pattern
+	if(!preset_readPatternFile(&preset_patternBuffer, dataVersion, seq_patternSet.kitNr[patternNr]))
 		return 0;
-	// ----------- Pattern/track lengths
-	// -- AS this might not exist in the saved data file, we still want success
-	for(uint8_t trk=0; trk<NUM_TRACKS;trk++)
-	{
-		f_read((FIL*)&SDFile,(void*)&next,sizeof(uint8_t),&bytesRead);
-		buf->length[trk] = preset_validLength(next);
-	}
-	//V1 files have no kit nr: the pattern keeps its kit nr
-	buf->kitNr = seq_patternSet.kitNr[patternNr];
-	if(dataVersion > 1)
-	{
-		f_read((FIL*)&SDFile,(void*)&buf->kitNr,sizeof(uint8_t),&bytesRead);
-		if(bytesRead == 0)
-			return 0;
-	}
-	preset_readPatternArp(buf->arp);
-
-	//complete: copy into the pattern
-	memcpy(seq_patternSet.seq_subStepPattern[patternNr], buf->steps, sizeof(buf->steps));
-	memcpy(seq_patternSet.seq_stepTiming[patternNr], buf->timing, sizeof(buf->timing));
-	for(uint8_t bar=0;bar<NUM_BARS; bar++)
-		memcpy(seq_patternSet.seq_mainSteps[bar][patternNr], buf->mainSteps[bar], sizeof(buf->mainSteps[bar]));
-	memcpy(seq_patternSet.length[patternNr], buf->length, sizeof(buf->length));
-	seq_patternSet.shuffle[patternNr] = buf->shuffle;
-	seq_patternSet.kitNr[patternNr] = buf->kitNr;
-	memcpy(seq_patternSet.arp[patternNr], buf->arp, sizeof(buf->arp));
-	preset_validateKitNr(patternNr);
+	preset_commitPattern(patternNr, &preset_patternBuffer, 1);
 	return 1;
 #endif
 }
@@ -2342,6 +2365,7 @@ uint8_t preset_getMorphValue(uint16_t index, uint8_t morph)
 
 FRESULT preset_createProject(uint8_t presetNr)
 {
+	preset_clearOtherPattern();
 
 
 	//create default globals
@@ -2399,7 +2423,10 @@ FRESULT preset_saveProject(uint8_t presetNr)
 	//slot of the kit loaded before it
 	if(!preset_otherKitLoaded)
 		preset_saveDrumsetRam(menu_loadedPresetNr[CURRENT_KIT], 0);
-	preset_savePatternRAM(seq_activePattern);
+	//not a pattern loaded from another project: temporary until saved into a slot (the playing
+	//slot keeps its saved version)
+	if(!preset_isOtherPatternLoaded())
+		preset_savePatternRAM(seq_activePattern);
 
 #if USE_INTERRUPT_ONLY_DURING_SAVE_PROJ
 	HAL_TIM_Base_Start_IT(&htim2);	//calc sample interrupt - prio 1
@@ -2697,10 +2724,10 @@ FRESULT preset_saveSongSD(uint8_t songNr)
 //----------------------------------------------------
 //index of a kit file in a project folder: NN-NAME.SND (0-63) or the older
 //PNNN.SND (isOld = 1); -1 for any other file
-static int8_t preset_kitFileIndex(const char* fname, uint8_t* isOld)
+static int8_t preset_fileIndex(const char* fname, const char* ext, uint8_t* isOld)
 {
 	const char* dot = strchr(fname, '.');
-	if(!dot || strcasecmp(dot, ".snd") != 0)
+	if(!dot || strcasecmp(dot, ext) != 0)
 		return -1;
 	if(fname[0] >= '0' && fname[0] <= '9' && fname[1] >= '0' && fname[1] <= '9' && fname[2] == '-')
 	{
@@ -2716,9 +2743,13 @@ static int8_t preset_kitFileIndex(const char* fname, uint8_t* isOld)
 	}
 	return -1;
 }
+static int8_t preset_kitFileIndex(const char* fname, uint8_t* isOld)
+{
+	return preset_fileIndex(fname, ".snd", isOld);
+}
 //----------------------------------------------------
-//find the file of a kit in a project folder (the NN- name wins over the old one)
-static FRESULT preset_findProjectKit(const char* folder, uint8_t kitNr, char* path)
+//find the file of kit/pattern nr (ext ".snd"/".pat") in a project folder (the NN- name wins over the old one)
+static FRESULT preset_findProjectFile(const char* folder, uint8_t nr, const char* ext, char* path)
 {
 	DIR dir;
 	FILINFO fno;
@@ -2729,7 +2760,7 @@ static FRESULT preset_findProjectKit(const char* folder, uint8_t kitNr, char* pa
 	while(f_readdir(&dir, &fno) == FR_OK && fno.fname[0])
 	{
 		uint8_t isOld;
-		if(preset_kitFileIndex(fno.fname, &isOld) == kitNr && (!found || !isOld))
+		if(preset_fileIndex(fno.fname, ext, &isOld) == nr && (!found || !isOld))
 		{
 			sprintf(path, "%s/%s", folder, fno.fname);
 			found = isOld ? 1 : 2;
@@ -2795,7 +2826,7 @@ FRESULT preset_readProjectKit(uint8_t projectNr, uint8_t kitNr, uint8_t* params,
 	char folder[12];
 	char path[32];
 	preset_projectFolderName(folder, projectNr);
-	FRESULT res = preset_findProjectKit(folder, kitNr, path);
+	FRESULT res = preset_findProjectFile(folder, kitNr, ".snd", path);
 	if(res != FR_OK)
 		return res;
 	res = f_open((FIL*)&SDFile, path, FA_OPEN_EXISTING | FA_READ);
@@ -2838,7 +2869,7 @@ FRESULT preset_saveProjectKit(uint8_t projectNr, uint8_t kitNr, char* name, cons
 		return res;
 
 	//the file name contains the kit name: remove the kit's old file first
-	while(preset_findProjectKit(folder, kitNr, path) == FR_OK)
+	while(preset_findProjectFile(folder, kitNr, ".snd", path) == FR_OK)
 	{
 		res = f_unlink(path);
 		if(res != FR_OK)
@@ -2855,6 +2886,210 @@ FRESULT preset_saveProjectKit(uint8_t projectNr, uint8_t kitNr, char* name, cons
 		res = preset_writeKitParams(params);
 	if(res == FR_OK)
 		res = preset_writeEngines(engines, params);
+	return preset_fcloseWrite();
+}
+//----------------------------------------------------
+//version of a pattern file after its name: "PatVnn" tag or V1 (no tag, read pointer back)
+static uint8_t preset_readPatternVersion(uint8_t* tagged)
+{
+	char buf[7];
+	UINT bytesRead = 0;
+	f_read((FIL*)&SDFile, buf, 6, &bytesRead);
+	buf[6] = 0;
+	if(bytesRead == 6 && strncmp(buf, "PatV", 4) == 0)
+	{
+		*tagged = 1;
+		return (uint8_t)atoi(&buf[4]);
+	}
+	*tagged = 0;
+	f_lseek((FIL*)&SDFile, f_tell((FIL*)&SDFile) - bytesRead);
+	return 1;
+}
+//----------------------------------------------------
+FRESULT preset_scanProjectPatterns(uint8_t projectNr, char names[][8], uint8_t* hasSteps)
+{
+	//one open file or folder at a time: first collect the pattern files, then read them
+	static char patFiles[NUM_PATTERN][13];
+	uint8_t exists[NUM_PATTERN];
+	uint8_t isOldFile[NUM_PATTERN];
+	char folder[12];
+	char path[32];
+	DIR dir;
+	FILINFO fno;
+
+	memset(exists, 0, sizeof(exists));
+	memset(hasSteps, 0, NUM_PATTERN);
+	memset(names, 0, NUM_PATTERN * 8);
+	preset_projectFolderName(folder, projectNr);
+	FRESULT res = f_opendir(&dir, folder);
+	if(res != FR_OK)
+		return res;
+	while(f_readdir(&dir, &fno) == FR_OK && fno.fname[0])
+	{
+		uint8_t isOld;
+		const int8_t nr = preset_fileIndex(fno.fname, ".pat", &isOld);
+		//the NN- name wins over the old one
+		if(nr < 0 || (exists[nr] && (isOld || !isOldFile[nr])))
+			continue;
+		strcpy(patFiles[nr], fno.fname);
+		exists[nr] = 1;
+		isOldFile[nr] = isOld;
+	}
+	f_closedir(&dir);
+
+	for(uint8_t nr=0;nr<NUM_PATTERN;nr++)
+	{
+		if(!exists[nr])
+			continue;
+		snprintf(path, sizeof(path), "%s/%.12s", folder, patFiles[nr]);
+		if(f_open((FIL*)&SDFile, path, FA_OPEN_EXISTING | FA_READ) != FR_OK)
+			continue;
+		UINT bytesRead = 0;
+		if(f_read((FIL*)&SDFile, names[nr], 8, &bytesRead) == FR_OK && bytesRead == 8)
+		{
+			//only the main steps: they decide between "Empty" and "Unnamed"
+			uint8_t tagged;
+			const uint8_t version = preset_readPatternVersion(&tagged);
+			const uint32_t mainSteps = 8 + (tagged ? 6 : 0)
+					+ NUM_TRACKS * (sizeof(Step) * STEPS_PER_PATTERN + (version > 2 ? sizeof(StepTiming) * STEPS_PER_PATTERN : 0));
+			uint8_t steps[NUM_BARS * NUM_TRACKS * 2];
+			if(f_lseek((FIL*)&SDFile, mainSteps) == FR_OK
+					&& f_read((FIL*)&SDFile, steps, sizeof(steps), &bytesRead) == FR_OK && bytesRead == sizeof(steps))
+			{
+				for(uint8_t i=0;i<sizeof(steps);i++)
+				{
+					if(steps[i])
+						hasSteps[nr] = 1;
+				}
+			}
+		}
+		f_close((FIL*)&SDFile);
+	}
+	return FR_OK;
+}
+//----------------------------------------------------
+//a pattern of another project: read completely first, then played in the playing pattern's
+//slot as unsaved changes from the next pattern change on (temporary until saved into a slot)
+static PatternFileData preset_otherPattern;
+static char preset_otherPatternName[8];
+static uint8_t preset_otherPatternSlot;
+static uint8_t preset_otherPatternPending = 0;
+static uint8_t preset_otherPatternLoaded = 0;
+//----------------------------------------------------
+FRESULT preset_loadOtherPattern(uint8_t projectNr, uint8_t nr)
+{
+	char folder[12];
+	char path[32];
+	preset_projectFolderName(folder, projectNr);
+	FRESULT res = preset_findProjectFile(folder, nr, ".pat", path);
+	if(res != FR_OK)
+		return res;
+	res = f_open((FIL*)&SDFile, path, FA_OPEN_EXISTING | FA_READ);
+	if(res != FR_OK)
+		return res;
+	UINT bytesRead = 0;
+	uint8_t ok = f_read((FIL*)&SDFile, preset_otherPatternName, 8, &bytesRead) == FR_OK && bytesRead == 8;
+	if(ok)
+	{
+		uint8_t tagged;
+		const uint8_t version = preset_readPatternVersion(&tagged);
+		ok = preset_readPatternFile(&preset_otherPattern, version, 0);
+	}
+	f_close((FIL*)&SDFile);
+	if(!ok)
+		return FR_INT_ERR;
+
+	//only the pattern: the kit stays (no kit change when it starts)
+	if(activeParameters[PAR_PATTERN_MODE] == 1)
+		activeParameters[PAR_PATTERN_MODE] = SKIP_NEXT_KIT_AUTOLOAD;
+	preset_otherPatternSlot = seq_activePattern;
+	preset_otherPatternPending = 1;
+	//like a pattern change to the playing slot: at the end of the pattern, at once while stopped
+	seq_setNextPattern(seq_activePattern);
+	return FR_OK;
+}
+//----------------------------------------------------
+void preset_patternActivated(void)
+{
+	if(preset_otherPatternPending && seq_activePattern == preset_otherPatternSlot)
+	{
+		//replaces the slot's restored version as unsaved changes; the slot keeps its kit nr
+		preset_commitPattern(seq_activePattern, &preset_otherPattern, 0);
+		preset_otherPatternLoaded = 1;
+	}
+	else
+	{
+		//any other pattern change discards it, like unsaved changes
+		preset_otherPatternLoaded = 0;
+		//a song step or program change came first: its kit loads as usual
+		if(preset_otherPatternPending && activeParameters[PAR_PATTERN_MODE] == SKIP_NEXT_KIT_AUTOLOAD)
+			activeParameters[PAR_PATTERN_MODE] = 1;
+	}
+	preset_otherPatternPending = 0;
+}
+//----------------------------------------------------
+void preset_cancelOtherPattern(void)
+{
+	preset_otherPatternPending = 0;
+}
+//----------------------------------------------------
+void preset_clearOtherPattern(void)
+{
+	preset_otherPatternPending = 0;
+	preset_otherPatternLoaded = 0;
+}
+//----------------------------------------------------
+void preset_otherPatternSaved(void)
+{
+	preset_otherPatternLoaded = 0;
+}
+//----------------------------------------------------
+uint8_t preset_isOtherPatternLoaded(void)
+{
+	return preset_otherPatternLoaded;
+}
+//----------------------------------------------------
+uint8_t preset_isOtherPatternPending(void)
+{
+	return preset_otherPatternPending;
+}
+//----------------------------------------------------
+char* preset_activePatternName(void)
+{
+	return preset_otherPatternLoaded ? preset_otherPatternName : savefileNames[seq_activePattern][PATTERN_NAMES];
+}
+//----------------------------------------------------
+FRESULT preset_saveProjectPattern(uint8_t projectNr, uint8_t nr, char* name)
+{
+	char folder[12];
+	char path[32];
+	char fileName[13];
+	FILINFO fno;
+	UINT bytesWritten;
+
+	preset_projectFolderName(folder, projectNr);
+	FRESULT res = f_stat(folder, &fno);
+	if(res != FR_OK)
+		return res;
+
+	//the file name contains the pattern name: remove the slot's old file first
+	while(preset_findProjectFile(folder, nr, ".pat", path) == FR_OK)
+	{
+		res = f_unlink(path);
+		if(res != FR_OK)
+			return res;
+	}
+
+	preset_makeFileNameSave(fileName, nr, FEXT_PAT, name);
+	snprintf(path, sizeof(path), "%s/%s", folder, fileName);
+	res = preset_fopenWrite(path);
+	if(res != FR_OK)
+		return res;
+	preset_fwrite((FIL*)&SDFile, name, 8, &bytesWritten);
+	preset_fwrite((FIL*)&SDFile, "PatV03", 6, &bytesWritten);
+	//the playing pattern with its changes and the current shuffle; its kit nr would point to an
+	//unrelated kit there: kit 1
+	preset_writePatternDataAs(seq_activePattern, activeParameters[PAR_SHUFFLE], 0);
 	return preset_fcloseWrite();
 }
 //----------------------------------------------------
@@ -2919,6 +3154,8 @@ FRESULT preset_loadProject(uint8_t presetNr, uint8_t clearTmp)
 	FRESULT res;
 	FILINFO fno;
 	char text[17];
+
+	preset_clearOtherPattern();
 
 	lcd_process_display_interrupt = 0;
 	while(sendDisplayBuffer() != 0);

@@ -783,6 +783,8 @@ void buttonHandler_patternSlot(uint8_t pattern)
 		{
 			activeParameters[PAR_PATTERN_MODE] = 1;
 		}
+		//a pattern of another project waiting for the pattern change doesn't come
+		preset_cancelOtherPattern();
 
 		//select pattern to show // shownPattern
 		menu_setShownPattern(pattern);
@@ -1209,9 +1211,13 @@ static void buttonHandler_seqButtonPressed(uint8_t seqButtonPressed)
 			break;
 
 		case SELECT_MODE_PATTERN:
-			//while the pattern save asks for the name, the step buttons do nothing
+			//while the pattern save asks for the name, the step buttons do nothing; while another
+			//project is browsed they act on the active project (back to its list)
 			if(menu_getActivePage() != SAVE_PAGE)
+			{
+				menu_patternLeaveOtherProject();
 				buttonHandler_patternSlot((uint8_t)(seqButtonPressed + 16 * menu_activePatternBank));
+			}
 			break;
 
 
@@ -1610,6 +1616,7 @@ void buttonHandler_buttonPressed(uint8_t buttonNr) {
 			//pattern load/save pages: the cursor moves to the same slot in the next bank
 			if(menu_activePage == PATTERN_LOAD_PAGE || menu_activePage == PATTERN_SAVE_PAGE)
 			{
+				menu_patternLeaveOtherProject();
 				if(menu_activePatternBank < 3)
 					menu_patternCursorSet((uint8_t)(menu_getPatternCursor() + 16));
 			}
@@ -1699,6 +1706,7 @@ void buttonHandler_buttonPressed(uint8_t buttonNr) {
 			//pattern load/save pages: the cursor moves to the same slot in the previous bank
 			if(menu_activePage == PATTERN_LOAD_PAGE || menu_activePage == PATTERN_SAVE_PAGE)
 			{
+				menu_patternLeaveOtherProject();
 				if(menu_activePatternBank > 0)
 					menu_patternCursorSet((uint8_t)(menu_getPatternCursor() - 16));
 			}
