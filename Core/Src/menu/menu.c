@@ -62,6 +62,7 @@ static void getMenuItemNameForValue(const uint8_t menuId, const uint8_t curParmV
 static uint8_t getMaxEntriesForMenu(uint8_t menuId);
 // given a number, convert it to a note name
 static void setNoteName(uint8_t num, char *buf);
+static void setNoteNameLong(uint8_t num, char *buf);
 
 
 
@@ -1874,7 +1875,7 @@ void menu_repaintGeneric()
 				if(parNr >= PAR_MIDI_NOTE1 && parNr <= PAR_MIDI_NOTE7 && curParmVal==0)
 					memcpy(&editDisplayBuffer[1][13],menuText_any,3);
 				else
-					setNoteName(curParmVal, &editDisplayBuffer[1][13]);
+					setNoteNameLong(curParmVal, &editDisplayBuffer[1][12]);
 				break;
 
 			case DTYPE_0b1: // the only 0/1 is automation track, make it look 1 based
@@ -4734,16 +4735,48 @@ uint8_t menu_areMuteLedsShown()
 //----------------------------------------------------------------
 
 // given a 0-127 number will return a midi note name
-void setNoteName(uint8_t num, char *buf)
+//note names with MIDI note 0 = C-1 (60 = C4, 127 = G9)
+static char noteLetter(uint8_t n)
 {
-	uint8_t n = num%12; // get the note number (0 is C, 9 is A, 11 is B)
 	// get the note letter ascii A=65, C=67. All repeat twice except E and B.
 	// B is at the end, so only E presents a hurdle
-	buf[0]=(char)((n>8 ? 60 : 67) + ((n+(n>4))/2));
-	// determine natural or sharp (# if the note is 1, 3, 6, 8, 10)
-	buf[1]=(n < 5 && (n&1)) || (n > 5 && !(n&1)) ? '#' : ' ';
-	// determine the octave 0=48
-	buf[2]=(char)(48+(num / 12));
+	return (char)((n>8 ? 60 : 67) + ((n+(n>4))/2));
+}
+static uint8_t noteIsSharp(uint8_t n)
+{
+	// # if the note is 1, 3, 6, 8, 10
+	return (n < 5 && (n&1)) || (n > 5 && !(n&1));
+}
+//3 characters: "C#4". Octave -1 has no room for the sharp: "C-1", sharps as lowercase letter ("c-1" = C#-1)
+void setNoteName(uint8_t num, char *buf)
+{
+	const uint8_t n = num%12; // get the note number (0 is C, 9 is A, 11 is B)
+	const char letter = noteLetter(n);
+	if(num < 12)
+	{
+		buf[0] = noteIsSharp(n) ? (char)(letter + ('a'-'A')) : letter;
+		buf[1] = '-';
+		buf[2] = '1';
+		return;
+	}
+	buf[0] = letter;
+	buf[1] = noteIsSharp(n) ? '#' : ' ';
+	buf[2] = (char)('0' + num/12 - 1);
+}
+//4 characters for the edit page, the full name also in octave -1 ("C#-1", " C 4")
+static void setNoteNameLong(uint8_t num, char *buf)
+{
+	const uint8_t n = num%12;
+	if(num < 12 && noteIsSharp(n))
+	{
+		buf[0] = noteLetter(n);
+		buf[1] = '#';
+		buf[2] = '-';
+		buf[3] = '1';
+		return;
+	}
+	buf[0] = ' ';
+	setNoteName(num, &buf[1]);
 }
 
 /* fill up to 2 bytes of a buffer with string representation of a number */
