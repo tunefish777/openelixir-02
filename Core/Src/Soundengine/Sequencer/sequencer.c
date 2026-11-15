@@ -806,7 +806,9 @@ IN_ITCM_RAM void seq_setPendingPatternActive()
 					//store the pending pattern update for shift button release handler
 					menu_shownPattern = seq_activePattern;
 
-
+					//the song page shows the new song position
+					if(menu_activePage == SONG_MODE_PAGE)
+						menu_repaint();
 				}
 			}
 
@@ -2051,6 +2053,11 @@ void seq_setRunning(uint8_t isRunning)
 	*/
 	seq_setStepIndexToStart();
 
+}
+//------------------------------------------------------------------------------
+uint8_t seq_isSongModeEnabled(void)
+{
+	return seq_songModeEnabled;
 }
 //------------------------------------------------------------------------------
 void seq_setSongModeEnabled(uint8_t onOff)

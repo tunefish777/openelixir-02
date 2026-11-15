@@ -1429,6 +1429,81 @@ static void menu_repaintCpuMeter()
 }
 #endif
 //-----------------------------------------------------------------
+//song page: a song entry as 8 characters: the pattern's name ("Pat 05" if it has none), END or
+//LOOP; a pattern named like the END/LOOP marks in apostrophes ("'END'")
+#define NO_SONG_SLOT 0xFF
+static void menu_songEntryName(uint8_t entry, char* buf)
+{
+	memset(buf, ' ', 8);
+	if(entry == SONG_END)
+	{
+		memcpy(buf, "END", 3);
+		return;
+	}
+	if(entry == SONG_LOOP)
+	{
+		memcpy(buf, "LOOP", 4);
+		return;
+	}
+	if(entry >= MAX_PATTERN)
+		return;
+	char* name = savefileNames[entry][PATTERN_NAMES];
+	if(menu_isPatternNameEmpty(name))
+	{
+		memcpy(buf, "Pat ", 4);
+		buf[4] = (char)('0' + (entry+1)/10);
+		buf[5] = (char)('0' + (entry+1)%10);
+		return;
+	}
+	uint8_t len = 8;
+	while(len && (name[len-1] == ' ' || name[len-1] == 0))
+		len--;
+	if((len == 3 && memcmp(name, "END", 3) == 0) || (len == 4 && memcmp(name, "LOOP", 4) == 0))
+	{
+		buf[0] = '\'';
+		memcpy(&buf[1], name, len);
+		buf[1+len] = '\'';
+		return;
+	}
+	for(uint8_t i=0;i<8;i++)
+	{
+		buf[i] = name[i] ? name[i] : ' ';
+	}
+}
+//one row of the song page: marker, slot 1-64, entry, arrow; editName: the brackets around the entry
+static void menu_repaintSongRow(char* row, uint8_t slot, char marker, char arrow, uint8_t editName)
+{
+	memset(row, ' ', 16);
+	row[0] = marker;
+	const uint8_t nr = (uint8_t)(slot + 1);
+	row[2] = (char)('0' + nr/10);
+	row[3] = (char)('0' + nr%10);
+	if(editName)
+	{
+		//choosing the entry: the number of the pattern instead of the slot ("p--" for END/LOOP)
+		const uint8_t entry = seq_activeSong[slot];
+		row[1] = 'p';
+		if(entry < MAX_PATTERN)
+		{
+			row[2] = (char)('0' + (entry+1)/10);
+			row[3] = (char)('0' + (entry+1)%10);
+		}
+		else
+		{
+			row[2] = row[3] = '-';
+		}
+		row[5] = '[';
+		row[14] = ']';
+	}
+	else
+	{
+		row[1] = '[';
+		row[4] = ']';
+	}
+	menu_songEntryName(seq_activeSong[slot], &row[6]);
+	row[15] = arrow;
+}
+//-----------------------------------------------------------------
 static void menu_repaintSimplePage()
 {
 
@@ -1531,95 +1606,27 @@ static void menu_repaintSimplePage()
 	}
 	else if(menu_activePage == SONG_MODE_PAGE)
 	{
-		//show list of chained patterns
-		//0123456789..
-		// [002] | p05 ↑
-		//> 003  | p01 ↓
-
-
-		//the playing song position (-1 = 255 before the song started: it starts at 0)
-		const uint8_t pos = seq_songPositionPointer < MAX_SONG_LENGTH ? seq_songPositionPointer : 0;
+		//the cursor slot and the one after it, slots 1-64:
+		//">[05] Groove1  ^"  (encoder moves the cursor)
+		//"> 05 [Groove1 ]^"  (edit mode: encoder changes the entry)
+		//'>' cursor, '*' the slot the song is playing; arrows: more slots above/below
 		if(menu_songMenuPosition >= MAX_SONG_LENGTH)
 			menu_songMenuPosition = 0;
+		const uint8_t playing = (seq_isRunning() && seq_isSongModeEnabled() && seq_songPositionPointer < MAX_SONG_LENGTH) ?
+				seq_songPositionPointer : NO_SONG_SLOT;
 
-
-		//song position pointer if visible
-		if(pos == menu_songMenuPosition)
+		menu_repaintSongRow(editDisplayBuffer[0], menu_songMenuPosition, '>',
+				menu_songMenuPosition > 0 ? ARROW_UP : ' ', editModeActive);
+		if(menu_songMenuPosition+1 < MAX_SONG_LENGTH)
 		{
-			editDisplayBuffer[0][0] = '>';
-		}
-		else if(pos == menu_songMenuPosition+1)
-		{
-			editDisplayBuffer[1][0] = '>';
-		}
-
-		//----- line 1 -----
-		if(editModeActive)
-		{
-
-			numtostrpu(&editDisplayBuffer[0][2], menu_songMenuPosition, '0');
-
-			editDisplayBuffer[0][8] = '[';
-			editDisplayBuffer[0][12] = ']';
+			menu_repaintSongRow(editDisplayBuffer[1], (uint8_t)(menu_songMenuPosition+1),
+					menu_songMenuPosition+1 == playing ? '*' : ' ',
+					menu_songMenuPosition+2 < MAX_SONG_LENGTH ? ARROW_DOWN : ' ', 0);
 		}
 		else
 		{
-			editDisplayBuffer[0][1] = '[';
-			numtostrpu(&editDisplayBuffer[0][2], menu_songMenuPosition, '0');
-			editDisplayBuffer[0][5] = ']';
+			memset(editDisplayBuffer[1], ' ', 16);
 		}
-		editDisplayBuffer[0][7] = '|';
-
-		if(seq_activeSong[menu_songMenuPosition] < SONG_END)
-		{
-			//show pattern number
-			numtostrpu(&editDisplayBuffer[0][9], seq_activeSong[menu_songMenuPosition], '0');
-			editDisplayBuffer[0][9] = 'p'; //overwrites the first zero... we only have 64 patterns
-
-		}
-		else if(seq_activeSong[menu_songMenuPosition] == SONG_LOOP)
-		{
-			strcpy(&editDisplayBuffer[0][9], "LOOP");
-			if(editModeActive) editDisplayBuffer[0][13] = ']';
-		}
-		else if(seq_activeSong[menu_songMenuPosition] == SONG_END)
-		{
-			strcpy(&editDisplayBuffer[0][9], "END");
-			if(editModeActive) editDisplayBuffer[0][12] = ']';
-		}
-
-		if( (menu_songMenuPosition) > 0)
-			editDisplayBuffer[0][15] = ARROW_UP;
-
-
-		//----- line 2 -----
-		if( (menu_songMenuPosition+1) < MAX_SONG_LENGTH)
-		{
-			numtostrpu(&editDisplayBuffer[1][2], menu_songMenuPosition+1, '0');
-
-			editDisplayBuffer[1][7] = '|';
-
-			if(seq_activeSong[menu_songMenuPosition+1] < SONG_END)
-			{
-				//show pattern number
-				numtostrpu(&editDisplayBuffer[1][9], seq_activeSong[menu_songMenuPosition + 1], '0');
-				editDisplayBuffer[1][9] = 'p'; //overwrites the first zero... we only have 64 patterns
-
-			}
-			else if(seq_activeSong[menu_songMenuPosition+1] == SONG_LOOP)
-			{
-				strcpy(&editDisplayBuffer[1][9], "LOOP");
-			}
-			else if(seq_activeSong[menu_songMenuPosition+1] == SONG_END)
-			{
-				strcpy(&editDisplayBuffer[1][9], "END");
-			}
-
-
-			if( (menu_songMenuPosition+2) < MAX_SONG_LENGTH)
-				editDisplayBuffer[1][15] = ARROW_DOWN;
-		}
-
 	}
 }
 //-----------------------------------------------------------------

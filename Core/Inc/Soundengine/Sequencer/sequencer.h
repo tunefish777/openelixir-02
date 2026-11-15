@@ -275,6 +275,8 @@ void seq_deleteRow();
 void seq_insertRow();
 //------------------------------------------------------------------------------
 uint8_t seq_isRunning();
+//the song (SHIFT + PLAY) plays instead of a single pattern
+uint8_t seq_isSongModeEnabled(void);
 //------------------------------------------------------------------------------
 uint8_t seq_isStepActive(uint8_t voice, uint8_t stepNr, uint8_t patternNr);
 //------------------------------------------------------------------------------
