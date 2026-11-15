@@ -42,3 +42,11 @@ How it works:
 - `stats.py`: level statistics per kit of a render file.
 
 Linux only (uses `mmap` with fixed addresses). Needs gcc and Python 3.
+
+## Modal engine prototype
+
+`test/engine/modal.sh [dir]` builds the resonator of the planned Modal engine
+(`Core/Src/Soundengine/DSPAudio/ModalResonator.c`) with `modal/modal_render.c` and renders parameter
+sweeps as WAV files (default `build/modal-test`): structure, damping, brightness, position, hardness,
+noise burst, sustained exciter, partials and a pitch run. It prints the struct size, the level of
+each hit before the soft limit and the number of modes computed. Not part of the firmware yet.
