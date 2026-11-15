@@ -87,19 +87,6 @@ const char stepChordNames[][4] =
 	{"Di7"},
 	{"Au7"},
 };
-//full names for the edit page
-const char stepChordLongNames[][5] =
-{
-	{" Rep"},
-	{" Maj"},
-	{" Min"},
-	{" Dim"},
-	{" Aug"},
-	{"Maj7"},
-	{"Min7"},
-	{"Dim7"},
-	{"Aug7"},
-};
 const char stepDirNames[][4] =
 {
 	{2},		//number of entries
@@ -438,6 +425,74 @@ const char midiFilterNames[][16] =
 	{"PCN"},
 	{"PCR"},
 	{"all"},
+};
+//-----------------------------------------------------------------
+//full value names for the edit page (OpenElixir-02), same order as the short names above
+//(without their count entry); shown right-aligned, at most 16 characters
+const char waveformLongNames[][12] =
+{
+	{"Sine"}, {"Triangle"}, {"Sawtooth"}, {"Square"}, {"Noise"}, {"Pulse width"},
+};
+const char filterLongNames[][10] =
+{
+	{"Lowpass"}, {"Highpass"}, {"Bandpass"}, {"Unity BP"}, {"Notch"}, {"Peak"}, {"Lowpass 2"}, {"Off"},
+};
+//names from the owner's manual
+const char transientLongNames[][14] =
+{
+	{"Snappy Mode"}, {"Offset Mode"}, {"Click"}, {"Click 2"}, {"Tick"}, {"Acoustic kick"}, {"Rim shot"},
+	{"Drip"}, {"Hi-hat"}, {"Clap"}, {"Kick 2"}, {"Snare"}, {"Tom"}, {"Snap"},
+};
+const char modalExciterLongNames[][12] =
+{
+	{"Mallet"}, {"Noise burst"}, {"Bow"},
+};
+const char outputLongNames[][9] =
+{
+	{"Stereo 1"}, {"Stereo 2"}, {"Left 1"}, {"Right 1"}, {"Left 2"}, {"Right 2"}, {"FX bus"},
+};
+const char lfoWaveLongNames[][9] =
+{
+	{"Sine"}, {"Triangle"}, {"Saw up"}, {"Saw down"}, {"Square"}, {"Random"}, {"Exp up"}, {"Exp down"},
+};
+const char retriggerLongNames[][8] =
+{
+	{"Off"}, {"Voice 1"}, {"Voice 2"}, {"Voice 3"}, {"Voice 4"}, {"Voice 5"}, {"Voice 6"},
+};
+const char fxLongNames[][11] =
+{
+	{"Off"}, {"Drive"}, {"Ring mod"}, {"Compressor"}, {"Delay"},
+};
+const char distLongNames[][9] =
+{
+	{"Tube"}, {"Foldback"}, {"Clip"},
+};
+const char delayLongNames[][10] =
+{
+	{"Delay"}, {"Ping-pong"},
+};
+const char stepChordLongNames[][5] =
+{
+	{"Rep"}, {"Maj"}, {"Min"}, {"Dim"}, {"Aug"}, {"Maj7"}, {"Min7"}, {"Dim7"}, {"Aug7"},
+};
+const char stepDirLongNames[][5] =
+{
+	{"Up"}, {"Down"},
+};
+//kit change mode: "Aut" loads the kit of a pattern with it
+const char patModeLongNames[][9] =
+{
+	{"Off"}, {"Auto kit"},
+};
+const char midiRoutingLongNames[][14] =
+{
+	{"Off"}, {"USB>MIDI"}, {"MIDI>MIDI"}, {"USB+MIDI>MIDI"}, {"MIDI>USB"}, {"MIDI>USB+MIDI"},
+};
+//bits: notes, realtime, CC, program change
+const char midiFilterLongNames[][12] =
+{
+	{"Off"}, {"Notes"}, {"RT"}, {"Notes RT"}, {"CC"}, {"Notes CC"}, {"RT CC"}, {"Notes RT CC"},
+	{"PC"}, {"Notes PC"}, {"RT PC"}, {"Notes RT PC"}, {"CC PC"}, {"Notes CC PC"}, {"RT CC PC"}, {"All"},
 };
 //-----------------------------------------------------------------
 // these must correspond with shortNamesEnum

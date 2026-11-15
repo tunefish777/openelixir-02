@@ -58,6 +58,8 @@ uint8_t saveScreenPots[4]; //hold absolute pot position for save page name editi
 static void upr_three(char *buf);
 // given a menuid and a param value fill buf with the short menu item value. will not exceed 3 chars
 static void getMenuItemNameForValue(const uint8_t menuId, const uint8_t curParmVal, char *buf);
+// the full name of a menu value for the edit page, NULL if it has none
+static const char* getMenuItemLongName(const uint8_t menuId, const uint8_t curParmVal);
 // given a menu id returns the number of entries
 static uint8_t getMaxEntriesForMenu(uint8_t menuId);
 // given a number, convert it to a note name
@@ -2042,11 +2044,6 @@ void menu_repaintGeneric()
 				else
 					snprintf(&editDisplayBuffer[1][10], 7, offset < 0 ? "LP %3d" : "HP %3d", offset);
 			}
-			else if(parNr == PAR_STEP_CHORD && curParmVal < ARP_NUM_CHORDS)
-			{
-				//the full chord name ("Maj7")
-				memcpy(&editDisplayBuffer[1][12], stepChordLongNames[curParmVal], 4);
-			}
 			else
 			switch(menu_paramDtype(parNr) & 0xFF)
 			{
@@ -2075,8 +2072,15 @@ void menu_repaintGeneric()
 			{
 				//get the used menu (upper 4 bit)
 				const uint8_t menuId = (menu_paramDtype(parNr) >> 8);
-				// get the value name
-				getMenuItemNameForValue(menuId, curParmVal, &editDisplayBuffer[1][13]);
+				// get the value name: the full one right-aligned if there is one
+				const char* longName = getMenuItemLongName(menuId, curParmVal);
+				if(longName)
+				{
+					const size_t len = strlen(longName);
+					memcpy(&editDisplayBuffer[1][16 - len], longName, len);
+				}
+				else
+					getMenuItemNameForValue(menuId, curParmVal, &editDisplayBuffer[1][13]);
 			}
 				break; // switch(parameters[parNr].dtype&0x0F) case DTYPE_MENU
 
@@ -3285,6 +3289,33 @@ static void getMenuItemNameForValue(const uint8_t menuId, const uint8_t curParmV
 	memcpy(buf,p,3);
 #undef MENU_ITEM
 
+}
+//-----------------------------------------------------------------
+static const char* getMenuItemLongName(const uint8_t menuId, const uint8_t curParmVal)
+{
+	//the short table holds the number of entries; beyond it the short name shows "-"
+#define LONG_ITEM(shortTable, longTable) (curParmVal < (uint8_t)(shortTable)[0][0] ? (longTable)[curParmVal] : NULL)
+	switch(menuId)
+	{
+	case MENU_WAVEFORM:			return LONG_ITEM(waveformNames, waveformLongNames);
+	case MENU_FILTER:			return LONG_ITEM(filterTypes, filterLongNames);
+	case MENU_TRANS:			return LONG_ITEM(transientNames, transientLongNames);
+	case MENU_MODAL_EXCITER:	return LONG_ITEM(modalExciterNames, modalExciterLongNames);
+	case MENU_AUDIO_OUT:		return LONG_ITEM(outputNames, outputLongNames);
+	case MENU_AUDIO_OUT_FX:		return LONG_ITEM(outputNamesFx, outputLongNames);
+	case MENU_LFO_WAVES:		return LONG_ITEM(lfoWaveNames, lfoWaveLongNames);
+	case MENU_RETRIGGER:		return LONG_ITEM(retriggerNames, retriggerLongNames);
+	case MENU_FX:				return LONG_ITEM(fxNames, fxLongNames);
+	case MENU_DIST:				return LONG_ITEM(distNames, distLongNames);
+	case MENU_DELAY:			return LONG_ITEM(delayNames, delayLongNames);
+	case MENU_STEP_CHORD:		return LONG_ITEM(stepChordNames, stepChordLongNames);
+	case MENU_STEP_DIR:			return LONG_ITEM(stepDirNames, stepDirLongNames);
+	case MENU_PAT_MODE:			return LONG_ITEM(patModeNames, patModeLongNames);
+	case MENU_MIDI_ROUTING:		return LONG_ITEM(midiRoutingNames, midiRoutingLongNames);
+	case MENU_MIDI_FILTERING:	return LONG_ITEM(midiFilterNames, midiFilterLongNames);
+	default:					return NULL;
+	}
+#undef LONG_ITEM
 }
 
 //-----------------------------------------------------------------
