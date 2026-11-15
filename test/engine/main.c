@@ -224,6 +224,7 @@ static int renderSound(int maxBlocks, int* peak, int* nan)
 	return last + 1;
 }
 
+static int nrpnFail;
 static void switchEngine(uint8_t slot, uint8_t engine)
 {
 #ifdef HAVE_KIT_ENGINES
@@ -232,7 +233,16 @@ static void switchEngine(uint8_t slot, uint8_t engine)
 	m.status = MIDI_CC2;
 	m.data1 = PAR_SLOT_ENGINE - 128;
 	m.data2 = (uint8_t)(slot * 4 + engine);
+#ifdef SLOT_ENGINE_EXT_BASE
+	if(engine >= 4)	//engines added later: 24 + slot + 6*(engine-4)
+		m.data2 = (uint8_t)(SLOT_ENGINE_EXT_BASE + slot + NUM_VOICE_SLOTS * (engine - 4));
+#endif
 	midiParser_ccHandler(m, 1, 0, 0.f);
+	if(voiceSlots[slot].engine != engine)
+	{
+		printf("NRPN 98: slot %u didn't get engine %u\n", slot + 1, engine);
+		nrpnFail = 1;
+	}
 	kitEngines_assign(slot, engine);
 #else
 	slot_setEngine(slot, engine);
@@ -250,6 +260,9 @@ static void voiceTrigger(VoiceSlot* c, uint8_t slot, uint8_t second)
 	case ENGINE_SNARE:	Snare_trigger(&c->u.snare, 127, 60);			break;
 	case ENGINE_CYMBAL:	Cymbal_trigger(&c->u.cymbal, 127, 60);			break;
 	case ENGINE_HIHAT:	HiHat_trigger(&c->u.hat, 127, second, 60);		break;
+#ifdef HAVE_ENGINE_MODAL
+	case ENGINE_MODAL:	Modal_trigger(&c->u.modal, 127, 60);			break;
+#endif
 	default:			Drum_trigger(&c->u.drum, 127, 60);				break;
 	}
 	if(slot == NUM_VOICE_SLOTS - 1) c->u.c.oscVolEg.decay = c->decay[second];	//as slot_trigger()
@@ -269,6 +282,9 @@ static uint32_t voiceRender(VoiceSlot* c, int blocks, int* len)
 		case ENGINE_SNARE:	Snare_calcAsync(&c->u.snare);	Snare_calcSyncBlock(&c->u.snare, buf, OUTPUT_DMA_SIZE);		break;
 		case ENGINE_CYMBAL:	Cymbal_calcAsync(&c->u.cymbal);	Cymbal_calcSyncBlock(&c->u.cymbal, buf, OUTPUT_DMA_SIZE);	break;
 		case ENGINE_HIHAT:	HiHat_calcAsync(&c->u.hat);		HiHat_calcSyncBlock(&c->u.hat, buf, OUTPUT_DMA_SIZE);		break;
+#ifdef HAVE_ENGINE_MODAL
+		case ENGINE_MODAL:	Modal_calcAsync(&c->u.modal);	Modal_calcSyncBlock(&c->u.modal, buf, OUTPUT_DMA_SIZE);	break;
+#endif
 		default:			calcDrumVoiceAsync(&c->u.drum);	calcDrumVoiceSyncBlock(&c->u.drum, buf, OUTPUT_DMA_SIZE);	break;
 		}
 		h = fnv(buf, sizeof(buf)) ^ h * 16777619u;
@@ -470,7 +486,11 @@ static int loadVoiceTest(void)
 //track 6 must cut track 7, and the engine specific parameters must reach the engine
 static int engineTest(void)
 {
-	static const char* const names[NUM_ENGINES] = { "drum", "snare", "cymbal", "hihat" };
+	static const char* const names[NUM_ENGINES] = { "drum", "snare", "cymbal", "hihat",
+#ifdef HAVE_ENGINE_MODAL
+			"modal",
+#endif
+	};
 	int fail = 0, peak, nan = 0;
 #if KIT_ENGINES_API >= 3
 	fail |= loadVoiceTest();
@@ -529,6 +549,7 @@ static int engineTest(void)
 #endif
 	}
 	if(nan) printf("NaN in a voice\n");
+	fail |= nrpnFail;
 	printf(fail || nan ? "ENGINE TEST FAILED\n" : "engine test passed\n");
 	return fail || nan;
 }

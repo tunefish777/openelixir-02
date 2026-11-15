@@ -270,6 +270,13 @@ const Name valueNames[NUM_NAMES] =
 		{SHORT_SR, CAT_PERF, LONG_SAMPLE_RATE},/*TEXT_PERF_SRT*/
 		{SHORT_DJ_FILTER, CAT_PERF, LONG_PERF_DJ},/*TEXT_PERF_DJ*/
 		{SHORT_FIL_RESO, CAT_PERF, LONG_PERF_RES},/*TEXT_PERF_RES*/
+		{SHORT_MODAL_EXCITER, CAT_MODAL, LONG_MODAL_EXCITER},/*TEXT_MODAL_EXCITER*/
+		{SHORT_MODAL_DAMPING, CAT_MODAL, LONG_MODAL_DAMPING},/*TEXT_MODAL_DAMPING*/
+		{SHORT_MODAL_STRUCTURE, CAT_MODAL, LONG_MODAL_STRUCTURE},/*TEXT_MODAL_STRUCTURE*/
+		{SHORT_MODAL_BRIGHTNESS, CAT_MODAL, LONG_MODAL_BRIGHTNESS},/*TEXT_MODAL_BRIGHTNESS*/
+		{SHORT_MODAL_POSITION, CAT_MODAL, LONG_MODAL_POSITION},/*TEXT_MODAL_POSITION*/
+		{SHORT_MODAL_HARDNESS, CAT_MODAL, LONG_MODAL_HARDNESS},/*TEXT_MODAL_HARDNESS*/
+		{SHORT_MODAL_PARTIALS, CAT_MODAL, LONG_MODAL_PARTIALS},/*TEXT_MODAL_PARTIALS*/
 
 
 };
@@ -590,7 +597,8 @@ const enum Datatypes PROGMEM parameter_dtypes[NUM_PARAMS] = {
 };
 //---------------------------------------------------------------
 //Voice pages of slots that run a non-stock engine: built from the engine's stock
-//page, every parameter moved to the slot's parameter with the same function
+//page (an engine without stock slot: its template page with its own role names, unused
+//parameters hidden), every parameter moved to the slot's parameter with the same function
 static Page menu_voicePages[VOICE7_PAGE-VOICE1_PAGE+1][NUM_SUB_PAGES];
 static uint8_t menu_voicePageBuilt[VOICE7_PAGE-VOICE1_PAGE+1];
 
@@ -615,7 +623,7 @@ void menu_updateVoicePages()
 		if(!menu_voicePageBuilt[page])
 			continue;
 
-		const uint8_t stockSlot = kitEngines_stockSlot(engine);	//its page: VOICE1_PAGE + stockSlot
+		const uint8_t stockSlot = kitEngines_pageSlot(engine);	//its page: VOICE1_PAGE + stockSlot
 		for(uint8_t sub=0;sub<NUM_SUB_PAGES;sub++)
 		{
 			Page* dst = &menu_voicePages[page][sub];
@@ -624,6 +632,7 @@ void menu_updateVoicePages()
 			uint8_t* text = &dst->top1;
 			for(uint8_t i=0;i<8;i++)
 			{
+				par[i] = kitEngines_templatePar(engine, par[i], &text[i]);
 				par[i] = menu_trackPar(par[i], stockSlot, page);
 				par[i] = kitEngines_mapParam(par[i], stockSlot, slot);
 				if(page == VOICE7_PAGE && par[i] == PAR_VELOD6_CLOSED)
@@ -650,25 +659,33 @@ const Page* menu_getPage(const uint8_t page, const uint8_t sub)
 }
 
 //for a sound parameter of a slot with a non-stock engine: the parameter with
-//the same function in the engine's stock slot (its type, display, ...)
+//the same function in the engine's stock (or template) slot (its type, display, ...)
 static uint16_t menu_stockParam(const uint16_t par)
 {
 	const uint8_t slot = kitEngines_slotOfParam(par);
 	if(slot < NUM_VOICE_SLOTS && kitEngines[slot] != slot_stockEngine(slot))
 	{
-		return kitEngines_mapParam(par, slot, kitEngines_stockSlot(kitEngines[slot]));
+		return kitEngines_mapParam(par, slot, kitEngines_pageSlot(kitEngines[slot]));
 	}
 	return par;
 }
 
 uint16_t menu_paramDtype(const uint16_t par)
 {
+	//the role parameters of an engine without stock slot have their own types
+	uint8_t engine;
+	const uint8_t role = kitEngines_customRole(par, &engine);
+	if(role < NUM_SLOT_ROLES)
+		return kitEngines_info[engine].roleDtype[role];
 	return parameter_dtypes[menu_stockParam(par)];
 }
 
 //tuning parameters show +-63 around 60 instead of 63
 static uint8_t menu_isTuningParam(const uint16_t parNr)
 {
+	uint8_t engine;
+	if(kitEngines_customRole(parNr, &engine) < NUM_SLOT_ROLES)
+		return 0;
 	switch(menu_stockParam(parNr))
 	{
 	case PAR_COARSE1: case PAR_COARSE2: case PAR_COARSE3: case PAR_COARSE4: case PAR_COARSE5: case PAR_COARSE6:
@@ -3128,6 +3145,12 @@ static uint8_t getMaxEntriesForMenu(uint8_t menuId)
 	case MENU_STEP_DIR:
 		return stepDirNames[0][0];
 
+	case MENU_MODAL_EXCITER:
+		return modalExciterNames[0][0];
+
+	case MENU_MODAL_PARTIALS:
+		return modalPartialNames[0][0];
+
 	default:
 		return 0;
 	}
@@ -3244,6 +3267,14 @@ static void getMenuItemNameForValue(const uint8_t menuId, const uint8_t curParmV
 
 	case MENU_STEP_DIR:
 		p = MENU_ITEM(stepDirNames);
+		break;
+
+	case MENU_MODAL_EXCITER:
+		p = MENU_ITEM(modalExciterNames);
+		break;
+
+	case MENU_MODAL_PARTIALS:
+		p = MENU_ITEM(modalPartialNames);
 		break;
 
 

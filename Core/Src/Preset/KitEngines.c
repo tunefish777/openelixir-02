@@ -117,15 +117,33 @@ void kitEngines_stockLfoTargets(uint8_t* params)
 	}
 }
 //---------------------------------------------------
-uint8_t kitEngines_stockSlot(const uint8_t engine)
+//Modal: Drum 1's page without the oscillator waveform and PWM (no oscillator is played)
+static const uint8_t kitEngines_modalHidden[] = { PAR_OSC_WAVE_DRUM1, PAR_PWM_1 };
+//order of enum VoiceEngine
+const KitEngineInfo kitEngines_info[NUM_ENGINES] =
 {
-	switch(engine)
+	{ .name = "drum",	.shortName = "drm",	.stockSlot = 0 },
+	{ .name = "snare",	.shortName = "snr",	.stockSlot = 3 },
+	{ .name = "cymbal",	.shortName = "cym",	.stockSlot = 4 },
+	{ .name = "hi-hat",	.shortName = "hht",	.stockSlot = 5 },
 	{
-	case ENGINE_SNARE:	return 3;
-	case ENGINE_CYMBAL:	return 4;
-	case ENGINE_HIHAT:	return 5;
-	default:			return 0;
-	}
+		.name = "modal", .shortName = "mdl", .stockSlot = ENGINE_NO_STOCK_SLOT, .templateSlot = 0,
+		//exciter, damping, structure, brightness, position, hardness, partials
+		.roleText = { TEXT_MODAL_EXCITER, TEXT_MODAL_DAMPING, TEXT_MODAL_STRUCTURE, TEXT_MODAL_BRIGHTNESS,
+				TEXT_MODAL_POSITION, TEXT_MODAL_HARDNESS, TEXT_MODAL_PARTIALS },
+		.roleDtype = { DTYPE_MENU | (MENU_MODAL_EXCITER<<8), DTYPE_0B127, DTYPE_0B127, DTYPE_0B127,
+				DTYPE_0B127, DTYPE_0B127, DTYPE_MENU | (MENU_MODAL_PARTIALS<<8) },
+		.roleInit = { MODAL_EXC_MALLET, 64, 0, 64, 40, 64, 2 },	//mallet, 16 partials
+		.numHidden = sizeof(kitEngines_modalHidden), .hidden = kitEngines_modalHidden,
+	},
+};
+//---------------------------------------------------
+uint8_t kitEngines_pageSlot(const uint8_t engine)
+{
+	if(engine >= NUM_ENGINES)
+		return 0;
+	const KitEngineInfo* info = &kitEngines_info[engine];
+	return info->stockSlot != ENGINE_NO_STOCK_SLOT ? info->stockSlot : info->templateSlot;
 }
 //---------------------------------------------------
 static uint8_t kitEngines_isRolePar(const uint8_t slot, const uint16_t par)
@@ -236,6 +254,78 @@ uint16_t kitEngines_mapParam(uint16_t par, const uint8_t fromSlot, const uint8_t
 	return par;
 }
 //---------------------------------------------------
+//some slot runs an engine without a stock slot (otherwise nothing is custom: quick exit)
+static uint8_t kitEngines_anyCustom(void)
+{
+	for(uint8_t slot=0;slot<NUM_VOICE_SLOTS;slot++)
+	{
+		if(kitEngines[slot] < NUM_ENGINES && kitEngines_info[kitEngines[slot]].stockSlot == ENGINE_NO_STOCK_SLOT)
+			return 1;
+	}
+	return 0;
+}
+//---------------------------------------------------
+uint8_t kitEngines_customRole(const uint16_t par, uint8_t* engine)
+{
+	if(!kitEngines_anyCustom())
+		return NUM_SLOT_ROLES;
+	const uint8_t slot = kitEngines_rolePar2Slot(par);
+	if(slot >= NUM_VOICE_SLOTS || kitEngines[slot] >= NUM_ENGINES
+			|| kitEngines_info[kitEngines[slot]].stockSlot != ENGINE_NO_STOCK_SLOT)
+		return NUM_SLOT_ROLES;
+	*engine = kitEngines[slot];
+	for(uint8_t role=0;role<NUM_SLOT_ROLES;role++)
+	{
+		if(slot_rolePar[slot][role] == par)
+			return role;
+	}
+	return NUM_SLOT_ROLES;
+}
+//---------------------------------------------------
+static uint8_t kitEngines_inHidden(const KitEngineInfo* info, const uint16_t par)
+{
+	for(uint8_t i=0;i<info->numHidden;i++)
+	{
+		if(info->hidden[i] == par)
+			return 1;
+	}
+	return 0;
+}
+//---------------------------------------------------
+uint8_t kitEngines_isHiddenParam(const uint16_t par)
+{
+	if(!kitEngines_anyCustom())
+		return 0;
+	const uint8_t slot = kitEngines_slotOfParam(par);
+	if(slot >= NUM_VOICE_SLOTS || kitEngines[slot] >= NUM_ENGINES)
+		return 0;
+	const KitEngineInfo* info = &kitEngines_info[kitEngines[slot]];
+	if(info->stockSlot != ENGINE_NO_STOCK_SLOT)
+		return 0;
+	return kitEngines_inHidden(info, kitEngines_mapParam(par, slot, info->templateSlot));
+}
+//---------------------------------------------------
+uint16_t kitEngines_templatePar(const uint8_t engine, const uint16_t par, uint8_t* text)
+{
+	const KitEngineInfo* info = &kitEngines_info[engine];
+	if(info->stockSlot != ENGINE_NO_STOCK_SLOT)
+		return par;
+	if(kitEngines_inHidden(info, par))
+	{
+		*text = TEXT_EMPTY;
+		return PAR_NONE;
+	}
+	for(uint8_t role=0;role<NUM_SLOT_ROLES;role++)
+	{
+		if(slot_rolePar[info->templateSlot][role] == par)
+		{
+			*text = info->roleText[role];
+			return info->roleText[role] == TEXT_EMPTY ? PAR_NONE : par;
+		}
+	}
+	return par;
+}
+//---------------------------------------------------
 static uint8_t kitEngines_initValue(const uint8_t par)
 {
 	return par < INIT_KIT_SIZE - 8 ? initKit[8 + par] : 0;
@@ -322,14 +412,20 @@ void kitEngines_assign(const uint8_t slot, const uint8_t engine)
 	menu_updateVoicePages();
 
 	//every sound parameter of the slot starts from the new engine's defaults:
-	//the values of the engine's stock slot in the init kit
+	//the values of the engine's stock (or template) slot in the init kit, the role
+	//parameters of an engine without stock slot from its description
 	uint8_t list[NUM_SLOT_PARAMS], stockList[NUM_SLOT_PARAMS];
-	const uint8_t stockSlot = kitEngines_stockSlot(engine);
+	const uint8_t stockSlot = kitEngines_pageSlot(engine);
+	const KitEngineInfo* info = &kitEngines_info[engine];
 	kitEngines_slotParams(slot, list);
 	kitEngines_slotParams(stockSlot, stockList);
 	for(uint8_t i=0;i<NUM_SLOT_PARAMS;i++)
 	{
-		activeParameters[list[i]] = kitEngines_initValue(stockList[i]);
+		const uint8_t role = (uint8_t)(i - (NUM_SLOT_PARAMS - NUM_SLOT_ROLES));
+		if(info->stockSlot == ENGINE_NO_STOCK_SLOT && i >= NUM_SLOT_PARAMS - NUM_SLOT_ROLES)
+			activeParameters[list[i]] = info->roleInit[role];
+		else
+			activeParameters[list[i]] = kitEngines_initValue(stockList[i]);
 	}
 	if(slot == NUM_VOICE_SLOTS-1)
 	{

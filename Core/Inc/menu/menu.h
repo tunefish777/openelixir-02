@@ -65,6 +65,10 @@ enum
 
 extern uint8_t menu_loadedPresetNr[NUM_CURRENT];
 extern uint32_t sucessTimer;
+//menus of the Modal engine's settings (the others are in MenuText.h)
+#define MENU_MODAL_EXCITER	29
+#define MENU_MODAL_PARTIALS	30
+
 //pattern save page: slot with steps that the next press on the same step button overwrites
 #define NO_PATTERN 0xFF
 extern uint8_t menu_patternOverwriteTarget;
@@ -292,6 +296,13 @@ enum NamesEnum
 	TEXT_PERF_SRT,
 	TEXT_PERF_DJ,
 	TEXT_PERF_RES,
+	TEXT_MODAL_EXCITER,
+	TEXT_MODAL_DAMPING,
+	TEXT_MODAL_STRUCTURE,
+	TEXT_MODAL_BRIGHTNESS,
+	TEXT_MODAL_POSITION,
+	TEXT_MODAL_HARDNESS,
+	TEXT_MODAL_PARTIALS,
 
 
 	NUM_NAMES
@@ -405,7 +416,14 @@ enum shortNamesEnum
 	SHORT_LIMITER,
 	SHORT_DJ_FILTER,
 	SHORT_STEP_CHORD,
-	SHORT_STEP_DIR
+	SHORT_STEP_DIR,
+	SHORT_MODAL_EXCITER,
+	SHORT_MODAL_DAMPING,
+	SHORT_MODAL_STRUCTURE,
+	SHORT_MODAL_BRIGHTNESS,
+	SHORT_MODAL_POSITION,
+	SHORT_MODAL_HARDNESS,
+	SHORT_MODAL_PARTIALS
 
 	
 };
@@ -443,7 +461,8 @@ enum catNamesEnum
 	CAT_CLOCK,
 	CAT_FX,
 	CAT_DJ_FILTER,
-	CAT_PERF
+	CAT_PERF,
+	CAT_MODAL
 };
 //-----------------------------------------------------------------
 // these must correspond with longNames in MenuText.h
@@ -543,7 +562,14 @@ enum longNamesEnum
 	LONG_STEP_CHORD,
 	LONG_STEP_DIR,
 	LONG_PERF_DJ,
-	LONG_PERF_RES
+	LONG_PERF_RES,
+	LONG_MODAL_EXCITER,
+	LONG_MODAL_DAMPING,
+	LONG_MODAL_STRUCTURE,
+	LONG_MODAL_BRIGHTNESS,
+	LONG_MODAL_POSITION,
+	LONG_MODAL_HARDNESS,
+	LONG_MODAL_PARTIALS
 	
 };
 

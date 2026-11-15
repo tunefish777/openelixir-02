@@ -67,8 +67,36 @@ uint8_t kitEngines_slotOfParam(const uint16_t par);
 //(slot 6 decay B maps to decay); par itself if it isn't a sound parameter of fromSlot
 uint16_t kitEngines_mapParam(uint16_t par, const uint8_t fromSlot, const uint8_t toSlot);
 
-//the slot whose stock engine engine is (where its defaults and menu pages come from)
-uint8_t kitEngines_stockSlot(const uint8_t engine);
+//Engine descriptions (UI side). A stock engine takes its menu page, value types, defaults and
+//modulation target names from its stock slot. An engine without a stock slot takes its page
+//layout and the defaults of its common parameters from a template slot and describes its 7
+//engine specific parameters (roles) itself; template parameters it has no use for are hidden.
+#define ENGINE_NO_STOCK_SLOT	0xFF
+typedef struct
+{
+	const char* name;						//engine menu ("drum")
+	const char* shortName;					//3 characters (voice load list)
+	uint8_t stockSlot;						//slot whose stock engine this is, or ENGINE_NO_STOCK_SLOT
+	//engines without a stock slot:
+	uint8_t templateSlot;					//page layout and defaults of the common parameters
+	uint8_t roleText[NUM_SLOT_ROLES];		//names (TEXT_*); TEXT_EMPTY: role unused (hidden)
+	uint16_t roleDtype[NUM_SLOT_ROLES];		//value types (DTYPE_*)
+	uint8_t roleInit[NUM_SLOT_ROLES];		//defaults
+	uint8_t numHidden;
+	const uint8_t* hidden;					//template slot parameters without function
+} KitEngineInfo;
+extern const KitEngineInfo kitEngines_info[NUM_ENGINES];
+
+//the slot an engine's menu page, value types and (common) defaults come from
+uint8_t kitEngines_pageSlot(const uint8_t engine);
+//par is a role parameter of a slot whose engine has no stock slot: its role (and *engine),
+//otherwise NUM_SLOT_ROLES
+uint8_t kitEngines_customRole(const uint16_t par, uint8_t* engine);
+//par is a parameter of a slot whose engine has no stock slot and has no function there
+uint8_t kitEngines_isHiddenParam(const uint16_t par);
+//a parameter of an engine's template page (engines without stock slot): PAR_NONE if hidden;
+//for a role parameter *text becomes its name
+uint16_t kitEngines_templatePar(const uint8_t engine, const uint16_t par, uint8_t* text);
 
 //engines -> block, returns its size (KIT_ENGINES_BLOCK_SIZE)
 uint8_t kitEngines_encode(const uint8_t* engines, uint8_t* block);

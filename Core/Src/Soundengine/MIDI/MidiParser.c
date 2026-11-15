@@ -1218,7 +1218,11 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				//setting); step automation uses MIDI_CC2 without updateOriginalValue
 				if(msg.status == MIDI_CC2 && updateOriginalValue && !isFloatModulator)
 				{
-					slot_setEngine(value.itg>>2, value.itg&3);
+					if(value.itg < SLOT_ENGINE_EXT_BASE)
+						slot_setEngine(value.itg>>2, value.itg&3);
+					else
+						slot_setEngine((value.itg - SLOT_ENGINE_EXT_BASE) % NUM_VOICE_SLOTS,
+								4 + (value.itg - SLOT_ENGINE_EXT_BASE) / NUM_VOICE_SLOTS);
 				}
 				break;
 

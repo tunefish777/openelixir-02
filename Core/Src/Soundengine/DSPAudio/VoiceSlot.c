@@ -51,6 +51,7 @@ static void slot_initEngine(VoiceSlot* s, const uint8_t slot)
 	case ENGINE_SNARE:	Snare_init(&s->u.snare, slot);		break;
 	case ENGINE_CYMBAL:	Cymbal_init(&s->u.cymbal, slot);	break;
 	case ENGINE_HIHAT:	HiHat_init(&s->u.hat, slot);		break;
+	case ENGINE_MODAL:	Modal_init(&s->u.modal, slot);		break;
 	default:			Drum_init(&s->u.drum, slot);		break;
 	}
 }
@@ -103,6 +104,7 @@ void slot_trigger(const uint8_t track, const uint8_t vel, const uint8_t note)
 	case ENGINE_SNARE:	Snare_trigger(&s->u.snare, vel, note);				break;
 	case ENGINE_CYMBAL:	Cymbal_trigger(&s->u.cymbal, vel, note);			break;
 	case ENGINE_HIHAT:	HiHat_trigger(&s->u.hat, vel, second, note);		break;
+	case ENGINE_MODAL:	Modal_trigger(&s->u.modal, vel, note);				break;
 	default:			Drum_trigger(&s->u.drum, vel, note);				break;
 	}
 
@@ -179,6 +181,24 @@ static void slot_setFmRole(OscInfo* modOsc, OscInfo* modOsc2, float* modAmount1,
 	}
 }
 //---------------------------------------------------
+//Modal: exciter, damping, structure, brightness, position, hardness, partials
+static void slot_setModalRole(ModalVoice* v, const uint8_t role, const uint8_t itg, const float flt)
+{
+	static const uint8_t partials[MODAL_NUM_PARTIAL_SETTINGS] = { 8, 12, 16, 24 };
+	switch(role)
+	{
+	case 0:	modal_setExciter(&v->res, itg);		break;
+	case 1:	modal_setDamping(&v->res, flt);		break;
+	case 2:	modal_setStructure(&v->res, flt);	break;
+	case 3:	modal_setBrightness(&v->res, flt);	break;
+	case 4:	modal_setPosition(&v->res, flt);	break;
+	case 5:	modal_setHardness(&v->res, flt);	break;
+	default:
+		modal_setPartials(&v->res, partials[itg < MODAL_NUM_PARTIAL_SETTINGS ? itg : MODAL_NUM_PARTIAL_SETTINGS-1]);
+		break;
+	}
+}
+//---------------------------------------------------
 uint8_t slot_setRoleParameter(const uint16_t par, const uint8_t itg, const float flt, const uint8_t isFloatModulator)
 {
 	for(uint8_t slot=0;slot<NUM_VOICE_SLOTS;slot++)
@@ -200,6 +220,9 @@ uint8_t slot_setRoleParameter(const uint16_t par, const uint8_t itg, const float
 				else
 					slot_setFmRole(&s->u.cymbal.modOsc, &s->u.cymbal.modOsc2, &s->u.cymbal.fmModAmount1,
 							&s->u.cymbal.fmModAmount2, role, itg, flt, isFloatModulator);
+				break;
+			case ENGINE_MODAL:
+				slot_setModalRole(&s->u.modal, role, itg, flt);
 				break;
 			case ENGINE_HIHAT:
 				if(role != 6)

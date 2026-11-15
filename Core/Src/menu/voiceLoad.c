@@ -24,7 +24,6 @@ static uint8_t voiceLoad_voice;		//track 0-6 (6 = 2nd trigger of slot 6)
 static uint8_t voiceLoad_kit;		//position in the kit list of the listed project
 
 static const char* const voiceLoad_voiceNames[7] = { "Drum 1", "Drum 2", "Drum 3", "Snare", "Cymbal", "CL HH", "OP HH" };
-static const char* const voiceLoad_engineNames[NUM_ENGINES] = { "drm", "snr", "cym", "hht" };
 //---------------------------------------------------
 static uint8_t voiceLoad_slot(void)
 {
@@ -102,5 +101,5 @@ void voiceLoad_repaint(char lines[2][17])
 		snprintf(lines[1], 17, "%2u Empty", voiceLoad_kit);
 	else	//the engine the voice has in that kit at the end
 		snprintf(lines[1], 17, "%2u %-8.8s  %s", voiceLoad_kit, projectBrowse_kitName(voiceLoad_kit),
-				voiceLoad_engineNames[projectBrowse_kitEngine(voiceLoad_kit, voiceLoad_slot())]);
+				kitEngines_info[projectBrowse_kitEngine(voiceLoad_kit, voiceLoad_slot())].shortName);
 }

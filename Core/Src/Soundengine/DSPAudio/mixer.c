@@ -563,6 +563,7 @@ IN_ITCM_RAM static inline void mixer_calcVoiceAsync(VoiceSlot* s)
 	case ENGINE_SNARE:	Snare_calcAsync(&s->u.snare);		break;
 	case ENGINE_CYMBAL:	Cymbal_calcAsync(&s->u.cymbal);	break;
 	case ENGINE_HIHAT:	HiHat_calcAsync(&s->u.hat);		break;
+	case ENGINE_MODAL:	Modal_calcAsync(&s->u.modal);		break;
 	default:			calcDrumVoiceAsync(&s->u.drum);	break;
 	}
 }
@@ -573,6 +574,7 @@ IN_ITCM_RAM static inline void mixer_calcVoiceSyncBlock(VoiceSlot* s, int16_t* b
 	case ENGINE_SNARE:	Snare_calcSyncBlock(&s->u.snare, buf, OUTPUT_DMA_SIZE);		break;
 	case ENGINE_CYMBAL:	Cymbal_calcSyncBlock(&s->u.cymbal, buf, OUTPUT_DMA_SIZE);	break;
 	case ENGINE_HIHAT:	HiHat_calcSyncBlock(&s->u.hat, buf, OUTPUT_DMA_SIZE);		break;
+	case ENGINE_MODAL:	Modal_calcSyncBlock(&s->u.modal, buf, OUTPUT_DMA_SIZE);	break;
 	default:			calcDrumVoiceSyncBlock(&s->u.drum, buf, OUTPUT_DMA_SIZE);		break;
 	}
 }

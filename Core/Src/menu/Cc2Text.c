@@ -447,13 +447,20 @@ uint8_t getModTargetIdxFromGapIdx(uint8_t v, uint8_t gapidx)
 uint8_t modTargetNameIdx(const uint8_t idx)
 {
 	const uint16_t par = pgm_read_word(&modTargets[idx].param);
+	//engines without stock slot: their own role names, unused parameters hidden
+	uint8_t engine;
+	const uint8_t role = kitEngines_customRole(par, &engine);
+	if(role < NUM_SLOT_ROLES)
+		return kitEngines_info[engine].roleText[role] == TEXT_EMPTY ? MOD_TARGET_HIDDEN : kitEngines_info[engine].roleText[role];
+	if(kitEngines_isHiddenParam(par))
+		return MOD_TARGET_HIDDEN;
 	const uint8_t slot = kitEngines_rolePar2Slot(par);
 	if(slot >= NUM_VOICE_SLOTS || kitEngines[slot] == slot_stockEngine(slot))
 		return pgm_read_byte(&modTargets[idx].nameIdx);
 
 	//engine specific setting of a slot with a non-stock engine: named like the
 	//same role in the engine's stock voice, hidden if it has none there
-	const uint8_t stockSlot = kitEngines_stockSlot(kitEngines[slot]);
+	const uint8_t stockSlot = kitEngines_pageSlot(kitEngines[slot]);
 	const uint16_t stockPar = kitEngines_mapParam(par, slot, stockSlot);
 	for(uint8_t i=pgm_read_byte(&modTargetVoiceOffsets[stockSlot].start);i<=pgm_read_byte(&modTargetVoiceOffsets[stockSlot].end);i++)
 	{
