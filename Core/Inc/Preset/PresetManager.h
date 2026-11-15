@@ -106,9 +106,10 @@ FRESULT preset_saveProjectKit(uint8_t projectNr, uint8_t kitNr, char* name, cons
 
 //patterns of other projects (pattern load/save pages, "Change Project")
 //names (8 characters, not terminated, zero if no file) and whether the patterns have steps
-FRESULT preset_scanProjectPatterns(uint8_t projectNr, char names[][8], uint8_t* hasSteps);
+//(named: the name was given in a save dialog, see preset_isPatternNamed)
+FRESULT preset_scanProjectPatterns(uint8_t projectNr, char names[][8], uint8_t* hasSteps, uint8_t* named);
 //save the playing pattern (with its changes and the current shuffle, kit 1) into another project
-FRESULT preset_saveProjectPattern(uint8_t projectNr, uint8_t nr, char* name);
+FRESULT preset_saveProjectPattern(uint8_t projectNr, uint8_t nr, char* name, uint8_t named);
 //load pattern nr of another project: it replaces the playing pattern at the next pattern change
 //(at once while stopped) as unsaved changes of that slot, only the pattern (the kit stays). It is
 //temporary until saved into a slot: the project save and the autosave leave it out, a change to
@@ -126,6 +127,11 @@ uint8_t preset_isOtherPatternLoaded(void);
 uint8_t preset_isOtherPatternPending(void);
 //the name of what is playing: the slot's or the one of the pattern of another project
 char* preset_activePatternName(void);
+uint8_t preset_isActivePatternNamed(void);
+//the pattern's name was given in the save dialog (saved in the pattern file); other names (left
+//over in stock firmware files) aren't shown
+uint8_t preset_isPatternNamed(uint8_t nr);
+void preset_setPatternNamed(uint8_t nr, uint8_t named);
 //the active kit becomes these parameters and engines (a kit from another
 //project); nothing is written (no RAM kit, no autosave) until the user saves it
 void preset_loadKitData(const uint8_t* params, const uint8_t* engines, const char* name);

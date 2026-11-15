@@ -26,6 +26,7 @@ ProjectBrowse projectBrowse;
 static char projectBrowse_names[NUM_KIT_SLOTS][8];
 static uint8_t projectBrowse_engines[NUM_KIT_SLOTS][NUM_VOICE_SLOTS];
 static uint8_t projectBrowse_exists[NUM_KIT_SLOTS];
+static uint8_t projectBrowse_named[NUM_KIT_SLOTS];		//patterns: name given in a save dialog
 //---------------------------------------------------
 void projectBrowse_reset(void)
 {
@@ -95,7 +96,7 @@ uint8_t projectBrowse_click(const uint8_t forSave)
 			//reads up to 64 files: keep the audio running meanwhile
 			const uint8_t bg = soundengine_backgroundAudioBegin();
 			const FRESULT res = projectBrowse.patterns ?
-					preset_scanProjectPatterns(projectBrowse.project, projectBrowse_names, projectBrowse_exists) :
+					preset_scanProjectPatterns(projectBrowse.project, projectBrowse_names, projectBrowse_exists, projectBrowse_named) :
 					preset_scanProjectKits(projectBrowse.project, projectBrowse_names, projectBrowse_engines, projectBrowse_exists);
 			if(res != FR_OK)
 			{
@@ -162,18 +163,21 @@ FRESULT projectBrowse_saveKit(const uint8_t kit, char* name)
 //---------------------------------------------------
 void projectBrowse_patternName(const uint8_t nr, char* buf)
 {
-	const char* name = projectBrowse_names[nr];
-	uint8_t empty = 1;
-	for(uint8_t i=0;i<8;i++)
+	if(!projectBrowse_exists[nr])
 	{
-		if(name[i] != 0 && name[i] != ' ')
-			empty = 0;
+		memcpy(buf, "Empty   ", 8);
+		return;
 	}
-	if(empty || preset_isNameEmpty((char*)name))
-		name = projectBrowse_exists[nr] ? "Unnamed " : "Empty   ";
+	if(!projectBrowse_named[nr])
+	{
+		memcpy(buf, "Pat     ", 8);
+		buf[4] = (char)('0' + (nr+1)/10);
+		buf[5] = (char)('0' + (nr+1)%10);
+		return;
+	}
 	for(uint8_t i=0;i<8;i++)
 	{
-		buf[i] = name[i] ? name[i] : ' ';
+		buf[i] = projectBrowse_names[nr][i] ? projectBrowse_names[nr][i] : ' ';
 	}
 }
 //---------------------------------------------------
@@ -190,14 +194,15 @@ FRESULT projectBrowse_loadPattern(const uint8_t nr)
 	return res;
 }
 //---------------------------------------------------
-FRESULT projectBrowse_savePattern(const uint8_t nr, char* name)
+FRESULT projectBrowse_savePattern(const uint8_t nr, char* name, uint8_t named)
 {
 	const uint8_t bg = soundengine_backgroundAudioBegin();
-	const FRESULT res = preset_saveProjectPattern(projectBrowse.project, nr, name);
+	const FRESULT res = preset_saveProjectPattern(projectBrowse.project, nr, name, named);
 	soundengine_backgroundAudioEnd(bg);
 	if(res == FR_OK)
 	{
 		memcpy(projectBrowse_names[nr], name, 8);
+		projectBrowse_named[nr] = named;
 		projectBrowse_exists[nr] = seq_patternHasSteps(seq_activePattern);
 	}
 	return res;

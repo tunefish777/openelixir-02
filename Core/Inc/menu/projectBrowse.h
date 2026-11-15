@@ -59,11 +59,12 @@ FRESULT projectBrowse_readKit(const uint8_t kit, uint8_t* params, uint8_t* engin
 FRESULT projectBrowse_saveKit(const uint8_t kit, char* name);
 
 //the listed (other) project's patterns: name for the list (8 characters, "Empty" without steps,
-//"Unnamed" with steps but no name), steps, load (temporary) and save the playing pattern into it
+//"Pat 05" with steps but no name given in a save dialog), steps, load (temporary) and save the
+//playing pattern into it (named: the name was given in the save dialog)
 void projectBrowse_patternName(const uint8_t nr, char* buf);
 uint8_t projectBrowse_patternHasSteps(const uint8_t nr);
 FRESULT projectBrowse_loadPattern(const uint8_t nr);
-FRESULT projectBrowse_savePattern(const uint8_t nr, char* name);
+FRESULT projectBrowse_savePattern(const uint8_t nr, char* name, uint8_t named);
 
 //the 2 display lines for the project list or "Change Project"; returns 1 if
 //it drew line 1 (and line 0 for the project list)

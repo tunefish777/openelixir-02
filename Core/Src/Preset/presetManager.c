@@ -105,30 +105,38 @@ typedef struct PatternFileDataStruct
 	uint8_t shuffle;
 	uint8_t kitNr;
 	uint8_t arp[NUM_TRACKS][NUM_STEPS];
+	uint8_t named;		//the name was given in the save dialog (not left over in the file)
 }PatternFileData;
 static PatternFileData preset_patternBuffer;
 
+//the pattern's name was given in the save dialog (OpenElixir-02 1.3): only then it is shown;
+//the stock firmware wrote whatever was in its name buffer into the files
+static uint8_t preset_patternNamed[NUM_PATTERN];
+
 //Pattern files (also in projects) and tmp.pat carry the step arp in a block appended
-//after the kit nr: "OE02", version (1), the arp byte of each step (track by track).
+//after the kit nr: "OE02", version (2), the arp byte of each step (track by track),
+//version 2: the name flag (1 = the name was given in the save dialog).
 //Later versions may only append to the block. Files without it (from the stock firmware
 //or older versions) load with the plain flam (ARP_REPEAT), and the stock firmware ignores it.
 static const char preset_patternBlockSignature[4] = {'O','E','0','2'};
-#define PATTERN_BLOCK_VERSION 1
-//write the arp block after the pattern data
-static void preset_writePatternArp(uint8_t patternNr)
+#define PATTERN_BLOCK_VERSION 2
+//write the arp block after the pattern data (named: the name flag of the file)
+static void preset_writePatternArp(uint8_t patternNr, uint8_t named)
 {
 	UINT bytesWritten;
 	const uint8_t version = PATTERN_BLOCK_VERSION;
 	preset_fwrite((FIL*)&SDFile, preset_patternBlockSignature, 4, &bytesWritten);
 	preset_fwrite((FIL*)&SDFile, &version, 1, &bytesWritten);
 	preset_fwrite((FIL*)&SDFile, seq_patternSet.arp[patternNr], sizeof(seq_patternSet.arp[patternNr]), &bytesWritten);
+	preset_fwrite((FIL*)&SDFile, &named, 1, &bytesWritten);
 }
 //read the arp block after the pattern data (plain flam if there is none)
-static void preset_readPatternArp(uint8_t arp[NUM_TRACKS][NUM_STEPS])
+static void preset_readPatternArp(uint8_t arp[NUM_TRACKS][NUM_STEPS], uint8_t* named)
 {
 	uint8_t header[5];
 	UINT bytesRead = 0;
 	memset(arp, ARP_REPEAT, NUM_TRACKS*NUM_STEPS);
+	*named = 0;
 	if(f_read((FIL*)&SDFile, header, sizeof(header), &bytesRead) != FR_OK || bytesRead != sizeof(header)
 		|| memcmp(header, preset_patternBlockSignature, 4) != 0 || header[4] < 1)
 		return;
@@ -146,6 +154,9 @@ static void preset_readPatternArp(uint8_t arp[NUM_TRACKS][NUM_STEPS])
 			arp[trk][stp] &= ARP_CHORD_MASK | ARP_DIR_DOWN;
 		}
 	}
+	uint8_t flag = 0;
+	if(header[4] >= 2 && f_read((FIL*)&SDFile, &flag, 1, &bytesRead) == FR_OK && bytesRead == 1)
+		*named = flag & 1;
 }
 
 //values read from files are used as indices: keep them in range
@@ -616,7 +627,7 @@ FRESULT preset_saveTmpPat()
 		//write associated kit nr
 		preset_fwrite((FIL*)&SDFile,&seq_patternSet.kitNr[presetNr],sizeof(uint8_t),&bytesWritten);
 
-		preset_writePatternArp(presetNr);
+		preset_writePatternArp(presetNr, preset_patternNamed[presetNr]);
 #endif
 
 	//close the file
@@ -1695,7 +1706,7 @@ void preset_queryMainStepDataFromSeq(uint16_t stepNr, uint16_t *mainStepData, ui
 
 //----------------------------------------------------
 //the pattern data of slot patternNr with the given shuffle and kit nr (saving into another project)
-static void preset_writePatternDataAs(uint8_t patternNr, uint8_t shuffle, uint8_t kitNr)
+static void preset_writePatternDataAs(uint8_t patternNr, uint8_t shuffle, uint8_t kitNr, uint8_t named)
 {
 #if 0
 #else
@@ -1741,12 +1752,12 @@ static void preset_writePatternDataAs(uint8_t patternNr, uint8_t shuffle, uint8_
 		//write associated kit nr
 		preset_fwrite((FIL*)&SDFile,&kitNr,sizeof(uint8_t),&bytesWritten);
 
-		preset_writePatternArp(patternNr);
+		preset_writePatternArp(patternNr, named);
 #endif
 }
 static void preset_writePatternData(uint8_t patternNr)
 {
-	preset_writePatternDataAs(patternNr, seq_patternSet.shuffle[patternNr], seq_patternSet.kitNr[patternNr]);
+	preset_writePatternDataAs(patternNr, seq_patternSet.shuffle[patternNr], seq_patternSet.kitNr[patternNr], preset_patternNamed[patternNr]);
 }
 
 //----------------------------------------------------
@@ -1880,7 +1891,7 @@ static uint8_t preset_readPatternFile(PatternFileData* buf, uint8_t dataVersion,
 		if(bytesRead == 0)
 			return 0;
 	}
-	preset_readPatternArp(buf->arp);
+	preset_readPatternArp(buf->arp, &buf->named);
 
 	return 1;
 }
@@ -2137,6 +2148,7 @@ FRESULT preset_loadPatternSD(uint8_t presetNr)
 	uint8_t success=0;
 	//no file (empty slot of the project): no name left from the previous project
 	memset(savefileNames[presetNr][PATTERN_NAMES], 0, 8);
+	preset_patternNamed[presetNr] = 0;
 	//sprintf(filename,"p%03d.pat",presetNr);
 
 	/*
@@ -2185,6 +2197,7 @@ FRESULT preset_loadPatternSD(uint8_t presetNr)
 	{
 		goto closeFile;
 	}
+	preset_patternNamed[presetNr] = preset_patternBuffer.named;
 	
 	success=1;
 	//close the file handle
@@ -2399,6 +2412,7 @@ FRESULT preset_createProject(uint8_t presetNr)
 		//seq_patternSet.seq_patternSettings[i].nextPattern 	= i;	//default setting: repeat same pattern
 		seq_clearPattern(i); // will clear all tracks in the pattern
 		memset(savefileNames[i][PATTERN_NAMES], 0, 8);
+		preset_patternNamed[i] = 0;
 		preset_init(i); //set all kits to init sound
 	}
 
@@ -2906,7 +2920,7 @@ static uint8_t preset_readPatternVersion(uint8_t* tagged)
 	return 1;
 }
 //----------------------------------------------------
-FRESULT preset_scanProjectPatterns(uint8_t projectNr, char names[][8], uint8_t* hasSteps)
+FRESULT preset_scanProjectPatterns(uint8_t projectNr, char names[][8], uint8_t* hasSteps, uint8_t* named)
 {
 	//one open file or folder at a time: first collect the pattern files, then read them
 	static char patFiles[NUM_PATTERN][13];
@@ -2919,6 +2933,7 @@ FRESULT preset_scanProjectPatterns(uint8_t projectNr, char names[][8], uint8_t* 
 
 	memset(exists, 0, sizeof(exists));
 	memset(hasSteps, 0, NUM_PATTERN);
+	memset(named, 0, NUM_PATTERN);
 	memset(names, 0, NUM_PATTERN * 8);
 	preset_projectFolderName(folder, projectNr);
 	FRESULT res = f_opendir(&dir, folder);
@@ -2961,6 +2976,18 @@ FRESULT preset_scanProjectPatterns(uint8_t projectNr, char names[][8], uint8_t* 
 					if(steps[i])
 						hasSteps[nr] = 1;
 				}
+				//after shuffle, track lengths and kit nr: the OE02 block with the name flag
+				uint8_t header[5];
+				const uint32_t block = mainSteps + sizeof(steps) + 1 + NUM_TRACKS + (version > 1 ? 1 : 0);
+				uint8_t flag = 0;
+				if(f_lseek((FIL*)&SDFile, block) == FR_OK
+						&& f_read((FIL*)&SDFile, header, 5, &bytesRead) == FR_OK && bytesRead == 5
+						&& memcmp(header, preset_patternBlockSignature, 4) == 0 && header[4] >= 2
+						&& f_lseek((FIL*)&SDFile, block + 5 + NUM_TRACKS * NUM_STEPS) == FR_OK
+						&& f_read((FIL*)&SDFile, &flag, 1, &bytesRead) == FR_OK && bytesRead == 1)
+				{
+					named[nr] = flag & 1;
+				}
 			}
 		}
 		f_close((FIL*)&SDFile);
@@ -2972,6 +2999,7 @@ FRESULT preset_scanProjectPatterns(uint8_t projectNr, char names[][8], uint8_t* 
 //slot as unsaved changes from the next pattern change on (temporary until saved into a slot)
 static PatternFileData preset_otherPattern;
 static char preset_otherPatternName[8];
+static uint8_t preset_otherPatternNamed;
 static uint8_t preset_otherPatternSlot;
 static uint8_t preset_otherPatternPending = 0;
 static uint8_t preset_otherPatternLoaded = 0;
@@ -2994,6 +3022,7 @@ FRESULT preset_loadOtherPattern(uint8_t projectNr, uint8_t nr)
 		uint8_t tagged;
 		const uint8_t version = preset_readPatternVersion(&tagged);
 		ok = preset_readPatternFile(&preset_otherPattern, version, 0);
+		preset_otherPatternNamed = preset_otherPattern.named;
 	}
 	f_close((FIL*)&SDFile);
 	if(!ok)
@@ -3059,7 +3088,23 @@ char* preset_activePatternName(void)
 	return preset_otherPatternLoaded ? preset_otherPatternName : savefileNames[seq_activePattern][PATTERN_NAMES];
 }
 //----------------------------------------------------
-FRESULT preset_saveProjectPattern(uint8_t projectNr, uint8_t nr, char* name)
+uint8_t preset_isActivePatternNamed(void)
+{
+	return preset_otherPatternLoaded ? preset_otherPatternNamed : preset_patternNamed[seq_activePattern];
+}
+//----------------------------------------------------
+uint8_t preset_isPatternNamed(uint8_t nr)
+{
+	return nr < NUM_PATTERN && preset_patternNamed[nr];
+}
+//----------------------------------------------------
+void preset_setPatternNamed(uint8_t nr, uint8_t named)
+{
+	if(nr < NUM_PATTERN)
+		preset_patternNamed[nr] = named;
+}
+//----------------------------------------------------
+FRESULT preset_saveProjectPattern(uint8_t projectNr, uint8_t nr, char* name, uint8_t named)
 {
 	char folder[12];
 	char path[32];
@@ -3089,7 +3134,7 @@ FRESULT preset_saveProjectPattern(uint8_t projectNr, uint8_t nr, char* name)
 	preset_fwrite((FIL*)&SDFile, "PatV03", 6, &bytesWritten);
 	//the playing pattern with its changes and the current shuffle; its kit nr would point to an
 	//unrelated kit there: kit 1
-	preset_writePatternDataAs(seq_activePattern, activeParameters[PAR_SHUFFLE], 0);
+	preset_writePatternDataAs(seq_activePattern, activeParameters[PAR_SHUFFLE], 0, named);
 	return preset_fcloseWrite();
 }
 //----------------------------------------------------

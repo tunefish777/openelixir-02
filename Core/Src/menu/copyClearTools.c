@@ -42,6 +42,7 @@ void copyClear_clearCurrentPattern()
 	seq_clearPattern(pattern);
 	//a cleared pattern shows "Empty" again
 	memset(savefileNames[pattern][PATTERN_NAMES], 0, 8);
+	preset_setPatternNamed(pattern, 0);
 	//frontPanel_sendData(SEQ_CC,SEQ_CLEAR_PATTERN,pattern);
 };
 //-----------------------------------------------------------------------------

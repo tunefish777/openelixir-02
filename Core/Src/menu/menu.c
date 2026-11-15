@@ -898,12 +898,23 @@ static uint8_t menu_isPatternNameEmpty(char* name)
 	}
 	return 1;
 }
-//the name shown for a slot (8 characters): its name, "Unnamed" (steps but no name) or "Empty"
+//the name shown for a slot (8 characters): the name given in the save dialog, otherwise
+//"Pat 05" (steps) or "Empty"
 static void menu_patternName(uint8_t pattern, char* buf)
 {
 	char* name = savefileNames[pattern][PATTERN_NAMES];
-	if(menu_isPatternNameEmpty(name))
-		name = seq_patternHasSteps(pattern) ? "Unnamed " : "Empty   ";
+	if(!preset_isPatternNamed(pattern) || menu_isPatternNameEmpty(name))
+	{
+		if(seq_patternHasSteps(pattern))
+		{
+			memcpy(buf, "Pat     ", 8);
+			buf[4] = (char)('0' + (pattern+1)/10);
+			buf[5] = (char)('0' + (pattern+1)%10);
+		}
+		else
+			memcpy(buf, "Empty   ", 8);
+		return;
+	}
 	for(uint8_t i=0;i<8;i++)
 	{
 		buf[i] = name[i] ? name[i] : ' ';
@@ -966,13 +977,19 @@ static void menu_patternOtherSlot(uint8_t nr)
 	menu_repaint();
 }
 //-----------------------------------------------------------------
+//the saved pattern's name was given in a save dialog / the name editor was opened in this save:
+//only then the saved name counts (see preset_isPatternNamed)
+static uint8_t menu_patternSourceNamed;
+static uint8_t menu_patternNameEdited;
 //pattern save into target: the kit save dialog ("Edit Name? [y/N]", name editor, ok)
 //takes over; the name starts as the one of the saved (playing) pattern
 void menu_patternSaveDialog(uint8_t target)
 {
 	char name[8];
 	memcpy(name, preset_activePatternName(), 8);
-	if(menu_isPatternNameEmpty(name))
+	menu_patternSourceNamed = preset_isActivePatternNamed() && !menu_isPatternNameEmpty(name);
+	menu_patternNameEdited = 0;
+	if(!menu_patternSourceNamed)
 		memcpy(name, "Unnamed ", 8);
 
 	menu_saveOptions.category = SAVE_TYPE_PATTERN;
@@ -995,7 +1012,7 @@ void menu_savePattern(uint8_t target)
 		{
 			name[i] = characterOrder[(uint8_t)nameEditBuffer[i]];
 		}
-		const FRESULT res = projectBrowse_savePattern(target, name);
+		const FRESULT res = projectBrowse_savePattern(target, name, menu_patternSourceNamed || menu_patternNameEdited);
 		if(res != FR_OK)
 		{
 			menu_showSdError(res);
@@ -1015,6 +1032,7 @@ void menu_savePattern(uint8_t target)
 	}
 	seq_patternSet.shuffle[target] = activeParameters[PAR_SHUFFLE];
 	preset_savePatternRAM(target);
+	preset_setPatternNamed(target, menu_patternSourceNamed || menu_patternNameEdited);
 
 	//save to tmp folder, audio keeps running during the SD access
 	const uint8_t audioStarted = soundengine_backgroundAudioBegin();
@@ -1448,7 +1466,7 @@ static void menu_songEntryName(uint8_t entry, char* buf)
 	if(entry >= MAX_PATTERN)
 		return;
 	char* name = savefileNames[entry][PATTERN_NAMES];
-	if(menu_isPatternNameEmpty(name))
+	if(!preset_isPatternNamed(entry) || menu_isPatternNameEmpty(name))
 	{
 		memcpy(buf, "Pat ", 4);
 		buf[4] = (char)('0' + (entry+1)/10);
@@ -2585,6 +2603,8 @@ void menu_handleLoadSaveMenu(int8_t inc, uint8_t btnClicked)
 				case SAVE_STATE_CHANGE_NAME_DIALOG_Y:
 					//(stock: a pattern copied all patterns to RAM here; now it gets a name like a kit,
 					//starting with the one menu_patternSaveDialog put into the edit buffer)
+					if(menu_saveOptions.category == SAVE_TYPE_PATTERN)
+						menu_patternNameEdited = 1;
 					{
 						//click -> edit name
 						menu_saveOptions.state = SAVE_STATE_EDIT_NAME1;
