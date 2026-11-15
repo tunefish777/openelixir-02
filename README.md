@@ -62,6 +62,17 @@ Details for kits, patterns and engines: [docs/ENGINES.md](docs/ENGINES.md).
 
 The changes of each version are in the [release notes](https://github.com/tunefish777/openelixir-02/releases).
 
+## Staged for next release / under test
+In the main branch, not in a release yet; may still change.
+
+- **Modal engine:** a fifth voice engine, a struck resonator with up to 24 tuned modes. The exciter is a
+  mallet, a noise burst or a sustained "bow"; structure blends string, bar, drum-skin and bell
+  overtones; damping, brightness, strike position, hardness and the number of partials (8-24) set the
+  material. Filter, transient, amp envelope, drive, LFO and routing work as with the other engines; a
+  long amp attack swells the strike. Select it like any engine (SHIFT + KIT, or NRPN 98 values 24-29).
+- **Full value names:** clicking the encoder on a parameter shows the full name of its value (Sine,
+  Lowpass, Acoustic kick, Ping-pong, ...) instead of the 3-character short name.
+
 ## Building and installing
 
 ```sh
