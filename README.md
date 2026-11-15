@@ -60,6 +60,16 @@ is off; `res` sets the resonance. It isn't saved and starts off; while off, the 
 patterns (also from and to other projects on the SD card) and saving projects don't interrupt the
 audio or the sequencer while it plays.
 
+**New in 1.4:**
+- **Song page:** each row shows the slot (1-64) and the pattern's name, `>` at the cursor and `*` at
+  the slot the song is playing. While choosing a slot's pattern, the number on the left shows the
+  pattern (`p03`). SHIFT + PLAY always starts the song at slot 1.
+- **Repeats in songs:** after LOOP, the entries `REP x01` to `REP x32` play the pattern before them that
+  many more times (`REP x03`: 4 times in total), then the song continues. LOOP still jumps back to
+  slot 1. The stock firmware ends a song at a REP entry.
+- **Pattern names** are shown only if they were given in the pattern save dialog, otherwise "Pat 05".
+  Pattern files from the stock firmware often contain leftover text in their name field.
+
 **New in 1.3:**
 - **Step arp:** two new step parameters next to flam and shift. `chd` picks a chord (Rep, Maj, Min,
   Dim, Aug, Maj7, Min7, Dim7, Aug7), `dir` the direction (Up, Dn), and the flam setting the number
