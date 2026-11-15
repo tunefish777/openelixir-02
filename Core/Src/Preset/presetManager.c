@@ -109,7 +109,7 @@ typedef struct PatternFileDataStruct
 }PatternFileData;
 static PatternFileData preset_patternBuffer;
 
-//the pattern's name was given in the save dialog (OpenElixir-02 1.3): only then it is shown;
+//the pattern's name was given in the save dialog (OpenElixir-02 1.4): only then it is shown;
 //the stock firmware wrote whatever was in its name buffer into the files
 static uint8_t preset_patternNamed[NUM_PATTERN];
 
