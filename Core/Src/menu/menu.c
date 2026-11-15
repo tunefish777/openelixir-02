@@ -1537,10 +1537,10 @@ static void menu_repaintSimplePage()
 		//> 003  | p01 ↓
 
 
-		uint8_t pos = seq_songPositionPointer;
-		/*if(pos==255) pos = 0;
-		else if(pos>MAX_SONG_LENGTH) pos = MAX_SONG_LENGTH;
-		*/
+		//the playing song position (-1 = 255 before the song started: it starts at 0)
+		const uint8_t pos = seq_songPositionPointer < MAX_SONG_LENGTH ? seq_songPositionPointer : 0;
+		if(menu_songMenuPosition >= MAX_SONG_LENGTH)
+			menu_songMenuPosition = 0;
 
 
 		//song position pointer if visible

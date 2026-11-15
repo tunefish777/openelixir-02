@@ -775,8 +775,9 @@ IN_ITCM_RAM void seq_setPendingPatternActive()
 	//moved song list display here to prevent skipping list on same consecutive patterns
 	if(1) {
 
-				//update for song screen to follow patterns
-				menu_songMenuPosition = seq_songPositionPointer;
+				//update for song screen to follow patterns (-1 = 255: the song hasn't started yet,
+				//it starts at 0; never more than the 64 song slots)
+				menu_songMenuPosition = seq_songPositionPointer < MAX_SONG_LENGTH ? seq_songPositionPointer : 0;
 
 				if( menu_activePage < PATTERN_LOAD_PAGE || menu_activePage > SONG_MODE_PAGE)
 				{
@@ -2058,6 +2059,12 @@ void seq_setSongModeEnabled(uint8_t onOff)
 	if(onOff)
 	{
 		seq_songPositionPointer = -1; //because nextStep() will first increase it
+		//the song page shows where the song starts
+		menu_songMenuPosition = 0;
+		//the first step starts the song (at slot 0) only if no other pattern change is waiting:
+		//that one would play first and the song page showed position 255 meanwhile
+		if(!seq_running)
+			seq_pendingPattern = seq_activePattern;
 	}
 }
 //------------------------------------------------------------------------------
