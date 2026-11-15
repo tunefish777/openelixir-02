@@ -1463,6 +1463,14 @@ static void menu_songEntryName(uint8_t entry, char* buf)
 		memcpy(buf, "LOOP", 4);
 		return;
 	}
+	if(entry >= SONG_REP_FIRST && entry <= SONG_REP_LAST)
+	{
+		const uint8_t n = (uint8_t)(entry - SONG_REP_FIRST + 1);
+		memcpy(buf, "REP x", 5);
+		buf[5] = (char)('0' + n/10);
+		buf[6] = (char)('0' + n%10);
+		return;
+	}
 	if(entry >= MAX_PATTERN)
 		return;
 	char* name = savefileNames[entry][PATTERN_NAMES];
@@ -3021,7 +3029,8 @@ void menu_handleSongMenu(int8_t inc, uint8_t btnClicked)
 #define SONG_LOOP SONG_END+1
 		if(inc>0)
 		{
-			 if(seq_activeSong[menu_songMenuPosition] < SONG_LOOP) seq_activeSong[menu_songMenuPosition]++;
+			//patterns, END, LOOP, REP x01..x32
+			 if(seq_activeSong[menu_songMenuPosition] < SONG_REP_LAST) seq_activeSong[menu_songMenuPosition]++;
 		}
 		else if(inc<0)
 		{

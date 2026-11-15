@@ -152,6 +152,9 @@ PatternBackupBuffer patternBackupBuffer;
 uint8_t seq_songData[NUM_KIT_SLOTS][MAX_SONG_LENGTH];
 uint8_t *seq_activeSong;
 uint8_t seq_songPositionPointer = 0;	//for song playback, current song position
+//REP xNN: repeats of seq_songRepeatPattern still to come (the position stays at the REP slot)
+static uint8_t seq_songRepeatsLeft = 0;
+static uint8_t seq_songRepeatPattern = 0;
 //uint8_t seq_bankPreloadPendingFlag = NO_PRELOAD_PENDING;
 
 //for the automation tracks each track needs 2 modNodes
@@ -579,15 +582,39 @@ static uint8_t seq_determineNextPattern(uint8_t autoIncrement)
 	{
 		if(autoIncrement)
 		{
-			seq_songPositionPointer++;
-			//TODO: this will loop when all 64 pattern slots are used... maybe a stop would be better?
-			if(seq_songPositionPointer == MAX_SONG_LENGTH) seq_songPositionPointer = 0;
-			return seq_activeSong[seq_songPositionPointer];
+			if(seq_songRepeatsLeft)
+			{
+				seq_songRepeatsLeft--;
+				return seq_songRepeatPattern;
+			}
+			//(bounded: REP entries that have nothing to repeat are skipped)
+			for(uint8_t i=0;i<MAX_SONG_LENGTH;i++)
+			{
+				seq_songPositionPointer++;
+				//TODO: this will loop when all 64 pattern slots are used... maybe a stop would be better?
+				if(seq_songPositionPointer >= MAX_SONG_LENGTH) seq_songPositionPointer = 0;
+				const uint8_t entry = seq_activeSong[seq_songPositionPointer];
+				if(entry < SONG_REP_FIRST || entry > SONG_REP_LAST)
+					return entry;
+				//REP xNN: the pattern that just played, NN more times (this one is the first);
+				//nothing to repeat at the song start
+				if(seq_songPositionPointer > 0 && seq_activePattern < MAX_PATTERN)
+				{
+					seq_songRepeatPattern = seq_activePattern;
+					seq_songRepeatsLeft = (uint8_t)(entry - SONG_REP_FIRST);
+					return seq_songRepeatPattern;
+				}
+			}
+			return SONG_END;
 		}
 		else
 		{
+			if(seq_songRepeatsLeft)
+				return seq_songRepeatPattern;
 			uint8_t pos = seq_songPositionPointer +1;
-			if(pos == MAX_SONG_LENGTH) pos = 0;
+			if(pos >= MAX_SONG_LENGTH) pos = 0;
+			if(seq_activeSong[pos] >= SONG_REP_FIRST && seq_activeSong[pos] <= SONG_REP_LAST)
+				return seq_activePattern;
 			return seq_activeSong[pos];
 		}
 	}
@@ -1370,6 +1397,7 @@ IN_ITCM_RAM void seq_nextStep()
 				//reset to song start
 				seq_pendingPattern = seq_activeSong[0];
 				seq_songPositionPointer = 0;
+				seq_songRepeatsLeft = 0;
 			}
 			//the end of the song, or a loop to a song that has no pattern before its
 			//end/loop mark (that played "pattern 65" and edits went past the patterns)
@@ -2008,6 +2036,7 @@ void seq_resetPosition()
 //	seq_barCounter = 0;
 	seq_masterStepCnt = 0;
 	seq_songPositionPointer = -1;
+	seq_songRepeatsLeft = 0;
 	//so the next seq_tick call will trigger the next step immediately
 	seq_deltaT = 0;
 	seq_sendRealtime(MIDI_STOP);
@@ -2066,6 +2095,7 @@ void seq_setSongModeEnabled(uint8_t onOff)
 	if(onOff)
 	{
 		seq_songPositionPointer = -1; //because nextStep() will first increase it
+		seq_songRepeatsLeft = 0;
 		//the song page shows where the song starts
 		menu_songMenuPosition = 0;
 		//the first step starts the song (at slot 0) only if no other pattern change is waiting:

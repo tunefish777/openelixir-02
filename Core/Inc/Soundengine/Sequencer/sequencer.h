@@ -48,6 +48,11 @@ static inline uint16_t seq_automationTarget(const uint8_t stored)
 #define MAX_SONG_LENGTH 64
 #define SONG_END MAX_PATTERN
 #define SONG_LOOP SONG_END+1
+//OpenElixir-02: REP x01..x32 plays the pattern before it 1..32 more times, then the song
+//continues (REP x03: 4 times in total). The stock firmware ends the song there.
+#define SONG_REP_FIRST	(SONG_LOOP+1)
+#define SONG_REP_MAX	32
+#define SONG_REP_LAST	(SONG_REP_FIRST + SONG_REP_MAX - 1)
 
 #define SEQ_DEFAULT_NOTE 60
 
