@@ -20,6 +20,6 @@
 
 #define DMA_MODE_ACTIVE 1
 //-----------------------------------
-int CodecInit();
+int CodecInit(void);
 
 #endif /* AUDIOCODECMANAGER_H_ */

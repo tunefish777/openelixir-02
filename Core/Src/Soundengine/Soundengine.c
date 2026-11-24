@@ -51,7 +51,7 @@ void soundengine_init()
 
 	// start the audio codec
 //#ifndef DEBUG
-	CodecInit(SYNTH_FS);
+	CodecInit();
 //#endif
 
 	parameterArray_init();

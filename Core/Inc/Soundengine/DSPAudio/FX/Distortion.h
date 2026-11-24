@@ -51,7 +51,7 @@ typedef struct DistortionStruct
 
 
 
-void Distortion_init();
+void Distortion_init(MasterDistortion *dist);
 void Distortion_process(MasterDistortion *dist, int16_t *fxBuffer, int32_t* outL, int32_t* outR, uint16_t size,  uint8_t channels, float dryWet);
 void Distortion_setDrive(MasterDistortion *dist, float d);
 void Distortion_setParam1(MasterDistortion *dist, float p);
